@@ -84,6 +84,7 @@ fn pidfile_path(hcom_dir: &Path) -> PathBuf {
 
 /// Check if a process is alive via `kill(pid, 0)`.
 /// Handles EPERM (process exists but owned by another user).
+#[cfg(unix)]
 pub fn is_alive(pid: u32) -> bool {
     // SAFETY: kill(pid, 0) is a no-op signal that just checks process existence.
     let ret = unsafe { libc::kill(pid as i32, 0) };
@@ -93,6 +94,23 @@ pub fn is_alive(pid: u32) -> bool {
     // EPERM means process exists but is owned by another user
     let err = std::io::Error::last_os_error();
     err.raw_os_error() == Some(libc::EPERM)
+}
+
+#[cfg(windows)]
+pub fn is_alive(pid: u32) -> bool {
+    let filter = format!("PID eq {pid}");
+    match std::process::Command::new("tasklist")
+        .args(["/FI", &filter, "/FO", "CSV", "/NH"])
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            stdout
+                .lines()
+                .any(|line| !line.trim().is_empty() && !line.starts_with("INFO:"))
+        }
+        _ => false,
+    }
 }
 
 /// Read raw pidfile data.

@@ -418,6 +418,20 @@ pub fn stop_relay_worker() -> bool {
             return true;
         }
     }
+
+    #[cfg(windows)]
+    if let Some(pid) = read_pid_file() {
+        if let Ok(status) = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .status()
+        {
+            if status.success() {
+                log::log_info("relay", "relay_worker.stopped", &format!("pid={}", pid));
+                return true;
+            }
+        }
+    }
+
     false
 }
 

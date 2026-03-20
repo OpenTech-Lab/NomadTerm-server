@@ -366,36 +366,7 @@ fn poll_loop(
         };
 
         if let Some(server) = notify_server {
-            #[cfg(unix)]
-            {
-                // Block on poll(2) instead of busy-looping with accept+sleep
-                use std::os::fd::AsRawFd;
-                let fd = server.as_raw_fd();
-                let timeout_ms = wait_time.as_millis().min(i32::MAX as u128) as i32;
-                let mut pfd = libc::pollfd {
-                    fd,
-                    events: libc::POLLIN,
-                    revents: 0,
-                };
-                // SAFETY: valid pollfd, nfds=1, bounded timeout
-                let ret = unsafe { libc::poll(&mut pfd as *mut _, 1, timeout_ms) };
-                if ret > 0 {
-                    // Drain all pending connections
-                    if let Err(e) = server.set_nonblocking(true) {
-                        log::log_warn(
-                            "hooks",
-                            "poll.nonblocking_failed",
-                            &format!("set_nonblocking failed: {e}, skipping drain"),
-                        );
-                    } else {
-                        while let Ok((conn, _)) = server.accept() {
-                            drop(conn);
-                        }
-                    }
-                }
-            }
-            #[cfg(not(unix))]
-            std::thread::sleep(wait_time);
+            wait_for_notification(server, wait_time);
         } else {
             std::thread::sleep(wait_time);
         }
@@ -416,6 +387,7 @@ fn poll_loop(
 /// after the payload is consumed — this is NOT an orphan signal. Only check
 /// POLLERR (broken pipe) and POLLNVAL (fd was closed/invalidated).
 ///
+#[cfg(unix)]
 fn check_stdin_closed() -> bool {
     let mut pfd = libc::pollfd {
         fd: 0, // stdin
@@ -429,6 +401,64 @@ fn check_stdin_closed() -> bool {
     }
     // Only POLLERR/POLLNVAL — NOT POLLHUP (normal pipe EOF)
     (pfd.revents & (libc::POLLERR | libc::POLLNVAL)) != 0
+}
+
+#[cfg(not(unix))]
+fn check_stdin_closed() -> bool {
+    false
+}
+
+#[cfg(unix)]
+fn wait_for_notification(server: &TcpListener, wait_time: Duration) {
+    use std::os::fd::AsRawFd;
+
+    let fd = server.as_raw_fd();
+    let timeout_ms = wait_time.as_millis().min(i32::MAX as u128) as i32;
+    let mut pfd = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: valid pollfd, nfds=1, bounded timeout
+    let ret = unsafe { libc::poll(&mut pfd as *mut _, 1, timeout_ms) };
+    if ret > 0 {
+        if let Err(e) = server.set_nonblocking(true) {
+            log::log_warn(
+                "hooks",
+                "poll.nonblocking_failed",
+                &format!("set_nonblocking failed: {e}, skipping drain"),
+            );
+        } else {
+            while let Ok((conn, _)) = server.accept() {
+                drop(conn);
+            }
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn wait_for_notification(server: &TcpListener, wait_time: Duration) {
+    let deadline = Instant::now() + wait_time;
+    loop {
+        match server.accept() {
+            Ok((conn, _)) => {
+                drop(conn);
+                while let Ok((conn, _)) = server.accept() {
+                    drop(conn);
+                }
+                return;
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                let now = Instant::now();
+                if now >= deadline {
+                    return;
+                }
+                let remaining = deadline.saturating_duration_since(now);
+                std::thread::sleep(remaining.min(Duration::from_millis(25)));
+            }
+            Err(_) => return,
+        }
+    }
 }
 
 /// Create TCP server socket for instant message wake notifications.
@@ -844,36 +874,39 @@ fn stop_instance_inner(
     let pid = instance_data.pid;
     let is_headless = instance_data.background != 0;
     if let Some(pid_val) = pid {
-        let pid_i32 = pid_val as i32;
+        let Ok(pid_u32) = u32::try_from(pid_val) else {
+            return;
+        };
+        let pid_i32 = pid_u32 as i32;
         if is_headless {
-            // SIGTERM → wait up to 2s → SIGKILL
-            let term_ret = unsafe { libc::killpg(pid_i32, libc::SIGTERM) };
-            if term_ret == 0 {
-                let mut dead = false;
-                for _ in 0..20 {
-                    std::thread::sleep(Duration::from_millis(100));
-                    let probe = unsafe { libc::kill(pid_i32, 0) };
-                    if probe != 0 {
-                        dead = true;
-                        break;
+            #[cfg(unix)]
+            {
+                // SIGTERM → wait up to 2s → SIGKILL
+                let term_ret = unsafe { libc::killpg(pid_i32, libc::SIGTERM) };
+                if term_ret == 0 {
+                    let mut dead = false;
+                    for _ in 0..20 {
+                        std::thread::sleep(Duration::from_millis(100));
+                        if !crate::pidtrack::is_alive(pid_u32) {
+                            dead = true;
+                            break;
+                        }
+                    }
+                    if !dead {
+                        unsafe { libc::killpg(pid_i32, libc::SIGKILL) };
                     }
                 }
-                if !dead {
-                    unsafe { libc::killpg(pid_i32, libc::SIGKILL) };
-                }
             }
-            // ESRCH/EPERM from initial killpg is fine — process already gone or foreign
+
+            #[cfg(windows)]
+            {
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/PID", &pid_u32.to_string(), "/T", "/F"])
+                    .status();
+            }
         } else {
             // Track surviving PTY processes in pidtrack
-            let alive = {
-                let probe = unsafe { libc::kill(pid_i32, 0) };
-                if probe == 0 {
-                    true
-                } else {
-                    // EPERM = exists but foreign user — still track
-                    std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
-                }
-            };
+            let alive = crate::pidtrack::is_alive(pid_u32);
             if alive {
                 let hcom_dir = crate::paths::hcom_dir();
 

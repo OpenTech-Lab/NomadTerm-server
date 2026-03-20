@@ -22,8 +22,7 @@ impl NotifyServer {
         let listener = TcpListener::bind("127.0.0.1:0").context("Failed to bind notify server")?;
         let port = listener.local_addr()?.port();
 
-        // Set non-blocking for poll-based waiting (Unix uses poll(2), Windows uses read timeout)
-        #[cfg(unix)]
+        // Set non-blocking so all platforms can use accept loops safely.
         listener.set_nonblocking(true)?;
 
         Ok(Self { listener, port })
@@ -59,14 +58,24 @@ impl NotifyServer {
         }
         #[cfg(not(unix))]
         {
-            // Windows: blocking accept with a read timeout
-            let _ = self.listener.set_read_timeout(Some(timeout));
-            match self.listener.accept() {
-                Ok((stream, _)) => {
-                    drop(stream);
-                    true
+            let deadline = std::time::Instant::now() + timeout;
+            loop {
+                match self.listener.accept() {
+                    Ok((stream, _)) => {
+                        drop(stream);
+                        self.drain();
+                        return true;
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        let now = std::time::Instant::now();
+                        if now >= deadline {
+                            return false;
+                        }
+                        let remaining = deadline.saturating_duration_since(now);
+                        std::thread::sleep(remaining.min(Duration::from_millis(25)));
+                    }
+                    Err(_) => return false,
                 }
-                Err(_) => false,
             }
         }
     }

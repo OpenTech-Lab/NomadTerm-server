@@ -49,16 +49,22 @@ pub(crate) fn daemon_stop() -> i32 {
     };
 
     #[cfg(unix)]
-    unsafe {
-        libc::kill(pid as i32, libc::SIGTERM);
-    }
-    #[cfg(not(unix))]
     {
-        let _ = std::process::Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/F"])
-            .status();
+        unsafe {
+            libc::kill(pid as i32, libc::SIGTERM);
+        }
+        println!("Sent SIGTERM to daemon (PID {pid})");
     }
-    println!("Sent SIGTERM to daemon (PID {pid})");
+
+    #[cfg(windows)]
+    {
+        let status = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T"])
+            .status();
+        if matches!(status, Ok(s) if s.success()) {
+            println!("Sent stop request to daemon (PID {pid})");
+        }
+    }
 
     for _ in 0..50 {
         thread::sleep(Duration::from_millis(100));
@@ -69,18 +75,36 @@ pub(crate) fn daemon_stop() -> i32 {
         }
     }
 
-    println!("Daemon did not respond to SIGTERM, escalating to SIGKILL");
-    let kill_ret = unsafe { libc::kill(pid as i32, libc::SIGKILL) };
-    if kill_ret != 0 {
-        eprintln!(
-            "SIGKILL failed (errno {}), PID file retained",
-            std::io::Error::last_os_error()
-        );
-        return 1;
+    #[cfg(unix)]
+    {
+        println!("Daemon did not respond to SIGTERM, escalating to SIGKILL");
+        let kill_ret = unsafe { libc::kill(pid as i32, libc::SIGKILL) };
+        if kill_ret != 0 {
+            eprintln!(
+                "SIGKILL failed (errno {}), PID file retained",
+                std::io::Error::last_os_error()
+            );
+            return 1;
+        }
+        println!("Daemon killed (SIGKILL)");
+        crate::relay::worker::remove_relay_pid_file();
+        return 0;
     }
-    println!("Daemon killed (SIGKILL)");
-    crate::relay::worker::remove_relay_pid_file();
-    0
+
+    #[cfg(windows)]
+    {
+        println!("Daemon did not stop, escalating to forced termination");
+        let status = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .status();
+        if !matches!(status, Ok(s) if s.success()) {
+            eprintln!("Forced termination failed, PID file retained");
+            return 1;
+        }
+        println!("Daemon killed");
+        crate::relay::worker::remove_relay_pid_file();
+        return 0;
+    }
 }
 
 pub fn cmd_daemon(argv: &[String]) -> i32 {
