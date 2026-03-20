@@ -3,136 +3,30 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build-wheels:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            manylinux: auto
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            manylinux: auto
-            docker-options: -e CFLAGS_aarch64_unknown_linux_gnu=-D__ARM_ARCH=8
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            manylinux: musllinux_1_2
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            manylinux: musllinux_1_2
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
-            manylinux: auto
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            manylinux: auto
-
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build wheel
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist
-          manylinux: ${{ matrix.manylinux }}
-          docker-options: ${{ matrix.docker-options || '' }}
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-${{ matrix.target }}
-          path: dist/*.whl
-
-  build-android:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: android-actions/setup-android@v3
-
-      - name: Install NDK r25b
-        run: yes | sdkmanager "ndk;25.2.9519653" > /dev/null
-
-      - name: Build wheel
-        run: |
-          rustup target add aarch64-linux-android
-          pip install maturin
-
-          NDK_BIN="$ANDROID_HOME/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_BIN/aarch64-linux-android24-clang"
-          export CC_aarch64_linux_android="$NDK_BIN/aarch64-linux-android24-clang"
-          export AR_aarch64_linux_android="$NDK_BIN/llvm-ar"
-
-          maturin build --release --target aarch64-linux-android --out dist
-
-      - name: Fix wheel platform tag for Termux
-        run: |
-          cd dist && for f in *.whl; do
-            mv "$f" "$(echo "$f" | sed 's/-[^-]*\.whl$/-linux_aarch64.whl/')"
-          done
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-aarch64-linux-android
-          path: dist/*.whl
-
   create-release:
+    name: Create Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-      - run: gh release create ${{ github.ref_name }} --title "${{ github.ref_name }}" --generate-notes
+      - name: Create draft release
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "NomadTerm ${{ github.ref_name }}" \
+            --generate-notes \
+            --draft
         env:
           GH_TOKEN: ${{ github.token }}
 
-  publish:
-    needs: [build-wheels, build-android, create-release]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    permissions:
-      id-token: write
-      contents: write
-    steps:
-      - name: Download all wheels
-        uses: actions/download-artifact@v4
-        with:
-          pattern: wheel-*
-          path: dist/
-          merge-multiple: true
-
-      - name: List wheels
-        run: ls -la dist/
-
-      - name: Separate Android wheel
-        run: |
-          mkdir -p android-dist
-          mv dist/*-linux_aarch64.whl android-dist/ || true
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-
-      - name: Attach Android wheel to GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          gh release upload "$TAG" -R aannoo/hcom android-dist/*.whl --clobber
-
-  build-binaries:
+  build-daemon:
+    name: Daemon - ${{ matrix.name }}
     needs: [create-release]
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -142,53 +36,186 @@ jobs:
             name: linux-x86_64
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            name: linux-aarch64
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
-            name: darwin-x86_64
+            name: linux-arm64
+            linker: gcc-aarch64-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
-            name: darwin-aarch64
-          - os: ubuntu-latest
-            target: aarch64-linux-android
-            name: android-aarch64
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
+            name: darwin-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            name: darwin-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x86_64
+            ext: .exe
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+
       - name: Install cross-linker (ARM Linux)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: sudo apt-get install -y gcc-aarch64-linux-gnu
-      - name: Install Android NDK
-        if: matrix.target == 'aarch64-linux-android'
-        uses: android-actions/setup-android@v3
-      - name: Install Android NDK toolchain
-        if: matrix.target == 'aarch64-linux-android'
-        run: yes | sdkmanager "ndk;25.2.9519653" > /dev/null
+        if: matrix.linker != ''
+        run: sudo apt-get install -y ${{ matrix.linker }}
+
       - name: Build
-        if: matrix.target != 'aarch64-linux-android'
         run: cargo build --release --target ${{ matrix.target }}
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CFLAGS_aarch64_unknown_linux_gnu: "-D__ARM_ARCH=8"
-      - name: Build (Android)
-        if: matrix.target == 'aarch64-linux-android'
-        run: |
-          NDK_BIN="$ANDROID_HOME/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_BIN/aarch64-linux-android24-clang"
-          export CC_aarch64_linux_android="$NDK_BIN/aarch64-linux-android24-clang"
-          export AR_aarch64_linux_android="$NDK_BIN/llvm-ar"
-          cargo build --release --target ${{ matrix.target }}
+
       - name: Upload binary to release
+        shell: bash
         run: |
-          cp target/${{ matrix.target }}/release/hcom hcom-${{ matrix.name }}
-          gh release upload ${{ github.ref_name }} hcom-${{ matrix.name }} --clobber
+          EXT="${{ matrix.ext }}"
+          cp target/${{ matrix.target }}/release/nomadterm${EXT} \
+             nomadterm-${{ matrix.name }}${EXT}
+          gh release upload ${{ github.ref_name }} \
+            nomadterm-${{ matrix.name }}${EXT} --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create Linux server bundle
+        if: startsWith(matrix.name, 'linux-')
+        shell: bash
+        run: |
+          BUNDLE="nomadterm-server-${{ matrix.name }}"
+          mkdir -p "${BUNDLE}"
+          cp target/${{ matrix.target }}/release/nomadterm "${BUNDLE}/"
+          sed "s|__REPO__|${{ github.repository }}|g" \
+            scripts/install.sh > "${BUNDLE}/install.sh"
+          chmod +x "${BUNDLE}/install.sh"
+          cp contrib/nomadterm.service "${BUNDLE}/"
+          printf '%s\n' \
+            'NomadTerm Linux Quick Start' \
+            '===========================' \
+            '1. Manual run:' \
+            '     ./nomadterm --ws --bind-tailscale --port 7681' \
+            '' \
+            '   If you are not using Tailscale, omit --bind-tailscale.' \
+            '' \
+            '2. First-time systemd install:' \
+            '     sudo bash install.sh init' \
+            '' \
+            '3. Update later:' \
+            '     sudo bash install.sh update' \
+            > "${BUNDLE}/README.txt"
+          tar czf "${BUNDLE}.tar.gz" "${BUNDLE}"
+
+      - name: Upload Linux bundle to release
+        if: startsWith(matrix.name, 'linux-')
+        shell: bash
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            nomadterm-server-${{ matrix.name }}.tar.gz --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create macOS server bundle
+        if: startsWith(matrix.name, 'darwin-')
+        shell: bash
+        run: |
+          BUNDLE="nomadterm-server-${{ matrix.name }}"
+          mkdir -p "${BUNDLE}"
+          cp target/${{ matrix.target }}/release/nomadterm "${BUNDLE}/"
+          cp contrib/com.nomadterm.daemon.plist "${BUNDLE}/"
+          printf '%s\n' \
+            'NomadTerm macOS Quick Start' \
+            '===========================' \
+            '1. Manual run:' \
+            '     ./nomadterm --ws --bind-tailscale --port 7681' \
+            '' \
+            '   If you are not using Tailscale, omit --bind-tailscale.' \
+            '' \
+            '2. Install the binary:' \
+            '     sudo cp nomadterm /usr/local/bin/nomadterm' \
+            '' \
+            '3. Load the launchd service as your current user:' \
+            '     cp com.nomadterm.daemon.plist ~/Library/LaunchAgents/' \
+            '     launchctl load ~/Library/LaunchAgents/com.nomadterm.daemon.plist' \
+            '' \
+            'Service management:' \
+            '     launchctl start  com.nomadterm.daemon' \
+            '     launchctl stop   com.nomadterm.daemon' \
+            '     launchctl unload ~/Library/LaunchAgents/com.nomadterm.daemon.plist' \
+            > "${BUNDLE}/README.txt"
+          tar czf "${BUNDLE}.tar.gz" "${BUNDLE}"
+
+      - name: Upload macOS bundle to release
+        if: startsWith(matrix.name, 'darwin-')
+        shell: bash
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            nomadterm-server-${{ matrix.name }}.tar.gz --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create Windows server bundle
+        if: startsWith(matrix.name, 'windows-')
+        shell: pwsh
+        run: |
+          $bundle = "nomadterm-server-${{ matrix.name }}"
+          New-Item -ItemType Directory -Force -Path $bundle | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/nomadterm.exe" "$bundle/nomadterm.exe"
+          Copy-Item "contrib/windows-service.md" "$bundle/windows-service.md"
+          @(
+            'NomadTerm Windows Quick Start'
+            '============================='
+            '1. Manual run:'
+            '     .\nomadterm.exe --ws --bind-tailscale --port 7681'
+            ''
+            '   If you are not using Tailscale, omit --bind-tailscale.'
+            ''
+            '2. To run as a service, follow windows-service.md.'
+            '3. Keep Tailscale running so --bind-tailscale can bind to the Tailscale IP.'
+          ) | Set-Content -Path "$bundle/README.txt"
+          Compress-Archive -Path $bundle -DestinationPath "$bundle.zip" -Force
+
+      - name: Upload Windows bundle to release
+        if: startsWith(matrix.name, 'windows-')
+        shell: pwsh
+        run: |
+          gh release upload ${{ github.ref_name }} `
+            "nomadterm-server-${{ matrix.name }}.zip" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish-support-files:
+    name: Publish Support Files
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Linux install script
+        run: |
+          sed "s|__REPO__|${{ github.repository }}|g" \
+            scripts/install.sh > install.sh
+          chmod +x install.sh
+
+      - name: Upload support files
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            install.sh \
+            contrib/nomadterm.service \
+            contrib/com.nomadterm.daemon.plist \
+            contrib/windows-service.md \
+            --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    name: Publish Release
+    needs: [create-release, build-daemon, publish-support-files]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Undraft release
+        run: gh release edit ${{ github.ref_name }} --draft=false
         env:
           GH_TOKEN: ${{ github.token }}
