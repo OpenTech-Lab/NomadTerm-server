@@ -120,6 +120,8 @@ pub enum Action {
         port: u16,
         no_tls: bool,
     },
+    /// Open desktop GUI
+    Gui,
 }
 
 /// Global flags extracted from argv before dispatch.
@@ -268,6 +270,11 @@ pub fn resolve_action(argv: &[String]) -> Action {
         "--version" | "-v" => return Action::Version,
         "--new-terminal" => return Action::NewTerminal,
         _ => {}
+    }
+
+    // GUI mode: `nomadterm gui`
+    if first == "gui" {
+        return Action::Gui;
     }
 
     // WebSocket server mode: `nomadterm --ws [--bind-tailscale] [--port N] [--no-tls]`
@@ -507,6 +514,9 @@ pub fn dispatch() -> anyhow::Result<()> {
                 .context("Failed to build tokio runtime")?
                 .block_on(crate::ws::run(config))
                 .context("WebSocket server error")?;
+        }
+        Action::Gui => {
+            crate::gui::run().context("GUI error")?;
         }
         Action::Hook { ref hook, ref args } if hook == "codex-notify" => {
             // Codex notify hook — handled natively in Rust.

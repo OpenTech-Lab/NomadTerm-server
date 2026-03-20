@@ -28,6 +28,7 @@ mod tool;
 pub mod tools;
 mod transcript;
 mod tui;
+mod gui;
 mod update;
 
 use anyhow::{Context, Result, bail};

@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{Connection, params};
 
 /// Schema version - bump on any schema change (no migrations, archive + recreate)
-const SCHEMA_VERSION: i32 = 16;
+const SCHEMA_VERSION: i32 = 17;
 
 use crate::shared::constants::{MENTION_PATTERN, ST_LISTENING};
 use crate::shared::time::{now_epoch_f64, now_epoch_i64};
@@ -155,6 +155,18 @@ impl InstanceRow {
                 .filter(|s| !s.is_empty()),
         })
     }
+}
+
+/// A registered repo row from the repos table.
+#[derive(Debug, Clone)]
+pub struct RepoRow {
+    pub id: String,
+    pub path: String,
+    pub name: String,
+    pub token: String,
+    pub added_at: i64,
+    pub last_seen: Option<i64>,
+    pub is_active: bool,
 }
 
 /// Database handle for hcom operations
@@ -399,6 +411,18 @@ impl HcomDb {
                     COALESCE(json_extract(new.data, '$.reason'), '')
                 );
             END;
+
+            -- Repos registry (for GUI)
+            CREATE TABLE IF NOT EXISTS repos (
+                id        TEXT PRIMARY KEY,
+                path      TEXT NOT NULL UNIQUE,
+                name      TEXT NOT NULL,
+                token     TEXT NOT NULL UNIQUE,
+                added_at  INTEGER NOT NULL,
+                last_seen INTEGER,
+                is_active INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_repos_token ON repos(token);
             ",
         )?;
 
@@ -2889,6 +2913,102 @@ impl HcomDb {
                 |_| Ok(()),
             )
             .is_ok()
+    }
+
+    /// Insert-if-missing a repo by path, then return the (possibly existing) row.
+    /// New rows get a fresh UUID id and 32-byte hex token.
+    pub fn upsert_repo(&self, path: &str) -> Result<RepoRow> {
+        let name = std::path::Path::new(path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string());
+
+        let id = uuid::Uuid::new_v4().to_string();
+        let token: String = (0..32)
+            .map(|_| format!("{:02x}", rand::random::<u8>()))
+            .collect();
+        let added_at = crate::shared::time::now_epoch_i64();
+
+        self.conn.execute(
+            "INSERT OR IGNORE INTO repos (id, path, name, token, added_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, path, name, token, added_at],
+        )?;
+
+        let row = self.conn.query_row(
+            "SELECT id, path, name, token, added_at, last_seen, is_active FROM repos WHERE path = ?1",
+            params![path],
+            |row| Ok(RepoRow {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                name: row.get(2)?,
+                token: row.get(3)?,
+                added_at: row.get(4)?,
+                last_seen: row.get(5)?,
+                is_active: row.get::<_, i64>(6)? != 0,
+            }),
+        )?;
+        Ok(row)
+    }
+
+    /// List all repos ordered by most recently seen first.
+    pub fn list_repos(&self) -> Result<Vec<RepoRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, path, name, token, added_at, last_seen, is_active FROM repos ORDER BY last_seen DESC, added_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| Ok(RepoRow {
+            id: row.get(0)?,
+            path: row.get(1)?,
+            name: row.get(2)?,
+            token: row.get(3)?,
+            added_at: row.get(4)?,
+            last_seen: row.get(5)?,
+            is_active: row.get::<_, i64>(6)? != 0,
+        }))?
+        .filter_map(|r| r.ok())
+        .collect();
+        Ok(rows)
+    }
+
+    /// Find a repo by its bearer token.
+    pub fn find_repo_by_token(&self, token: &str) -> Result<Option<RepoRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, path, name, token, added_at, last_seen, is_active FROM repos WHERE token = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![token], |row| Ok(RepoRow {
+            id: row.get(0)?,
+            path: row.get(1)?,
+            name: row.get(2)?,
+            token: row.get(3)?,
+            added_at: row.get(4)?,
+            last_seen: row.get(5)?,
+            is_active: row.get::<_, i64>(6)? != 0,
+        }))?;
+        Ok(rows.next().and_then(|r| r.ok()))
+    }
+
+    /// Update last_seen timestamp to now for a repo.
+    pub fn touch_repo(&self, id: &str) -> Result<()> {
+        let now = crate::shared::time::now_epoch_i64();
+        self.conn.execute(
+            "UPDATE repos SET last_seen = ?1 WHERE id = ?2",
+            params![now, id],
+        )?;
+        Ok(())
+    }
+
+    /// Set the is_active flag for a repo.
+    pub fn set_repo_active(&self, id: &str, active: bool) -> Result<()> {
+        self.conn.execute(
+            "UPDATE repos SET is_active = ?1 WHERE id = ?2",
+            params![active as i64, id],
+        )?;
+        Ok(())
+    }
+
+    /// Delete a repo row.
+    pub fn remove_repo(&self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM repos WHERE id = ?1", params![id])?;
+        Ok(())
     }
 }
 

@@ -31,6 +31,7 @@ pub struct AppState {
     pub pool: Arc<SessionPool>,
     pub token: Arc<String>,
     pub workspace: Arc<PathBuf>,
+    pub repo_id: Option<String>,
 }
 
 /// Configuration for the WebSocket server.
@@ -45,6 +46,10 @@ pub struct WsConfig {
     pub workspace_dir: PathBuf,
     /// Skip the interactive trust prompt (e.g. when --go flag is passed).
     pub skip_trust_prompt: bool,
+    /// Per-repo token override (GUI mode — skips global file token).
+    pub token_override: Option<String>,
+    /// Repo UUID — used to call touch_repo on successful WS connect.
+    pub repo_id: Option<String>,
 }
 
 impl Default for WsConfig {
@@ -55,6 +60,8 @@ impl Default for WsConfig {
             no_tls: true,
             workspace_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
             skip_trust_prompt: false,
+            token_override: None,
+            repo_id: None,
         }
     }
 }
@@ -70,7 +77,11 @@ pub async fn run(config: WsConfig) -> Result<()> {
         prompt_trust_folder(&workspace)?;
     }
 
-    let token = load_or_create_token()?;
+    let token = if let Some(t) = config.token_override {
+        t
+    } else {
+        load_or_create_token()?
+    };
     let pool = Arc::new(SessionPool::new_with_workspace(workspace.clone()));
     let token_arc = Arc::new(token.clone());
     let workspace_arc = Arc::new(workspace.clone());
@@ -79,6 +90,7 @@ pub async fn run(config: WsConfig) -> Result<()> {
         pool,
         token: token_arc,
         workspace: workspace_arc,
+        repo_id: config.repo_id,
     };
 
     let app = Router::new()
@@ -116,8 +128,9 @@ async fn ws_upgrade_handler(
 
     let pool = state.pool.clone();
     let workspace = state.workspace.clone();
+    let repo_id = state.repo_id.clone();
     ws.on_upgrade(move |socket: WebSocket| async move {
-        handler::handle_socket(socket, pool, workspace).await;
+        handler::handle_socket(socket, pool, workspace, repo_id).await;
     })
 }
 

@@ -15,7 +15,7 @@ use crate::ws::protocol::{ClientMessage, ServerMessage};
 use crate::ws::session::SessionPool;
 
 /// Drive a single WebSocket connection to completion.
-pub async fn handle_socket(socket: WebSocket, pool: Arc<SessionPool>, workspace: Arc<PathBuf>) {
+pub async fn handle_socket(socket: WebSocket, pool: Arc<SessionPool>, workspace: Arc<PathBuf>, repo_id: Option<String>) {
     let (mut sender, mut receiver) = socket.split();
 
     // Send current session list + workspace on connect.
@@ -26,6 +26,13 @@ pub async fn handle_socket(socket: WebSocket, pool: Arc<SessionPool>, workspace:
     };
     if let Ok(json) = serde_json::to_string(&msg) {
         let _ = sender.send(Message::Text(json.into())).await;
+    }
+
+    // Touch repo to update last_seen on connect.
+    if let Some(ref rid) = repo_id {
+        if let Ok(db) = crate::db::HcomDb::open() {
+            let _ = db.touch_repo(rid);
+        }
     }
 
     // Channel to forward PTY output → sender task.
