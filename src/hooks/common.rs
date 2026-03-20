@@ -366,31 +366,36 @@ fn poll_loop(
         };
 
         if let Some(server) = notify_server {
-            // Block on poll(2) instead of busy-looping with accept+sleep
-            use std::os::fd::AsRawFd;
-            let fd = server.as_raw_fd();
-            let timeout_ms = wait_time.as_millis().min(i32::MAX as u128) as i32;
-            let mut pfd = libc::pollfd {
-                fd,
-                events: libc::POLLIN,
-                revents: 0,
-            };
-            // SAFETY: valid pollfd, nfds=1, bounded timeout
-            let ret = unsafe { libc::poll(&mut pfd as *mut _, 1, timeout_ms) };
-            if ret > 0 {
-                // Drain all pending connections
-                if let Err(e) = server.set_nonblocking(true) {
-                    log::log_warn(
-                        "hooks",
-                        "poll.nonblocking_failed",
-                        &format!("set_nonblocking failed: {e}, skipping drain"),
-                    );
-                } else {
-                    while let Ok((conn, _)) = server.accept() {
-                        drop(conn);
+            #[cfg(unix)]
+            {
+                // Block on poll(2) instead of busy-looping with accept+sleep
+                use std::os::fd::AsRawFd;
+                let fd = server.as_raw_fd();
+                let timeout_ms = wait_time.as_millis().min(i32::MAX as u128) as i32;
+                let mut pfd = libc::pollfd {
+                    fd,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                // SAFETY: valid pollfd, nfds=1, bounded timeout
+                let ret = unsafe { libc::poll(&mut pfd as *mut _, 1, timeout_ms) };
+                if ret > 0 {
+                    // Drain all pending connections
+                    if let Err(e) = server.set_nonblocking(true) {
+                        log::log_warn(
+                            "hooks",
+                            "poll.nonblocking_failed",
+                            &format!("set_nonblocking failed: {e}, skipping drain"),
+                        );
+                    } else {
+                        while let Ok((conn, _)) = server.accept() {
+                            drop(conn);
+                        }
                     }
                 }
             }
+            #[cfg(not(unix))]
+            std::thread::sleep(wait_time);
         } else {
             std::thread::sleep(wait_time);
         }

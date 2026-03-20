@@ -177,8 +177,16 @@ pub struct HcomDb {
 }
 
 fn get_inode(path: &std::path::Path) -> u64 {
-    use std::os::unix::fs::MetadataExt;
-    std::fs::metadata(path).map(|m| m.ino()).unwrap_or(0)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        return std::fs::metadata(path).map(|m| m.ino()).unwrap_or(0);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        0 // Windows has no inodes; reconnect_if_stale becomes a no-op
+    }
 }
 
 impl HcomDb {

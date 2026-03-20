@@ -6,7 +6,6 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use anyhow::{Result, bail};
@@ -409,7 +408,11 @@ pub fn create_runner_script(
     );
 
     fs::write(&script_file, &content)?;
-    fs::set_permissions(&script_file, fs::Permissions::from_mode(0o755))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&script_file, fs::Permissions::from_mode(0o755))?;
+    }
 
     crate::log::log_info(
         "pty",

@@ -913,9 +913,14 @@ pub fn generate_unique_name(db: &HcomDb) -> Result<String> {
         .open(&lock_path)?;
 
     // Acquire exclusive file lock
-    use nix::fcntl::{Flock, FlockArg};
-    let flock = Flock::lock(lock_file, FlockArg::LockExclusive)
-        .map_err(|(_, e)| anyhow::anyhow!("flock failed: {}", e))?;
+    #[cfg(unix)]
+    let flock = {
+        use nix::fcntl::{Flock, FlockArg};
+        Flock::lock(lock_file, FlockArg::LockExclusive)
+            .map_err(|(_, e)| anyhow::anyhow!("flock failed: {}", e))?
+    };
+    #[cfg(not(unix))]
+    drop(lock_file);
 
     let result = (|| -> Result<String> {
         // Build set of taken names (alive + stopped)
@@ -958,7 +963,11 @@ pub fn generate_unique_name(db: &HcomDb) -> Result<String> {
     })();
 
     // Unlock (drop the flock guard)
-    let _file = Flock::unlock(flock);
+    #[cfg(unix)]
+    {
+        use nix::fcntl::Flock;
+        let _file = Flock::unlock(flock);
+    }
 
     result
 }

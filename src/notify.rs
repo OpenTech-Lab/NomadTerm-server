@@ -8,10 +8,7 @@
 
 use anyhow::{Context, Result};
 use std::net::TcpListener;
-use std::os::fd::{AsRawFd, BorrowedFd};
 use std::time::Duration;
-
-use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 
 /// TCP notification server for wake-ups
 pub struct NotifyServer {
@@ -25,7 +22,8 @@ impl NotifyServer {
         let listener = TcpListener::bind("127.0.0.1:0").context("Failed to bind notify server")?;
         let port = listener.local_addr()?.port();
 
-        // Set non-blocking for poll-based waiting
+        // Set non-blocking for poll-based waiting (Unix uses poll(2), Windows uses read timeout)
+        #[cfg(unix)]
         listener.set_nonblocking(true)?;
 
         Ok(Self { listener, port })
@@ -40,19 +38,36 @@ impl NotifyServer {
     ///
     /// Returns true if notified (connection received), false on timeout
     pub fn wait(&self, timeout: Duration) -> bool {
-        let timeout_ms = timeout.as_millis().min(i32::MAX as u128) as i32;
-        let poll_timeout = PollTimeout::try_from(timeout_ms).unwrap_or(PollTimeout::MAX);
+        #[cfg(unix)]
+        {
+            use std::os::fd::{AsRawFd, BorrowedFd};
+            use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
 
-        let fd = unsafe { BorrowedFd::borrow_raw(self.listener.as_raw_fd()) };
-        let mut poll_fds = [PollFd::new(fd, PollFlags::POLLIN)];
+            let timeout_ms = timeout.as_millis().min(i32::MAX as u128) as i32;
+            let poll_timeout = PollTimeout::try_from(timeout_ms).unwrap_or(PollTimeout::MAX);
 
-        match poll(&mut poll_fds, poll_timeout) {
-            Ok(n) if n > 0 => {
-                // Drain all pending notifications
-                self.drain();
-                true
+            let fd = unsafe { BorrowedFd::borrow_raw(self.listener.as_raw_fd()) };
+            let mut poll_fds = [PollFd::new(fd, PollFlags::POLLIN)];
+
+            match poll(&mut poll_fds, poll_timeout) {
+                Ok(n) if n > 0 => {
+                    self.drain();
+                    return true;
+                }
+                _ => return false,
             }
-            _ => false,
+        }
+        #[cfg(not(unix))]
+        {
+            // Windows: blocking accept with a read timeout
+            let _ = self.listener.set_read_timeout(Some(timeout));
+            match self.listener.accept() {
+                Ok((stream, _)) => {
+                    drop(stream);
+                    true
+                }
+                Err(_) => false,
+            }
         }
     }
 
