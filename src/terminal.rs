@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -261,13 +260,16 @@ pub fn find_kitty_socket() -> String {
 
     for sock_path in &candidates {
         // Check if it's a socket
-        if let Ok(meta) = fs::metadata(sock_path) {
+        #[cfg(unix)]
+        {
             use std::os::unix::fs::FileTypeExt;
-            if !meta.file_type().is_socket() {
+            if let Ok(meta) = fs::metadata(sock_path) {
+                if !meta.file_type().is_socket() {
+                    continue;
+                }
+            } else {
                 continue;
             }
-        } else {
-            continue;
         }
 
         let socket_uri = format!("unix:{}", sock_path.display());
@@ -611,8 +613,12 @@ pub fn create_bash_script(
         writeln!(f, "exit $hcom_status")?;
     }
 
-    // Make executable
-    fs::set_permissions(script_file, fs::Permissions::from_mode(0o755))?;
+    // Make executable (Unix only — Windows doesn't use Unix mode bits)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(script_file, fs::Permissions::from_mode(0o755))?;
+    }
 
     Ok(())
 }
@@ -1068,26 +1074,43 @@ pub fn launch_terminal(
         if let Some(dir) = cwd {
             std::env::set_current_dir(dir).ok();
         }
-        // Use execve to replace this process entirely
-        use std::ffi::CString;
-        let bash_path = which_bin("bash").unwrap_or_else(|| "/bin/bash".to_string());
-        let bash = CString::new(bash_path).unwrap();
-        let arg0 = CString::new("bash").unwrap();
-        let arg1 = CString::new(script_file.to_string_lossy().as_ref()).unwrap();
-        let argv_ptrs: Vec<*const libc::c_char> =
-            vec![arg0.as_ptr(), arg1.as_ptr(), std::ptr::null()];
-        let env_cstrings: Vec<CString> = full_env
-            .iter()
-            .filter_map(|(k, v)| CString::new(format!("{}={}", k, v)).ok())
-            .collect();
-        let mut env_ptrs: Vec<*const libc::c_char> =
-            env_cstrings.iter().map(|c| c.as_ptr()).collect();
-        env_ptrs.push(std::ptr::null());
-        // execve replaces process; never returns on success
-        unsafe {
-            libc::execve(bash.as_ptr(), argv_ptrs.as_ptr(), env_ptrs.as_ptr());
+
+        #[cfg(unix)]
+        {
+            // Use execve to replace this process entirely (Unix)
+            use std::ffi::CString;
+            let bash_path = which_bin("bash").unwrap_or_else(|| "/bin/bash".to_string());
+            let bash = CString::new(bash_path).unwrap();
+            let arg0 = CString::new("bash").unwrap();
+            let arg1 = CString::new(script_file.to_string_lossy().as_ref()).unwrap();
+            let argv_ptrs: Vec<*const libc::c_char> =
+                vec![arg0.as_ptr(), arg1.as_ptr(), std::ptr::null()];
+            let env_cstrings: Vec<CString> = full_env
+                .iter()
+                .filter_map(|(k, v)| CString::new(format!("{}={}", k, v)).ok())
+                .collect();
+            let mut env_ptrs: Vec<*const libc::c_char> =
+                env_cstrings.iter().map(|c| c.as_ptr()).collect();
+            env_ptrs.push(std::ptr::null());
+            unsafe {
+                libc::execve(bash.as_ptr(), argv_ptrs.as_ptr(), env_ptrs.as_ptr());
+            }
+            bail!("execve failed: {}", std::io::Error::last_os_error());
         }
-        bail!("execve failed: {}", std::io::Error::last_os_error());
+
+        #[cfg(not(unix))]
+        {
+            // Windows: spawn and wait
+            let status = Command::new("bash")
+                .arg(&script_file)
+                .envs(full_env)
+                .status()
+                .context("Failed to run script on Windows")?;
+            if !status.success() {
+                bail!("Script exited with: {}", status);
+            }
+            return Ok(LaunchResult::Success);
+        }
     }
 
     // New window / custom command mode
@@ -1331,16 +1354,23 @@ pub fn kill_process(
     };
 
     // SIGTERM the process group
-    let result = unsafe { libc::killpg(pid as i32, libc::SIGTERM) };
-    let kill_result = if result == 0 {
-        KillResult::Sent
-    } else {
-        match std::io::Error::last_os_error().raw_os_error() {
-            Some(libc::ESRCH) => KillResult::AlreadyDead,
-            Some(libc::EPERM) => KillResult::PermissionDenied,
-            _ => KillResult::AlreadyDead,
+    #[cfg(unix)]
+    let kill_result = {
+        let result = unsafe { libc::killpg(pid as i32, libc::SIGTERM) };
+        if result == 0 {
+            KillResult::Sent
+        } else {
+            match std::io::Error::last_os_error().raw_os_error() {
+                Some(libc::ESRCH) => KillResult::AlreadyDead,
+                Some(libc::EPERM) => KillResult::PermissionDenied,
+                _ => KillResult::AlreadyDead,
+            }
         }
     };
+
+    // Windows: process group signaling not available; caller should use TerminateProcess
+    #[cfg(not(unix))]
+    let kill_result = KillResult::AlreadyDead;
 
     (kill_result, pane_closed)
 }

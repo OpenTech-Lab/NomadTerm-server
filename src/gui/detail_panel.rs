@@ -3,7 +3,7 @@
 use egui::{TextureHandle, Ui};
 
 use super::server_task::ServerHandle;
-use super::state::{GuiState, ServerEvent};
+use super::state::GuiState;
 
 pub fn show(
     ui: &mut Ui,
@@ -21,17 +21,21 @@ pub fn show(
         }
     };
 
-    let repo = &state.repos[idx];
+    // Clone repo fields needed across mutable borrow boundaries.
+    let repo_id = state.repos[idx].id.clone();
+    let repo_name = state.repos[idx].name.clone();
+    let repo_path = state.repos[idx].path.clone();
+    let repo_token = state.repos[idx].token.clone();
     let port = super::server_task::BASE_PORT + idx as u16;
 
     ui.vertical(|ui| {
-        ui.heading(&repo.name);
-        ui.label(&repo.path);
+        ui.heading(&repo_name);
+        ui.label(&repo_path);
         ui.add_space(8.0);
 
         let is_running = handles.get(idx).and_then(|h| h.as_ref()).is_some();
         let btn_label = if is_running { "■ Stop" } else { "▶ Start" };
-        let count = session_counts.get(&repo.id).copied().unwrap_or(0);
+        let count = session_counts.get(&repo_id).copied().unwrap_or(0);
 
         let status_text = if is_running {
             format!("● Running   Sessions: {}", count)
@@ -51,7 +55,7 @@ pub fn show(
                 }
                 state.repos[idx].is_active = false;
                 if let Ok(db) = crate::db::HcomDb::open() {
-                    let _ = db.set_repo_active(&repo.id, false);
+                    let _ = db.set_repo_active(&repo_id, false);
                 }
                 *qr_cache = None;
             } else {
@@ -61,16 +65,16 @@ pub fn show(
                 }
                 let h = ServerHandle::spawn(
                     rt,
-                    repo.id.clone(),
-                    repo.token.clone(),
-                    std::path::PathBuf::from(&repo.path),
+                    repo_id.clone(),
+                    repo_token.clone(),
+                    std::path::PathBuf::from(&repo_path),
                     port,
                     state.event_tx.clone(),
                 );
                 handles[idx] = Some(h);
                 state.repos[idx].is_active = true;
                 if let Ok(db) = crate::db::HcomDb::open() {
-                    let _ = db.set_repo_active(&repo.id, true);
+                    let _ = db.set_repo_active(&repo_id, true);
                 }
                 *qr_cache = None;
             }
@@ -84,11 +88,11 @@ pub fn show(
             let expires_at = chrono::Utc::now()
                 + chrono::Duration::days(30);
             let expires_str = expires_at.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            let repo_path_enc = urlencoding_simple(&repo.path);
-            let repo_name_enc = urlencoding_simple(&repo.name);
+            let repo_path_enc = urlencoding_simple(&repo_path);
+            let repo_name_enc = urlencoding_simple(&repo_name);
             let uri = format!(
                 "nomadterm://{}:{}?token={}&repo_id={}&repo_path={}&repo_name={}&expires_at={}&tls=0",
-                host, port, repo.token, repo.id, repo_path_enc, repo_name_enc, expires_str
+                host, port, repo_token, repo_id, repo_path_enc, repo_name_enc, expires_str
             );
 
             // QR code

@@ -54,10 +54,13 @@ bytes = "1"
 rustls = "0.22"
 webpki-roots = "0.26"
 
-# Desktop GUI
-eframe = { version = "0.31", default-features = false, features = ["glow", "persistence"] }
-egui = "0.31"
-rfd = { version = "0.15", default-features = false, features = ["xdg-portal"] }
+# Desktop GUI (optional — compile with --features gui)
+eframe = { version = "0.31", optional = true, default-features = false, features = ["glow", "persistence"] }
+egui = { version = "0.31", optional = true }
+rfd = { version = "0.15", optional = true }
+
+[features]
+gui = ["dep:eframe", "dep:egui", "dep:rfd"]
 
 [dev-dependencies]
 serial_test = "3"

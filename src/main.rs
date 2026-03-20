@@ -17,6 +17,7 @@ pub mod messages;
 mod notify;
 mod paths;
 mod pidtrack;
+#[cfg(unix)]
 mod pty;
 pub mod relay;
 pub mod router;
@@ -28,6 +29,7 @@ mod tool;
 pub mod tools;
 mod transcript;
 mod tui;
+#[cfg(feature = "gui")]
 mod gui;
 mod update;
 
@@ -59,7 +61,8 @@ fn main() -> Result<()> {
     router::dispatch()
 }
 
-/// Run PTY wrapper mode.
+/// Run PTY wrapper mode (Unix only).
+#[cfg(unix)]
 pub fn run_pty(args: &[String]) -> Result<()> {
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
         eprintln!("hcom pty - PTY wrapper for hcom");

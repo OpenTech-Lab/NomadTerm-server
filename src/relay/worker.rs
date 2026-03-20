@@ -409,6 +409,7 @@ pub fn remove_relay_pid_file() {
 
 /// Stop a running relay-worker by sending SIGTERM to the PID from PID file.
 pub fn stop_relay_worker() -> bool {
+    #[cfg(unix)]
     if let Some(pid) = read_pid_file() {
         // SAFETY: Sending SIGTERM to a known PID.
         let ret = unsafe { libc::kill(pid as i32, libc::SIGTERM) };

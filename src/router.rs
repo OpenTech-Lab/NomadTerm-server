@@ -7,7 +7,7 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::Context as _;
+use anyhow::{bail, Context as _};
 use clap::Parser;
 
 use crate::log::{log_error, log_info, log_warn};
@@ -473,7 +473,13 @@ pub fn dispatch() -> anyhow::Result<()> {
             crate::tui::run().map_err(|e| anyhow::anyhow!("{e:#}"))?;
         }
         Action::Pty { args } => {
+            #[cfg(unix)]
             crate::run_pty(&args)?;
+            #[cfg(not(unix))]
+            {
+                let _ = args;
+                bail!("PTY mode is not supported on Windows");
+            }
         }
         Action::RelayWorker => {
             let exit_code = crate::relay::worker::run();
@@ -505,6 +511,8 @@ pub fn dispatch() -> anyhow::Result<()> {
                 no_tls,
                 workspace_dir,
                 skip_trust_prompt,
+                token_override: None,
+                repo_id: None,
             };
 
             // Start a tokio runtime for the async axum server.
@@ -516,7 +524,10 @@ pub fn dispatch() -> anyhow::Result<()> {
                 .context("WebSocket server error")?;
         }
         Action::Gui => {
+            #[cfg(feature = "gui")]
             crate::gui::run().context("GUI error")?;
+            #[cfg(not(feature = "gui"))]
+            bail!("GUI not available. Rebuild with --features gui");
         }
         Action::Hook { ref hook, ref args } if hook == "codex-notify" => {
             // Codex notify hook — handled natively in Rust.
