@@ -2,99 +2,122 @@
 
 ## What Is This?
 
-This repo contains the NomadTerm daemon and CLI. It is the backend part of the project that runs on the machine where your AI CLI sessions live.
+NomadTerm is a secure remote PTY daemon for AI CLI tools (Claude Code, Codex, Copilot, Gemini). It runs on the machine where your AI sessions live and lets you monitor and control them from your phone or desktop.
 
-When started in WebSocket mode, the daemon:
-
-- exposes a `/ws` endpoint for the mobile client
-- lists and manages PTY-backed AI sessions such as Claude, Codex, Copilot, and Gemini
-- sends terminal output to the phone in real time
-- forwards input, resize, kill, and approval actions from the phone back to the running session
-- prints the connection address, token, and QR code used by the mobile app
-
-This codebase was originally forked from `aannoo/hcom` and extended into NomadTerm.
-
-## How To Use It
-
-### 1. Build the binary
-
-**CLI / headless daemon** (default):
-
-```bash
-cargo build --release
+```
+Mobile app ──WebSocket──► nomadterm daemon ◄── manages ── nomadterm-desktop (GUI)
 ```
 
-**Desktop GUI** (requires a display — Linux, macOS, Windows):
-
-```bash
-cargo build --release --features gui
-```
-
-The compiled binary will be available at `target/release/nomadterm`.
+- **Daemon** (`nomadterm`) — runs in the background, exposes a `/ws` endpoint, manages PTY sessions, streams output to your phone in real time
+- **Desktop GUI** (`nomadterm-desktop`) — optional Tauri app on your Linux desktop to manage repos, generate QR codes, and start/stop the daemon with one click
 
 ---
 
-### Option A — Desktop GUI (recommended)
+## Install (Linux — recommended)
 
-The GUI lets you register multiple repos, generate per-repo QR codes, and start/stop the daemon with one click.
+Download both `.deb` files from the [latest release](../../releases/latest):
+
+| File | What it installs |
+|------|-----------------|
+| `nomadterm_X.Y.Z_amd64.deb` | `/usr/bin/nomadterm` + systemd service + app launcher entry |
+| `nomadterm-desktop_X.Y.Z_amd64.deb` | `/usr/bin/nomadterm-desktop` (the Tauri GUI) |
 
 ```bash
-./target/release/nomadterm gui
+sudo apt install ./nomadterm_X.Y.Z_amd64.deb
+sudo apt install ./nomadterm-desktop_X.Y.Z_amd64.deb
 ```
 
-What you get:
+After installing both, **NomadTerm** appears in your Ubuntu app launcher. Open it to get started.
 
-- **Left panel**: add/remove repo folders; each repo gets a stable bearer token
-- **Right panel**: Start/Stop button, live session count, QR code, and a copyable `nomadterm://` URL
-- Scan the QR from the mobile app to connect — the token is saved on the phone for 30 days and auto-renewed on each connect
-
-> Requires a build with `--features gui`. Running `nomadterm gui` without it prints an error asking you to rebuild.
+> **Tip:** copy the `.deb` files to `/tmp/` before installing to avoid an apt sandbox warning:
+> ```bash
+> cp ~/Downloads/nomadterm*.deb /tmp/
+> sudo apt install /tmp/nomadterm_X.Y.Z_amd64.deb /tmp/nomadterm-desktop_X.Y.Z_amd64.deb
+> ```
 
 ---
 
-### Option B — Headless daemon (original CLI mode)
+## Usage
 
-For the intended phone-to-machine flow over Tailscale:
+### Option A — Desktop GUI (recommended for desktop Linux)
+
+1. Install both `.deb` packages above
+2. Open **NomadTerm** from your app launcher
+3. Click **+** to add a repo folder
+4. Click **Start** — the daemon starts and a QR code appears
+5. Scan the QR from the NomadTerm mobile app to connect
+
+The GUI manages tokens, ports, and the daemon lifecycle automatically.
+
+---
+
+### Option B — Headless daemon (servers, SSH, no display)
 
 ```bash
-./target/release/nomadterm --ws --bind-tailscale
+nomadterm --ws --bind-tailscale --port 7681
 ```
 
 Useful flags:
 
-- `--bind-tailscale`: bind to the machine's Tailscale IP when available
-- `--port <PORT>`: change the default port (`7681`)
-- `--no-tls`: run in local or trusted-network mode
+| Flag | Description |
+|------|-------------|
+| `--bind-tailscale` | bind to the Tailscale IP (falls back to LAN IP if unavailable) |
+| `--port <PORT>` | WebSocket port (default `7681`) |
+| `--no-tls` | disable TLS for local/trusted networks |
+| `--token <TOKEN>` | set a fixed bearer token instead of generating one |
+| `--workspace <PATH>` | set the working directory for the session |
 
-If Tailscale is not available, the daemon falls back to localhost. For local testing you can also start it without `--bind-tailscale`.
+At startup the daemon prints the WebSocket address, bearer token, and a QR code. Scan it from the mobile app or enter the details manually.
 
-### 3. Copy the connection info (headless mode)
+#### Install as a systemd service
 
-At startup the daemon prints:
+```bash
+# First-time setup
+sudo bash install.sh init
 
-- the WebSocket address
-- the generated bearer token
-- a QR code that the mobile app can scan
+# Update later
+sudo bash install.sh update
+```
 
-The token is persisted in `~/.hcom/nomadterm.token`.
+The `install.sh` script is included in `nomadterm-server-linux-x86_64.tar.gz` on the releases page, or downloadable directly:
 
-### 4. Connect from the mobile app
+```bash
+curl -Lo install.sh https://github.com/YOUR_ORG/nomadterm/releases/latest/download/install.sh
+sudo bash install.sh init
+```
 
-Open the NomadTerm mobile app and either:
+---
 
-- scan the QR code shown by the daemon or GUI, or
-- enter the host, port, and token manually
-- tap a saved repo from the list (after the first scan)
+## Connect from mobile
 
-### 5. Use the remote session manager
+Open the NomadTerm mobile app and:
 
-After connecting from mobile, you can:
+- **Scan the QR code** shown by the daemon or desktop GUI, or
+- **Enter manually**: host, port, and token
 
-- view the current session list
-- spawn a new AI CLI session
+After connecting you can:
+
+- view and spawn AI CLI sessions (Claude Code, Codex, Copilot, Gemini)
 - open a live terminal view
 - approve or reject tool calls
 - kill a running session
+
+---
+
+## Build from source
+
+```bash
+# Daemon only
+cargo build --release
+./target/release/nomadterm --ws
+
+# Desktop GUI
+cd desktop
+npm install
+npm run tauri dev   # requires nomadterm binary in PATH
+```
+
+---
 
 ## License
 
