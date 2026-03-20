@@ -6,7 +6,7 @@
 //!   3. Print connection string + QR code to stdout
 //!   4. Handle /ws upgrades, validating Authorization: Bearer <token>
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use axum::{
     Router,
     extract::{
@@ -18,7 +18,9 @@ use axum::{
     response::IntoResponse,
     routing::get,
 };
+use std::io::{self, BufRead, Write};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::ws::{handler, session::SessionPool};
@@ -28,6 +30,7 @@ use crate::ws::{handler, session::SessionPool};
 pub struct AppState {
     pub pool: Arc<SessionPool>,
     pub token: Arc<String>,
+    pub workspace: Arc<PathBuf>,
 }
 
 /// Configuration for the WebSocket server.
@@ -38,6 +41,10 @@ pub struct WsConfig {
     pub port: u16,
     /// Disable TLS (dev mode / trusted LAN).
     pub no_tls: bool,
+    /// Working directory used as the session workspace (defaults to CWD at startup).
+    pub workspace_dir: PathBuf,
+    /// Skip the interactive trust prompt (e.g. when --go flag is passed).
+    pub skip_trust_prompt: bool,
 }
 
 impl Default for WsConfig {
@@ -45,20 +52,33 @@ impl Default for WsConfig {
         Self {
             bind_addr: "0.0.0.0".to_string(),
             port: 7681,
-            no_tls: true, // TLS cert pinning added in Phase 5 extension
+            no_tls: true,
+            workspace_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            skip_trust_prompt: false,
         }
     }
 }
 
 /// Entry point: start the WebSocket server (blocking — call from a tokio runtime).
 pub async fn run(config: WsConfig) -> Result<()> {
+    // Resolve workspace to an absolute canonical path.
+    let workspace = config.workspace_dir.canonicalize()
+        .unwrap_or_else(|_| config.workspace_dir.clone());
+
+    // Trust prompt — mirrors VS Code's "Do you trust the authors of this folder?"
+    if !config.skip_trust_prompt {
+        prompt_trust_folder(&workspace)?;
+    }
+
     let token = load_or_create_token()?;
-    let pool = Arc::new(SessionPool::new());
+    let pool = Arc::new(SessionPool::new_with_workspace(workspace.clone()));
     let token_arc = Arc::new(token.clone());
+    let workspace_arc = Arc::new(workspace.clone());
 
     let state = AppState {
         pool,
         token: token_arc,
+        workspace: workspace_arc,
     };
 
     let app = Router::new()
@@ -70,7 +90,7 @@ pub async fn run(config: WsConfig) -> Result<()> {
         .parse()
         .context("Invalid bind address")?;
 
-    print_connection_info(&addr, &token);
+    print_connection_info(&addr, &token, &workspace);
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
@@ -95,8 +115,9 @@ async fn ws_upgrade_handler(
     }
 
     let pool = state.pool.clone();
+    let workspace = state.workspace.clone();
     ws.on_upgrade(move |socket: WebSocket| async move {
-        handler::handle_socket(socket, pool).await;
+        handler::handle_socket(socket, pool, workspace).await;
     })
 }
 
@@ -113,6 +134,37 @@ fn check_auth(headers: &HeaderMap, expected: &str) -> bool {
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(|t| t == expected)
         .unwrap_or(false)
+}
+
+/// Prompt the user to confirm they trust the given folder before starting the server.
+/// Mirrors VS Code's "Do you trust the authors of the files in this folder?" prompt.
+fn prompt_trust_folder(path: &std::path::Path) -> Result<()> {
+    let path_str = path.display();
+    eprintln!("\n┌─────────────────────────────────────────────────────┐");
+    eprintln!("│          NomadTerm — Workspace Trust Check          │");
+    eprintln!("├─────────────────────────────────────────────────────┤");
+    eprintln!("│  Do you trust the authors of the files in:          │");
+    eprintln!("│  {}  │", path_str);
+    eprintln!("│                                                     │");
+    eprintln!("│  NomadTerm will use this folder as your workspace   │");
+    eprintln!("│  and may execute code within it.                    │");
+    eprintln!("└─────────────────────────────────────────────────────┘");
+    eprint!("\nTrust this folder and continue? [y/N]: ");
+    io::stderr().flush().ok();
+
+    let stdin = io::stdin();
+    let answer = stdin.lock().lines().next()
+        .and_then(|l| l.ok())
+        .unwrap_or_default()
+        .trim()
+        .to_lowercase();
+
+    if answer == "y" || answer == "yes" {
+        eprintln!("[nomadterm] Workspace trusted: {}", path_str);
+        Ok(())
+    } else {
+        bail!("Workspace not trusted. Exiting.")
+    }
 }
 
 /// Load token from disk or generate + persist a new one.
@@ -136,12 +188,14 @@ fn load_or_create_token() -> Result<String> {
 }
 
 /// Print the connection URL and QR code to stderr so the user can scan from their phone.
-fn print_connection_info(addr: &SocketAddr, token: &str) {
+fn print_connection_info(addr: &SocketAddr, token: &str, workspace: &std::path::Path) {
     let connection_string = format!("ws://{}/?token={}", addr, token);
+    let workspace_str = workspace.display().to_string();
 
     eprintln!("\n╔══════════════════════════════════════════════════╗");
     eprintln!("║           NomadTerm — WebSocket Daemon           ║");
     eprintln!("╠══════════════════════════════════════════════════╣");
+    eprintln!("║  Workspace: {}", workspace_str);
     eprintln!("║  Address : ws://{}/ws", addr);
     eprintln!("║  Token   : {}", token);
     eprintln!("╠══════════════════════════════════════════════════╣");

@@ -8,18 +8,22 @@
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::broadcast;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::ws::protocol::{ClientMessage, ServerMessage};
 use crate::ws::session::SessionPool;
 
 /// Drive a single WebSocket connection to completion.
-pub async fn handle_socket(socket: WebSocket, pool: Arc<SessionPool>) {
+pub async fn handle_socket(socket: WebSocket, pool: Arc<SessionPool>, workspace: Arc<PathBuf>) {
     let (mut sender, mut receiver) = socket.split();
 
-    // Send current session list on connect.
+    // Send current session list + workspace on connect.
     let sessions = pool.list();
-    let msg = ServerMessage::SessionList { sessions };
+    let msg = ServerMessage::SessionList {
+        sessions,
+        workspace: workspace.display().to_string(),
+    };
     if let Ok(json) = serde_json::to_string(&msg) {
         let _ = sender.send(Message::Text(json.into())).await;
     }

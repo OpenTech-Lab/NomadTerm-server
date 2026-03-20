@@ -485,7 +485,20 @@ pub fn dispatch() -> anyhow::Result<()> {
                 "0.0.0.0".to_string()
             };
 
-            let config = crate::ws::WsConfig { bind_addr, port, no_tls };
+            let workspace_dir = std::env::current_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+            // Extract --go flag to skip trust prompt.
+            let raw_argv: Vec<String> = std::env::args().skip(1).collect();
+            let skip_trust_prompt = raw_argv.iter().any(|a| a == "--go");
+
+            let config = crate::ws::WsConfig {
+                bind_addr,
+                port,
+                no_tls,
+                workspace_dir,
+                skip_trust_prompt,
+            };
 
             // Start a tokio runtime for the async axum server.
             tokio::runtime::Builder::new_multi_thread()

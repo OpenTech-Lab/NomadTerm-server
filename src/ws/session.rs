@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::TcpStream;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use uuid::Uuid;
@@ -82,12 +83,23 @@ impl Session {
 #[derive(Clone)]
 pub struct SessionPool {
     inner: Arc<Mutex<HashMap<String, Session>>>,
+    workspace_dir: Arc<PathBuf>,
 }
 
 impl SessionPool {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
+            workspace_dir: Arc::new(
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            ),
+        }
+    }
+
+    pub fn new_with_workspace(workspace_dir: PathBuf) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            workspace_dir: Arc::new(workspace_dir),
         }
     }
 
@@ -108,6 +120,7 @@ impl SessionPool {
         let mut child = std::process::Command::new(&binary)
             .args(["pty", cli])
             .env("HCOM_INSTANCE_NAME", &session_id)
+            .current_dir(self.workspace_dir.as_ref())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .spawn()
