@@ -114,7 +114,7 @@ if [[ -f "$CARGO_LOCK" ]]; then
   if ! awk -v ver="$NEW_VERSION" '
     BEGIN{in_target=0; updated=0}
     /^\[\[package\]\]$/ {in_target=0}
-    /^name = "sync-server"$/ {in_target=1}
+    /^name = "nomadterm"$/ {in_target=1}
     in_target && /^version = "/ && !updated {
       print "version = \"" ver "\""
       in_target=0
@@ -153,7 +153,7 @@ if [[ -z "$CHANGELOG_ENTRIES" ]]; then
 fi
 
 cat >"$RELEASE_NOTE" <<EOF
-# Sync Server $NEW_VERSION
+# NomadTerm Server $NEW_VERSION
 
 - Released on: $(date -u +"%Y-%m-%d")
 - Previous version: $CURRENT_VERSION
