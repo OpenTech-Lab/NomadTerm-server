@@ -1,10 +1,12 @@
 [Desktop Entry]
+Version=1.0
 Name=NomadTerm
 Comment=Secure Remote PTY Daemon for Multi-AI CLI
+TryExec=/usr/bin/nomadterm
 Exec=/usr/bin/nomadterm-desktop
 Icon=nomadterm
 Terminal=false
 Type=Application
-Categories=Development;Network;
+Categories=Development;
 Keywords=terminal;ai;claude;ssh;remote;pty;
 StartupWMClass=NomadTerm
