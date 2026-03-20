@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-`server/` contains the NomadTerm daemon and CLI. It is the backend part of the project that runs on the machine where your AI CLI sessions live.
+This repo contains the NomadTerm daemon and CLI. It is the backend part of the project that runs on the machine where your AI CLI sessions live.
 
 When started in WebSocket mode, the daemon:
 
