@@ -14,3 +14,10 @@ export interface ServerState {
   running: boolean;
   port: number | null;
 }
+
+export interface ConnectionStrategy {
+  kind: "tailscale" | "lan" | "local_only";
+  host: string | null;
+  remoteCapable: boolean;
+  secure: boolean;
+}

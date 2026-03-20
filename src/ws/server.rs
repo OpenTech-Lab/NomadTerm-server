@@ -305,17 +305,27 @@ pub fn detect_tailscale_ip() -> Option<String> {
     None
 }
 
+fn preferred_connect_host(tailscale_ip: Option<String>, lan_ip: Option<String>) -> Option<String> {
+    tailscale_ip.or(lan_ip)
+}
+
 /// Detect the best client-connect host for QR codes and human-facing URLs.
 ///
 /// Preference order:
 ///   1. Tailscale IPv4, if available
 ///   2. Primary LAN IPv4 inferred from the routing table
 pub fn detect_connect_host() -> Option<String> {
-    detect_tailscale_ip().or_else(detect_lan_ip)
+    preferred_connect_host(detect_tailscale_ip(), detect_lan_ip())
 }
 
-fn detect_lan_ip() -> Option<String> {
+pub fn detect_lan_ip() -> Option<String> {
     use std::net::{IpAddr, UdpSocket};
+
+    if let Ok(ip) = std::env::var("NOMADTERM_LAN_IP") {
+        if !ip.is_empty() {
+            return Some(ip);
+        }
+    }
 
     let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
 
@@ -338,7 +348,7 @@ fn detect_lan_ip() -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::check_auth;
+    use super::{check_auth, preferred_connect_host};
     use axum::http::{HeaderMap, HeaderValue};
 
     #[test]
@@ -361,5 +371,17 @@ mod tests {
         let headers = HeaderMap::new();
 
         assert!(!check_auth(&headers, Some("wrong"), "secret"));
+    }
+
+    #[test]
+    fn preferred_connect_host_prefers_tailscale() {
+        let host = preferred_connect_host(Some("100.70.1.2".into()), Some("192.168.1.20".into()));
+        assert_eq!(host.as_deref(), Some("100.70.1.2"));
+    }
+
+    #[test]
+    fn preferred_connect_host_falls_back_to_lan() {
+        let host = preferred_connect_host(None, Some("192.168.1.20".into()));
+        assert_eq!(host.as_deref(), Some("192.168.1.20"));
     }
 }

@@ -362,8 +362,9 @@ jobs:
       - name: Sync desktop version to release tag
         run: |
           VERSION="${RELEASE_TAG#v}"
-          # tauri.conf.json
+          # tauri.conf.json + package.json share the same "version": "x.y.z" pattern
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" desktop/src-tauri/tauri.conf.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" desktop/package.json
           # Cargo.toml (first occurrence = [package] version)
           sed -i "0,/^version = \"[^\"]*\"/{s/^version = \"[^\"]*\"/version = \"${VERSION}\"/}" desktop/src-tauri/Cargo.toml
           case "${{ matrix.platform }}" in

@@ -19,7 +19,7 @@ Download both `.deb` files from the [latest release](../../releases/latest):
 
 | File | What it installs |
 |------|-----------------|
-| `nomadterm_X.Y.Z_amd64.deb` | `/usr/bin/nomadterm` + systemd service + app launcher entry |
+| `nomadterm_X.Y.Z_amd64.deb` | `/usr/bin/nomadterm` + systemd service |
 | `nomadterm-desktop_X.Y.Z_amd64.deb` | `/usr/bin/nomadterm-desktop` (the Tauri GUI) |
 
 ```bash
@@ -48,6 +48,9 @@ After installing both, **NomadTerm** appears in your Ubuntu app launcher. Open i
 5. Scan the QR from the NomadTerm mobile app to connect
 
 The GUI manages tokens, ports, and the daemon lifecycle automatically.
+When Tailscale is installed and active, it is preferred automatically so the
+same QR code can work from outside your home network. Without Tailscale,
+NomadTerm falls back to LAN-only access.
 
 ---
 
@@ -68,6 +71,8 @@ Useful flags:
 | `--workspace <PATH>` | set the working directory for the session |
 
 At startup the daemon prints the WebSocket address, bearer token, and a QR code. Scan it from the mobile app or enter the details manually.
+For out-of-home access, keep Tailscale active on both the server machine and
+your phone.
 
 #### Install as a systemd service
 

@@ -42,6 +42,29 @@ impl From<RepoRow> for RepoEntry {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionStrategyKind {
+    Tailscale,
+    Lan,
+    LocalOnly,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionStrategy {
+    pub kind: ConnectionStrategyKind,
+    pub host: Option<String>,
+    pub remote_capable: bool,
+    pub secure: bool,
+}
+
+impl ConnectionStrategy {
+    fn bind_tailscale(&self) -> bool {
+        matches!(self.kind, ConnectionStrategyKind::Tailscale)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // App state — tracks running nomadterm subprocesses
 // ---------------------------------------------------------------------------
@@ -72,6 +95,39 @@ fn nomadterm_bin() -> String {
     }
     // 2. PATH fallback.
     "nomadterm".to_string()
+}
+
+fn preferred_connect_host(tailscale_ip: Option<String>, lan_ip: Option<String>) -> Option<String> {
+    tailscale_ip.or(lan_ip)
+}
+
+fn detect_connection_strategy_inner() -> ConnectionStrategy {
+    let tailscale_ip = detect_tailscale_ip();
+    let lan_ip = detect_lan_ip();
+    let host = preferred_connect_host(tailscale_ip.clone(), lan_ip.clone());
+
+    if let Some(ip) = tailscale_ip {
+        ConnectionStrategy {
+            kind: ConnectionStrategyKind::Tailscale,
+            host: Some(ip),
+            remote_capable: true,
+            secure: true,
+        }
+    } else if let Some(ip) = lan_ip {
+        ConnectionStrategy {
+            kind: ConnectionStrategyKind::Lan,
+            host: Some(ip),
+            remote_capable: false,
+            secure: false,
+        }
+    } else {
+        ConnectionStrategy {
+            kind: ConnectionStrategyKind::LocalOnly,
+            host,
+            remote_capable: false,
+            secure: false,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,19 +179,22 @@ async fn start_server(
         }
     }
 
+    let strategy = detect_connection_strategy_inner();
     let bin = nomadterm_bin();
-    let child = tokio::process::Command::new(&bin)
-        .args([
-            "--ws",
-            "--no-tls",
-            "--go",
-            "--port",
-            &port.to_string(),
-            "--token",
-            &repo_token,
-            "--workspace",
-            &repo_path,
-        ])
+    let mut command = tokio::process::Command::new(&bin);
+    command.args(["--ws", "--no-tls", "--go"]);
+    if strategy.bind_tailscale() {
+        command.arg("--bind-tailscale");
+    }
+    command.args([
+        "--port",
+        &port.to_string(),
+        "--token",
+        &repo_token,
+        "--workspace",
+        &repo_path,
+    ]);
+    let child = command
         .kill_on_drop(true)
         .spawn()
         .map_err(|e| format!("Failed to spawn {bin}: {e}"))?;
@@ -189,8 +248,12 @@ fn stop_server(
 
 #[tauri::command]
 fn detect_host() -> Option<String> {
-    // Try Tailscale first, then LAN.
-    detect_tailscale_ip().or_else(detect_lan_ip)
+    detect_connection_strategy_inner().host
+}
+
+#[tauri::command]
+fn detect_connection_strategy() -> ConnectionStrategy {
+    detect_connection_strategy_inner()
 }
 
 #[tauri::command]
@@ -214,6 +277,11 @@ fn server_port(state: State<AppState>, repo_id: String) -> Option<u16> {
 
 fn detect_tailscale_ip() -> Option<String> {
     use std::process::Command;
+    if let Ok(ip) = std::env::var("TAILSCALE_IP") {
+        if !ip.is_empty() {
+            return Some(ip);
+        }
+    }
     // `tailscale ip -4` is the canonical way
     if let Ok(out) = Command::new("tailscale").args(["ip", "-4"]).output() {
         let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -221,14 +289,16 @@ fn detect_tailscale_ip() -> Option<String> {
             return Some(s);
         }
     }
-    // Fallback: look for 100.x.y.z address in network interfaces
-    detect_lan_ip()
-        .filter(|ip| ip.starts_with("100."))
-        .or(None)
+    None
 }
 
 fn detect_lan_ip() -> Option<String> {
     use std::net::{IpAddr, UdpSocket};
+    if let Ok(ip) = std::env::var("NOMADTERM_LAN_IP") {
+        if !ip.is_empty() {
+            return Some(ip);
+        }
+    }
     // Bind a UDP socket and "connect" it to a public address — no packets are
     // sent, but the OS routing table chooses the correct outbound interface,
     // giving us the LAN IP instantly without any network round-trip.
@@ -266,6 +336,7 @@ pub fn run() {
             start_server,
             stop_server,
             detect_host,
+            detect_connection_strategy,
             is_server_running,
             server_port,
         ])

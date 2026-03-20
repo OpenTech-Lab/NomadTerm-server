@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import type { RepoEntry, ServerState } from "@/types";
+import type { ConnectionStrategy, RepoEntry, ServerState } from "@/types";
 
 interface DetailPanelProps {
   repo: RepoEntry | null;
@@ -20,12 +20,14 @@ export function DetailPanel({
   repoIndex,
   onServerStateChange,
 }: DetailPanelProps) {
-  const [host, setHost] = useState<string | null>(null);
+  const [strategy, setStrategy] = useState<ConnectionStrategy | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Detect reachable host whenever panel mounts or server starts.
+  // Detect the best connection path whenever panel mounts or server starts.
   useEffect(() => {
-    invoke<string | null>("detect_host").then(setHost).catch(console.error);
+    invoke<ConnectionStrategy>("detect_connection_strategy")
+      .then(setStrategy)
+      .catch(console.error);
   }, [serverState.running]);
 
   if (!repo) {
@@ -40,7 +42,7 @@ export function DetailPanel({
     ? (serverState.port ?? 7682 + repoIndex)
     : 7682 + repoIndex;
 
-  const connectHost = host ?? "127.0.0.1";
+  const connectHost = strategy?.host ?? "127.0.0.1";
   const repoNameEnc = encodeURIComponent(repo.name);
   const uri = serverState.running
     ? `nomadterm://${connectHost}:${port}?token=${repo.token}&repo_id=${repo.id}&repo_name=${repoNameEnc}&tls=0`
@@ -70,6 +72,13 @@ export function DetailPanel({
     setTimeout(() => setCopied(false), 1500);
   }
 
+  const strategyBadge =
+    strategy?.kind === "tailscale"
+      ? { label: "Tailscale", variant: "success" as const }
+      : strategy?.kind === "lan"
+        ? { label: "LAN only", variant: "warning" as const }
+        : { label: "Local only", variant: "outline" as const };
+
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       {/* Repo header */}
@@ -94,6 +103,7 @@ export function DetailPanel({
             "Stopped"
           )}
         </Badge>
+        <Badge variant={strategyBadge.variant}>{strategyBadge.label}</Badge>
         {serverState.running && (
           <span className="text-sm text-muted-foreground">
             <Wifi className="inline h-3.5 w-3.5 mr-1" />
@@ -148,10 +158,26 @@ export function DetailPanel({
               </Button>
             </div>
 
-            {!host && (
+            {strategy?.kind === "tailscale" && (
+              <p className="text-xs text-green-400 bg-green-500/10 border border-green-500/20 rounded px-2 py-1.5">
+                Remote access is ready through Tailscale. This QR should work
+                from outside your home as long as Tailscale is active on your
+                phone too.
+              </p>
+            )}
+
+            {strategy?.kind === "lan" && (
               <p className="text-xs text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded px-2 py-1.5">
-                No reachable LAN or Tailscale IP detected. The phone must be on
-                the same network as this machine.
+                Tailscale was not detected, so this connection is LAN-only. For
+                coffee-shop or mobile-data access, install and enable Tailscale
+                on both this machine and your phone.
+              </p>
+            )}
+
+            {strategy?.kind === "local_only" && (
+              <p className="text-xs text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded px-2 py-1.5">
+                No reachable LAN or Tailscale IP was detected. NomadTerm fell
+                back to local-only mode on this machine.
               </p>
             )}
           </div>

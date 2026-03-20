@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
-import type { RepoEntry, ServerState } from "@/types";
+import type { ConnectionStrategy, RepoEntry, ServerState } from "@/types";
 
 interface TerminalProps {
   repo: RepoEntry | null;
@@ -21,6 +22,13 @@ export function Terminal({ repo, serverState }: TerminalProps) {
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [strategy, setStrategy] = useState<ConnectionStrategy | null>(null);
+
+  useEffect(() => {
+    invoke<ConnectionStrategy>("detect_connection_strategy")
+      .then(setStrategy)
+      .catch(console.error);
+  }, [serverState.running]);
 
   // Initialise xterm once.
   useEffect(() => {
@@ -81,14 +89,15 @@ export function Terminal({ repo, serverState }: TerminalProps) {
 
     const port = serverState.port;
     const token = repo.token;
-    const url = `ws://127.0.0.1:${port}/ws?token=${encodeURIComponent(token)}`;
+    const host = strategy?.host ?? "127.0.0.1";
+    const url = `ws://${host}:${port}/ws?token=${encodeURIComponent(token)}`;
 
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
     term.clear();
-    term.writeln(`\x1b[90mConnecting to ws://127.0.0.1:${port}/ws …\x1b[0m`);
+    term.writeln(`\x1b[90mConnecting to ws://${host}:${port}/ws …\x1b[0m`);
 
     ws.onopen = () => {
       term.writeln("\x1b[32mConnected.\x1b[0m\r\n");
@@ -131,7 +140,7 @@ export function Terminal({ repo, serverState }: TerminalProps) {
       ws.close();
       wsRef.current = null;
     };
-  }, [serverState.running, serverState.port, repo]);
+  }, [serverState.running, serverState.port, repo, strategy]);
 
   return (
     <div

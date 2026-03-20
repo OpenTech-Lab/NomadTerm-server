@@ -31,6 +31,7 @@ CARGO_LOCK="$REPO_ROOT/Cargo.lock"
 DESKTOP_CARGO_TOML="$REPO_ROOT/desktop/src-tauri/Cargo.toml"
 DESKTOP_CARGO_LOCK="$REPO_ROOT/desktop/src-tauri/Cargo.lock"
 DESKTOP_TAURI_CONF="$REPO_ROOT/desktop/src-tauri/tauri.conf.json"
+DESKTOP_PACKAGE_JSON="$REPO_ROOT/desktop/package.json"
 VERSION_DIR="$SCRIPT_DIR/version"
 REMOTE="${REMOTE:-origin}"
 
@@ -188,6 +189,18 @@ if [[ -f "$DESKTOP_TAURI_CONF" ]]; then
     exit 1
   fi
   mv "$tmp_tauri_conf" "$DESKTOP_TAURI_CONF"
+fi
+
+# --- desktop/package.json ---
+if [[ -f "$DESKTOP_PACKAGE_JSON" ]]; then
+  tmp_pkg_json="$(mktemp)"
+  if ! sed "s/\"version\": \"[^\"]*\"/\"version\": \"${NEW_VERSION}\"/" \
+      "$DESKTOP_PACKAGE_JSON" >"$tmp_pkg_json"; then
+    rm -f "$tmp_pkg_json"
+    echo "Error: failed to update version in desktop/package.json" >&2
+    exit 1
+  fi
+  mv "$tmp_pkg_json" "$DESKTOP_PACKAGE_JSON"
 fi
 
 # --- desktop/src-tauri/Cargo.lock ---

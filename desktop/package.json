@@ -1,13 +1,13 @@
 {
   "name": "nomadterm-desktop",
   "private": true,
-  "version": "0.2.10",
+  "version": "0.3.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri:icons": "python3 scripts/generate_tauri_icon_source.py && tauri icon src-tauri/icons/logo-square.png",
+    "tauri:icons": "tauri icon src-tauri/icons/logo-square.png",
     "tauri": "tauri"
   },
   "dependencies": {

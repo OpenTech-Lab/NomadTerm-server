@@ -525,8 +525,9 @@ pub fn dispatch() -> anyhow::Result<()> {
         } => {
             let bind_addr = if bind_tailscale {
                 crate::ws::server::detect_tailscale_ip()
+                    .or_else(crate::ws::server::detect_lan_ip)
                     .unwrap_or_else(|| {
-                        eprintln!("[nomadterm] --bind-tailscale: Tailscale IP not found, falling back to 127.0.0.1");
+                        eprintln!("[nomadterm] --bind-tailscale: no Tailscale or LAN IP found, falling back to 127.0.0.1");
                         "127.0.0.1".to_string()
                     })
             } else {
@@ -977,6 +978,28 @@ mod tests {
             action,
             Action::Pty {
                 args: sv(&["claude", "--arg1"])
+            }
+        );
+    }
+
+    #[test]
+    fn ws_server_mode_with_bind_tailscale() {
+        let action = resolve_action(&sv(&[
+            "--ws",
+            "--bind-tailscale",
+            "--port",
+            "9001",
+            "--token",
+            "secret",
+        ]));
+        assert_eq!(
+            action,
+            Action::WsServer {
+                bind_tailscale: true,
+                port: 9001,
+                no_tls: false,
+                token_override: Some("secret".into()),
+                workspace_override: None,
             }
         );
     }
