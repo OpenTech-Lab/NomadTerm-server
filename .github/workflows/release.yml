@@ -371,6 +371,14 @@ jobs:
           workspaces: desktop/src-tauri -> target
           key: desktop-${{ matrix.platform }}
 
+      - name: Sync desktop version to release tag
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          # tauri.conf.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" desktop/src-tauri/tauri.conf.json
+          # Cargo.toml (first occurrence = [package] version)
+          sed -i "0,/^version = \"[^\"]*\"/{s/^version = \"[^\"]*\"/version = \"${VERSION}\"/}" desktop/src-tauri/Cargo.toml
+
       - name: Install frontend dependencies
         working-directory: desktop
         run: npm install
@@ -391,3 +399,42 @@ jobs:
           prerelease: false
           projectPath: desktop
           args: ${{ matrix.tauri_args }}
+
+      - name: Rename Linux desktop assets to nomadterm-desktop-*
+        if: matrix.platform == 'linux-x86_64'
+        shell: bash
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          mkdir -p /tmp/desktop-rename
+
+          # .deb: NomadTerm_{ver}_amd64.deb -> nomadterm-desktop_{ver}_amd64.deb
+          gh release download "${RELEASE_TAG}" \
+            -p "NomadTerm_${VERSION}_amd64.deb" -D /tmp/desktop-rename/
+          mv "/tmp/desktop-rename/NomadTerm_${VERSION}_amd64.deb" \
+             "/tmp/desktop-rename/nomadterm-desktop_${VERSION}_amd64.deb"
+          gh release upload "${RELEASE_TAG}" \
+            "/tmp/desktop-rename/nomadterm-desktop_${VERSION}_amd64.deb" --clobber
+          gh release delete-asset "${RELEASE_TAG}" \
+            "NomadTerm_${VERSION}_amd64.deb" --yes
+
+          # .AppImage: NomadTerm_{ver}_amd64.AppImage -> nomadterm-desktop_{ver}_amd64.AppImage
+          gh release download "${RELEASE_TAG}" \
+            -p "NomadTerm_${VERSION}_amd64.AppImage" -D /tmp/desktop-rename/
+          mv "/tmp/desktop-rename/NomadTerm_${VERSION}_amd64.AppImage" \
+             "/tmp/desktop-rename/nomadterm-desktop_${VERSION}_amd64.AppImage"
+          gh release upload "${RELEASE_TAG}" \
+            "/tmp/desktop-rename/nomadterm-desktop_${VERSION}_amd64.AppImage" --clobber
+          gh release delete-asset "${RELEASE_TAG}" \
+            "NomadTerm_${VERSION}_amd64.AppImage" --yes
+
+          # .rpm: NomadTerm-{ver}-1.x86_64.rpm -> nomadterm-desktop-{ver}-1.x86_64.rpm
+          gh release download "${RELEASE_TAG}" \
+            -p "NomadTerm-${VERSION}-1.x86_64.rpm" -D /tmp/desktop-rename/
+          mv "/tmp/desktop-rename/NomadTerm-${VERSION}-1.x86_64.rpm" \
+             "/tmp/desktop-rename/nomadterm-desktop-${VERSION}-1.x86_64.rpm"
+          gh release upload "${RELEASE_TAG}" \
+            "/tmp/desktop-rename/nomadterm-desktop-${VERSION}-1.x86_64.rpm" --clobber
+          gh release delete-asset "${RELEASE_TAG}" \
+            "NomadTerm-${VERSION}-1.x86_64.rpm" --yes
+        env:
+          GH_TOKEN: ${{ github.token }}

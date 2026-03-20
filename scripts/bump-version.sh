@@ -28,6 +28,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CARGO_TOML="$REPO_ROOT/Cargo.toml"
 CARGO_LOCK="$REPO_ROOT/Cargo.lock"
+DESKTOP_CARGO_TOML="$REPO_ROOT/desktop/src-tauri/Cargo.toml"
+DESKTOP_CARGO_LOCK="$REPO_ROOT/desktop/src-tauri/Cargo.lock"
+DESKTOP_TAURI_CONF="$REPO_ROOT/desktop/src-tauri/tauri.conf.json"
 VERSION_DIR="$SCRIPT_DIR/version"
 REMOTE="${REMOTE:-origin}"
 
@@ -151,6 +154,63 @@ if [[ -f "$CARGO_LOCK" ]]; then
     exit 1
   fi
   mv "$tmp_lock" "$CARGO_LOCK"
+fi
+
+# --- desktop/src-tauri/Cargo.toml ---
+if [[ -f "$DESKTOP_CARGO_TOML" ]]; then
+  tmp_desktop_toml="$(mktemp)"
+  if ! awk -v ver="$NEW_VERSION" '
+    BEGIN{in_pkg=0; done=0}
+    /^\[package\]$/ {in_pkg=1; print; next}
+    /^\[/ && $0 !~ /^\[package\]$/ {in_pkg=0}
+    in_pkg && !done && /^version[[:space:]]*=/ {
+      print "version = \"" ver "\""
+      done=1
+      next
+    }
+    {print}
+    END { if (!done) { exit 42 } }
+  ' "$DESKTOP_CARGO_TOML" >"$tmp_desktop_toml"; then
+    rm -f "$tmp_desktop_toml"
+    echo "Error: failed to update version in desktop/src-tauri/Cargo.toml" >&2
+    exit 1
+  fi
+  mv "$tmp_desktop_toml" "$DESKTOP_CARGO_TOML"
+fi
+
+# --- desktop/src-tauri/tauri.conf.json ---
+if [[ -f "$DESKTOP_TAURI_CONF" ]]; then
+  tmp_tauri_conf="$(mktemp)"
+  if ! sed "s/\"version\": \"[^\"]*\"/\"version\": \"${NEW_VERSION}\"/" \
+      "$DESKTOP_TAURI_CONF" >"$tmp_tauri_conf"; then
+    rm -f "$tmp_tauri_conf"
+    echo "Error: failed to update version in desktop/src-tauri/tauri.conf.json" >&2
+    exit 1
+  fi
+  mv "$tmp_tauri_conf" "$DESKTOP_TAURI_CONF"
+fi
+
+# --- desktop/src-tauri/Cargo.lock ---
+if [[ -f "$DESKTOP_CARGO_LOCK" ]]; then
+  tmp_desktop_lock="$(mktemp)"
+  if ! awk -v ver="$NEW_VERSION" '
+    BEGIN{in_target=0; updated=0}
+    /^\[\[package\]\]$/ {in_target=0}
+    /^name = "nomadterm-desktop"$/ {in_target=1}
+    in_target && /^version = "/ && !updated {
+      print "version = \"" ver "\""
+      in_target=0
+      updated=1
+      next
+    }
+    {print}
+    END { if (!updated) { exit 43 } }
+  ' "$DESKTOP_CARGO_LOCK" >"$tmp_desktop_lock"; then
+    rm -f "$tmp_desktop_lock"
+    echo "Error: failed to update nomadterm-desktop version in desktop/src-tauri/Cargo.lock" >&2
+    exit 1
+  fi
+  mv "$tmp_desktop_lock" "$DESKTOP_CARGO_LOCK"
 fi
 
 RELEASE_NOTE="$VERSION_DIR/$NEW_VERSION.md"
