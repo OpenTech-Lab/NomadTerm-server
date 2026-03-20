@@ -346,6 +346,7 @@ pub fn detect_lan_ip() -> Option<String> {
     None
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::{check_auth, preferred_connect_host};
@@ -355,21 +356,18 @@ mod tests {
     fn check_auth_accepts_bearer_header() {
         let mut headers = HeaderMap::new();
         headers.insert("authorization", HeaderValue::from_static("Bearer secret"));
-
         assert!(check_auth(&headers, None, "secret"));
     }
 
     #[test]
     fn check_auth_accepts_query_token() {
         let headers = HeaderMap::new();
-
         assert!(check_auth(&headers, Some("secret"), "secret"));
     }
 
     #[test]
     fn check_auth_rejects_wrong_token() {
         let headers = HeaderMap::new();
-
         assert!(!check_auth(&headers, Some("wrong"), "secret"));
     }
 
