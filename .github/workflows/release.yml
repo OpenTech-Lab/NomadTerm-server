@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, for example v0.2.4"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,14 +18,23 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
+    env:
+      CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
-      - name: Create draft release
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+      - name: Create release if missing
         run: |
-          gh release create ${{ github.ref_name }} \
-            --title "NomadTerm ${{ github.ref_name }}" \
-            --generate-notes \
-            --draft
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists"
+            exit 0
+          fi
+
+          gh release create "${RELEASE_TAG}" \
+            --title "NomadTerm ${RELEASE_TAG}" \
+            --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -27,6 +42,9 @@ jobs:
     name: Daemon - ${{ matrix.name }}
     needs: [create-release]
     runs-on: ${{ matrix.os }}
+    env:
+      CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     strategy:
       fail-fast: false
       matrix:
@@ -51,6 +69,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -75,7 +95,7 @@ jobs:
           EXT="${{ matrix.ext }}"
           cp target/${{ matrix.target }}/release/nomadterm${EXT} \
              nomadterm-${{ matrix.name }}${EXT}
-          gh release upload ${{ github.ref_name }} \
+          gh release upload "${RELEASE_TAG}" \
             nomadterm-${{ matrix.name }}${EXT} --clobber
         env:
           GH_TOKEN: ${{ github.token }}
@@ -111,7 +131,7 @@ jobs:
         if: startsWith(matrix.name, 'linux-')
         shell: bash
         run: |
-          gh release upload ${{ github.ref_name }} \
+          gh release upload "${RELEASE_TAG}" \
             nomadterm-server-${{ matrix.name }}.tar.gz --clobber
         env:
           GH_TOKEN: ${{ github.token }}
@@ -150,7 +170,7 @@ jobs:
         if: startsWith(matrix.name, 'darwin-')
         shell: bash
         run: |
-          gh release upload ${{ github.ref_name }} \
+          gh release upload "${RELEASE_TAG}" \
             nomadterm-server-${{ matrix.name }}.tar.gz --clobber
         env:
           GH_TOKEN: ${{ github.token }}
@@ -180,7 +200,7 @@ jobs:
         if: startsWith(matrix.name, 'windows-')
         shell: pwsh
         run: |
-          gh release upload ${{ github.ref_name }} `
+          gh release upload "${env:RELEASE_TAG}" `
             "nomadterm-server-${{ matrix.name }}.zip" --clobber
         env:
           GH_TOKEN: ${{ github.token }}
@@ -189,8 +209,13 @@ jobs:
     name: Publish Support Files
     needs: [create-release]
     runs-on: ubuntu-latest
+    env:
+      CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Prepare Linux install script
         run: |
@@ -200,22 +225,11 @@ jobs:
 
       - name: Upload support files
         run: |
-          gh release upload ${{ github.ref_name }} \
+          gh release upload "${RELEASE_TAG}" \
             install.sh \
             contrib/nomadterm.service \
             contrib/com.nomadterm.daemon.plist \
             contrib/windows-service.md \
             --clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-  publish:
-    name: Publish Release
-    needs: [create-release, build-daemon, publish-support-files]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Undraft release
-        run: gh release edit ${{ github.ref_name }} --draft=false
         env:
           GH_TOKEN: ${{ github.token }}
