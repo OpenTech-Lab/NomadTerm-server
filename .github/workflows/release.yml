@@ -175,19 +175,6 @@ jobs:
           cp "target/${{ matrix.target }}/release/nomadterm" "${PKG}/usr/bin/nomadterm"
           cp contrib/nomadterm.service "${PKG}/lib/systemd/system/"
 
-          # Desktop integration — icons (pre-sized, no imagemagick needed) + .desktop file.
-          for SIZE_DIR in 32x32 128x128 256x256; do
-            mkdir -p "${PKG}/usr/share/icons/hicolor/${SIZE_DIR}/apps"
-          done
-          cp desktop/src-tauri/icons/32x32.png \
-             "${PKG}/usr/share/icons/hicolor/32x32/apps/nomadterm.png"
-          cp desktop/src-tauri/icons/128x128.png \
-             "${PKG}/usr/share/icons/hicolor/128x128/apps/nomadterm.png"
-          cp desktop/src-tauri/icons/128x128@2x.png \
-             "${PKG}/usr/share/icons/hicolor/256x256/apps/nomadterm.png"
-          mkdir -p "${PKG}/usr/share/applications"
-          cp contrib/nomadterm.desktop "${PKG}/usr/share/applications/"
-
           INSTALLED_SIZE=$(du -sk "${PKG}" | cut -f1)
           printf 'Package: nomadterm\nVersion: %s\nArchitecture: %s\nMaintainer: NomadTerm <noreply@nomadterm.dev>\nInstalled-Size: %s\nSection: utils\nPriority: optional\nRecommends: nomadterm-desktop\nDescription: NomadTerm -- Secure Remote PTY Daemon for Multi-AI CLI\n PTY daemon for Claude Code, Codex, Copilot and Gemini CLI\n with Flutter mobile client integration.\n' \
             "${VERSION}" "${DEB_ARCH}" "${INSTALLED_SIZE}" \
@@ -378,6 +365,14 @@ jobs:
           sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" desktop/src-tauri/tauri.conf.json
           # Cargo.toml (first occurrence = [package] version)
           sed -i "0,/^version = \"[^\"]*\"/{s/^version = \"[^\"]*\"/version = \"${VERSION}\"/}" desktop/src-tauri/Cargo.toml
+          case "${{ matrix.platform }}" in
+            linux-*)
+              # Tauri derives Linux package names from productName. Override it in CI so
+              # the desktop package identity is nomadterm-desktop while the launcher label
+              # stays NomadTerm via the custom desktop template.
+              sed -i 's/"productName": "[^"]*"/"productName": "nomadterm-desktop"/' desktop/src-tauri/tauri.conf.json
+              ;;
+          esac
 
       - name: Install frontend dependencies
         working-directory: desktop
