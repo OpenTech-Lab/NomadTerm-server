@@ -54,7 +54,11 @@ impl ServerHandle {
             }
         });
 
-        ServerHandle { repo_id, port, shutdown_tx }
+        ServerHandle {
+            repo_id,
+            port,
+            shutdown_tx,
+        }
     }
 
     /// Send the shutdown signal to the running task.

@@ -124,8 +124,14 @@ pub fn print_launch_tips(
     let is_tmux = terminal_mode.starts_with("tmux");
 
     let managed = if has_close { "managed" } else { "unmanaged" };
-    let auto = if terminal_auto_detected { ", auto-detected" } else { "" };
-    tips.push(format!("[info] Terminal: {terminal_mode} ({managed}{auto})"));
+    let auto = if terminal_auto_detected {
+        ", auto-detected"
+    } else {
+        ""
+    };
+    tips.push(format!(
+        "[info] Terminal: {terminal_mode} ({managed}{auto})"
+    ));
 
     // --- Always-shown (batch-specific) ---
 

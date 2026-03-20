@@ -83,16 +83,14 @@ pub fn show(
         ui.add_space(12.0);
 
         if is_running {
-            let host = crate::ws::server::detect_tailscale_ip()
-                .unwrap_or_else(|| "0.0.0.0".to_string());
-            let expires_at = chrono::Utc::now()
-                + chrono::Duration::days(30);
-            let expires_str = expires_at.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            let repo_path_enc = urlencoding_simple(&repo_path);
+            let detected_host = crate::ws::server::detect_connect_host();
+            let host = detected_host
+                .clone()
+                .unwrap_or_else(|| "127.0.0.1".to_string());
             let repo_name_enc = urlencoding_simple(&repo_name);
             let uri = format!(
-                "nomadterm://{}:{}?token={}&repo_id={}&repo_path={}&repo_name={}&expires_at={}&tls=0",
-                host, port, repo_token, repo_id, repo_path_enc, repo_name_enc, expires_str
+                "nomadterm://{}:{}?token={}&repo_id={}&repo_name={}&tls=0",
+                host, port, repo_token, repo_id, repo_name_enc
             );
 
             // QR code
@@ -101,12 +99,15 @@ pub fn show(
             }
 
             if let Some(tex) = qr_cache {
-                let size = egui::vec2(200.0, 200.0);
+                let size = egui::vec2(260.0, 260.0);
                 ui.image((tex.id(), size));
             }
 
             ui.add_space(8.0);
             ui.label(&uri);
+            if detected_host.is_none() {
+                ui.label("No reachable LAN or Tailscale IP detected. The phone must be on the same reachable network as this machine.");
+            }
 
             if ui.button("Copy URL").clicked() {
                 ui.ctx().copy_text(uri.clone());

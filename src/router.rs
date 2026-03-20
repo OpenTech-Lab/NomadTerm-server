@@ -6,7 +6,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{bail, Context as _};
+use anyhow::{Context as _, bail};
 use clap::Parser;
 
 use crate::log::{log_error, log_info, log_warn};
@@ -285,7 +285,11 @@ pub fn resolve_action(argv: &[String]) -> Action {
             .find(|w| w[0] == "--port")
             .and_then(|w| w[1].parse::<u16>().ok())
             .unwrap_or(7681);
-        return Action::WsServer { bind_tailscale, port, no_tls };
+        return Action::WsServer {
+            bind_tailscale,
+            port,
+            no_tls,
+        };
     }
 
     // Relay worker mode: `nomadterm relay-worker`
@@ -496,7 +500,11 @@ pub fn dispatch() -> anyhow::Result<()> {
                 std::process::exit(exit_code);
             }
         }
-        Action::WsServer { bind_tailscale, port, no_tls } => {
+        Action::WsServer {
+            bind_tailscale,
+            port,
+            no_tls,
+        } => {
             let bind_addr = if bind_tailscale {
                 crate::ws::server::detect_tailscale_ip()
                     .unwrap_or_else(|| {
@@ -507,8 +515,8 @@ pub fn dispatch() -> anyhow::Result<()> {
                 "0.0.0.0".to_string()
             };
 
-            let workspace_dir = std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let workspace_dir =
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
             // Extract --go flag to skip trust prompt.
             let raw_argv: Vec<String> = std::env::args().skip(1).collect();

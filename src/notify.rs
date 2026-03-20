@@ -39,8 +39,8 @@ impl NotifyServer {
     pub fn wait(&self, timeout: Duration) -> bool {
         #[cfg(unix)]
         {
-            use std::os::fd::{AsRawFd, BorrowedFd};
             use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
+            use std::os::fd::{AsRawFd, BorrowedFd};
 
             let timeout_ms = timeout.as_millis().min(i32::MAX as u128) as i32;
             let poll_timeout = PollTimeout::try_from(timeout_ms).unwrap_or(PollTimeout::MAX);

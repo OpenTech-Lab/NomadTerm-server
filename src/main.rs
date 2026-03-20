@@ -2,12 +2,13 @@
 
 mod bootstrap;
 mod cli_context;
-pub mod ws;
 pub mod commands;
 mod config;
 pub mod core;
 mod db;
 mod delivery;
+#[cfg(feature = "gui")]
+mod gui;
 pub mod hooks;
 pub mod identity;
 mod instances;
@@ -29,10 +30,9 @@ mod tool;
 pub mod tools;
 mod transcript;
 mod tui;
-#[cfg(feature = "gui")]
-mod gui;
 mod update;
 pub mod usage_tracker;
+pub mod ws;
 
 use anyhow::{Context, Result, bail};
 use std::panic;
@@ -102,7 +102,8 @@ pub fn run_pty(args: &[String]) -> Result<()> {
 
     // On Termux, some wrapped tools need a launcher override instead of direct exec.
     let (command, extra_args): (String, Vec<String>);
-    if let Some((launcher, prefix_args)) = terminal::resolve_termux_tool_launcher(tool_str, &resolved)
+    if let Some((launcher, prefix_args)) =
+        terminal::resolve_termux_tool_launcher(tool_str, &resolved)
     {
         command = launcher;
         extra_args = prefix_args;

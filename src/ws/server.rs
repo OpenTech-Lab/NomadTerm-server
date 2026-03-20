@@ -9,15 +9,12 @@
 use anyhow::{Context, Result, bail};
 use axum::{
     Router,
-    extract::{
-        State,
-        WebSocketUpgrade,
-        ws::WebSocket,
-    },
+    extract::{Query, State, WebSocketUpgrade, ws::WebSocket},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::get,
 };
+use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -76,7 +73,9 @@ impl Default for WsConfig {
 /// Entry point: start the WebSocket server (blocking — call from a tokio runtime).
 pub async fn run(config: WsConfig) -> Result<()> {
     // Resolve workspace to an absolute canonical path.
-    let workspace = config.workspace_dir.canonicalize()
+    let workspace = config
+        .workspace_dir
+        .canonicalize()
         .unwrap_or_else(|_| config.workspace_dir.clone());
 
     // Trust prompt — mirrors VS Code's "Do you trust the authors of this folder?"
@@ -134,10 +133,15 @@ pub async fn run(config: WsConfig) -> Result<()> {
 async fn ws_upgrade_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
     // Phase 5: validate bearer token.
-    if !check_auth(&headers, &state.token) {
+    if !check_auth(
+        &headers,
+        params.get("token").map(String::as_str),
+        &state.token,
+    ) {
         return (StatusCode::UNAUTHORIZED, "Invalid or missing token").into_response();
     }
 
@@ -156,13 +160,14 @@ async fn health_handler() -> &'static str {
 }
 
 /// Validate `Authorization: Bearer <token>` header.
-fn check_auth(headers: &HeaderMap, expected: &str) -> bool {
+fn check_auth(headers: &HeaderMap, query_token: Option<&str>, expected: &str) -> bool {
     headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .map(|t| t == expected)
         .unwrap_or(false)
+        || query_token.map(|t| t == expected).unwrap_or(false)
 }
 
 /// Prompt the user to confirm they trust the given folder before starting the server.
@@ -182,7 +187,10 @@ fn prompt_trust_folder(path: &std::path::Path) -> Result<()> {
     io::stderr().flush().ok();
 
     let stdin = io::stdin();
-    let answer = stdin.lock().lines().next()
+    let answer = stdin
+        .lock()
+        .lines()
+        .next()
         .and_then(|l| l.ok())
         .unwrap_or_default()
         .trim()
@@ -218,14 +226,24 @@ fn load_or_create_token() -> Result<String> {
 
 /// Print the connection URL and QR code to stderr so the user can scan from their phone.
 fn print_connection_info(addr: &SocketAddr, token: &str, workspace: &std::path::Path) {
-    let connection_string = format!("ws://{}/?token={}", addr, token);
+    let advertised_host = if addr.ip().is_unspecified() {
+        detect_connect_host().unwrap_or_else(|| "127.0.0.1".to_string())
+    } else {
+        addr.ip().to_string()
+    };
+    let connection_string = format!(
+        "ws://{}:{}/ws?token={}",
+        advertised_host,
+        addr.port(),
+        token
+    );
     let workspace_str = workspace.display().to_string();
 
     eprintln!("\n╔══════════════════════════════════════════════════╗");
     eprintln!("║           NomadTerm — WebSocket Daemon           ║");
     eprintln!("╠══════════════════════════════════════════════════╣");
     eprintln!("║  Workspace: {}", workspace_str);
-    eprintln!("║  Address : ws://{}/ws", addr);
+    eprintln!("║  Address : ws://{}:{}/ws", advertised_host, addr.port());
     eprintln!("║  Token   : {}", token);
     eprintln!("╠══════════════════════════════════════════════════╣");
     eprintln!("║  Scan QR code from the NomadTerm Flutter app:   ║");
@@ -285,4 +303,63 @@ pub fn detect_tailscale_ip() -> Option<String> {
     }
 
     None
+}
+
+/// Detect the best client-connect host for QR codes and human-facing URLs.
+///
+/// Preference order:
+///   1. Tailscale IPv4, if available
+///   2. Primary LAN IPv4 inferred from the routing table
+pub fn detect_connect_host() -> Option<String> {
+    detect_tailscale_ip().or_else(detect_lan_ip)
+}
+
+fn detect_lan_ip() -> Option<String> {
+    use std::net::{IpAddr, UdpSocket};
+
+    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
+
+    for remote in ["192.0.2.1:80", "8.8.8.8:80"] {
+        if socket.connect(remote).is_err() {
+            continue;
+        }
+
+        if let Ok(local_addr) = socket.local_addr() {
+            if let IpAddr::V4(v4) = local_addr.ip() {
+                if !v4.is_loopback() && !v4.is_unspecified() {
+                    return Some(v4.to_string());
+                }
+            }
+        }
+    }
+
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_auth;
+    use axum::http::{HeaderMap, HeaderValue};
+
+    #[test]
+    fn check_auth_accepts_bearer_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Bearer secret"));
+
+        assert!(check_auth(&headers, None, "secret"));
+    }
+
+    #[test]
+    fn check_auth_accepts_query_token() {
+        let headers = HeaderMap::new();
+
+        assert!(check_auth(&headers, Some("secret"), "secret"));
+    }
+
+    #[test]
+    fn check_auth_rejects_wrong_token() {
+        let headers = HeaderMap::new();
+
+        assert!(!check_auth(&headers, Some("wrong"), "secret"));
+    }
 }

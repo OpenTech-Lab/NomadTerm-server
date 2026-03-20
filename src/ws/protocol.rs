@@ -26,7 +26,10 @@ pub enum ServerMessage {
     },
     /// Current session list (sent on connect and on change).
     /// `workspace` is the absolute path of the server's working directory.
-    SessionList { sessions: Vec<SessionInfo>, workspace: String },
+    SessionList {
+        sessions: Vec<SessionInfo>,
+        workspace: String,
+    },
     /// Error response.
     Error { message: String },
     /// Session started successfully.

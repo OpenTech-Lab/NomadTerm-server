@@ -416,7 +416,11 @@ fn test_relay_roundtrip() {
                             data = parsed;
                         }
                     }
-                    if data["text"].as_str().map(|t| t.contains(&marker_b)).unwrap_or(false) {
+                    if data["text"]
+                        .as_str()
+                        .map(|t| t.contains(&marker_b))
+                        .unwrap_or(false)
+                    {
                         return Some((ev, data));
                     }
                 }

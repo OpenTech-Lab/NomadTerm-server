@@ -17,7 +17,11 @@ fn app_icon() -> egui::IconData {
         .expect("embedded logo.png must be a valid PNG")
         .into_rgba8();
     let (w, h) = img.dimensions();
-    egui::IconData { rgba: img.into_raw(), width: w, height: h }
+    egui::IconData {
+        rgba: img.into_raw(),
+        width: w,
+        height: h,
+    }
 }
 
 /// Launch the eframe desktop window (blocks until window is closed).
@@ -35,15 +39,18 @@ pub fn run() -> Result<()> {
     if let Ok(mut db) = crate::db::HcomDb::open() {
         if db.ensure_schema().is_ok() {
             if let Ok(rows) = db.list_repos() {
-                gui_state.repos = rows.into_iter().map(|r| state::RepoEntry {
-                    id: r.id,
-                    path: r.path,
-                    name: r.name,
-                    token: r.token,
-                    added_at: r.added_at,
-                    last_seen: r.last_seen,
-                    is_active: false, // servers don't survive restart
-                }).collect();
+                gui_state.repos = rows
+                    .into_iter()
+                    .map(|r| state::RepoEntry {
+                        id: r.id,
+                        path: r.path,
+                        name: r.name,
+                        token: r.token,
+                        added_at: r.added_at,
+                        last_seen: r.last_seen,
+                        is_active: false, // servers don't survive restart
+                    })
+                    .collect();
             }
         }
     }
@@ -59,9 +66,7 @@ pub fn run() -> Result<()> {
     eframe::run_native(
         "NomadTerm",
         native_options,
-        Box::new(move |cc| {
-            Ok(Box::new(app::GuiApp::new(cc, gui_state, rt_handle)))
-        }),
+        Box::new(move |cc| Ok(Box::new(app::GuiApp::new(cc, gui_state, rt_handle)))),
     )
     .map_err(|e| anyhow::anyhow!("eframe error: {e}"))
 }

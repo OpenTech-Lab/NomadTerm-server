@@ -100,10 +100,8 @@ async fn test_accept_with_correct_token() {
 
     let url = format!("ws://{addr}/ws");
     let mut req = url.into_client_request().unwrap();
-    req.headers_mut().insert(
-        "authorization",
-        format!("Bearer {token}").parse().unwrap(),
-    );
+    req.headers_mut()
+        .insert("authorization", format!("Bearer {token}").parse().unwrap());
 
     let (mut stream, _response) = connect_async(req).await.expect("connection should succeed");
 

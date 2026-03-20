@@ -90,9 +90,7 @@ impl SessionPool {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(HashMap::new())),
-            workspace_dir: Arc::new(
-                std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-            ),
+            workspace_dir: Arc::new(std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
         }
     }
 
@@ -111,8 +109,8 @@ impl SessionPool {
         let session_id = Uuid::new_v4().to_string();
         let cli_name = cli.to_string();
 
-        let binary = std::env::current_exe()
-            .unwrap_or_else(|_| std::path::PathBuf::from("nomadterm"));
+        let binary =
+            std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("nomadterm"));
 
         let (tx, _) = broadcast::channel::<Vec<u8>>(BROADCAST_CAPACITY);
         let tx_clone = tx.clone();
@@ -154,17 +152,20 @@ impl SessionPool {
             _child: child,
         };
 
-        self.inner.lock().unwrap().insert(session_id.clone(), session);
+        self.inner
+            .lock()
+            .unwrap()
+            .insert(session_id.clone(), session);
 
         Ok(session_id)
     }
 
     /// Poll SQLite until the PTY registers its inject port or timeout expires.
     fn wait_for_inject_port(instance_name: &str, timeout_ms: u64) -> Result<u16> {
-        let deadline = std::time::Instant::now()
-            + std::time::Duration::from_millis(timeout_ms);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
 
-        let db = crate::db::HcomDb::open().context("Failed to open DB for inject port discovery")?;
+        let db =
+            crate::db::HcomDb::open().context("Failed to open DB for inject port discovery")?;
 
         while std::time::Instant::now() < deadline {
             if let Ok(Some(port)) = db.get_inject_port(instance_name) {

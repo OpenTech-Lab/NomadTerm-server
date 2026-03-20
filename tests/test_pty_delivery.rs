@@ -207,8 +207,7 @@ struct TestLog {
 
 impl TestLog {
     fn new(tool: &str) -> Self {
-        let log_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("target/test-logs");
+        let log_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-logs");
         fs::create_dir_all(&log_dir).ok();
 
         let ts = chrono::Local::now().format("%Y%m%d_%H%M%S");
@@ -391,7 +390,10 @@ fn validate_delivery_events(instance: &str, baseline_id: i64, sender: &str, log:
         pos > baseline_id,
         "Delivery position {pos} not after baseline {baseline_id}"
     );
-    logln!(log, "  OK: Delivery position {pos} > baseline {baseline_id}");
+    logln!(
+        log,
+        "  OK: Delivery position {pos} > baseline {baseline_id}"
+    );
 }
 
 fn validate_gate_block(instance: &str, tool: &str, after_id: i64, log: &TestLog) {
@@ -417,7 +419,10 @@ fn validate_gate_block(instance: &str, tool: &str, after_id: i64, log: &TestLog)
         if ctx == expected {
             logln!(log, "  OK: Gate blocked with expected context '{expected}'");
         } else {
-            logln!(log, "  WARN: Expected gate context '{expected}', got '{ctx}'");
+            logln!(
+                log,
+                "  WARN: Expected gate context '{expected}', got '{ctx}'"
+            );
         }
     } else {
         logln!(
@@ -539,7 +544,11 @@ fn run_pty_test(tool: &str) {
     validate_screen_schema(&screen);
     logln!(log, "  OK: Schema valid");
     validate_ready_pattern(&screen, tool);
-    logln!(log, "  OK: Ready pattern '{}' consistent", ready_pattern(tool));
+    logln!(
+        log,
+        "  OK: Ready pattern '{}' consistent",
+        ready_pattern(tool)
+    );
     assert_eq!(screen["ready"].as_bool(), Some(true));
     validate_prompt_consistency(&screen);
     logln!(
@@ -997,7 +1006,10 @@ fn run_pty_test_opencode() {
     }
 
     // ── Phase 3: Plugin delivery (second message) ────────────────
-    logln!(log, "\n[Phase 3] Testing plugin delivery (second message)...");
+    logln!(
+        log,
+        "\n[Phase 3] Testing plugin delivery (second message)..."
+    );
 
     let baseline_event2 = get_last_event_id(&base_name);
     thread::sleep(Duration::from_secs(2));

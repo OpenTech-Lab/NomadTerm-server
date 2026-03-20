@@ -68,11 +68,8 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     // Open DB
     let db = HcomDb::open()?;
 
-    let launcher_name = resolve_launcher_name(
-        &db,
-        flags,
-        std::env::var("HCOM_PROCESS_ID").ok().as_deref(),
-    );
+    let launcher_name =
+        resolve_launcher_name(&db, flags, std::env::var("HCOM_PROCESS_ID").ok().as_deref());
     let launcher_name_ref = launcher_name.as_str();
 
     // Clone for post-launch tips (originals are moved into LaunchParams)
@@ -160,8 +157,8 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
         terminal_auto_detected = false;
         &hcom_config.terminal
     } else {
-        detected_terminal = crate::terminal::detect_terminal_from_env()
-            .unwrap_or_else(|| "default".to_string());
+        detected_terminal =
+            crate::terminal::detect_terminal_from_env().unwrap_or_else(|| "default".to_string());
         terminal_auto_detected = detected_terminal != "default";
         &detected_terminal
     };
@@ -189,21 +186,19 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     Ok(if result.failed == 0 { 0 } else { 1 })
 }
 
-fn resolve_launcher_name(
-    db: &HcomDb,
-    flags: &GlobalFlags,
-    process_id: Option<&str>,
-) -> String {
+fn resolve_launcher_name(db: &HcomDb, flags: &GlobalFlags, process_id: Option<&str>) -> String {
     // Launch caller identity only needs explicit --name, then process binding.
     flags
         .name
         .as_deref()
-        .map(|name| crate::instances::resolve_display_name(db, name).unwrap_or_else(|| name.to_string()))
+        .map(|name| {
+            crate::instances::resolve_display_name(db, name).unwrap_or_else(|| name.to_string())
+        })
         .or_else(|| flags.name.clone())
         .unwrap_or_else(|| {
-        identity::resolve_identity(db, None, None, None, process_id, None, None)
-            .map(|id| id.name)
-            .unwrap_or_else(|_| "user".to_string())
+            identity::resolve_identity(db, None, None, None, process_id, None, None)
+                .map(|id| id.name)
+                .unwrap_or_else(|_| "user".to_string())
         })
 }
 

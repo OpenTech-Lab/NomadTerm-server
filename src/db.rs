@@ -2963,17 +2963,20 @@ impl HcomDb {
         let mut stmt = self.conn.prepare(
             "SELECT id, path, name, token, added_at, last_seen, is_active FROM repos ORDER BY last_seen DESC, added_at DESC",
         )?;
-        let rows = stmt.query_map([], |row| Ok(RepoRow {
-            id: row.get(0)?,
-            path: row.get(1)?,
-            name: row.get(2)?,
-            token: row.get(3)?,
-            added_at: row.get(4)?,
-            last_seen: row.get(5)?,
-            is_active: row.get::<_, i64>(6)? != 0,
-        }))?
-        .filter_map(|r| r.ok())
-        .collect();
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(RepoRow {
+                    id: row.get(0)?,
+                    path: row.get(1)?,
+                    name: row.get(2)?,
+                    token: row.get(3)?,
+                    added_at: row.get(4)?,
+                    last_seen: row.get(5)?,
+                    is_active: row.get::<_, i64>(6)? != 0,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(rows)
     }
 
@@ -2982,15 +2985,17 @@ impl HcomDb {
         let mut stmt = self.conn.prepare(
             "SELECT id, path, name, token, added_at, last_seen, is_active FROM repos WHERE token = ?1",
         )?;
-        let mut rows = stmt.query_map(params![token], |row| Ok(RepoRow {
-            id: row.get(0)?,
-            path: row.get(1)?,
-            name: row.get(2)?,
-            token: row.get(3)?,
-            added_at: row.get(4)?,
-            last_seen: row.get(5)?,
-            is_active: row.get::<_, i64>(6)? != 0,
-        }))?;
+        let mut rows = stmt.query_map(params![token], |row| {
+            Ok(RepoRow {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                name: row.get(2)?,
+                token: row.get(3)?,
+                added_at: row.get(4)?,
+                last_seen: row.get(5)?,
+                is_active: row.get::<_, i64>(6)? != 0,
+            })
+        })?;
         Ok(rows.next().and_then(|r| r.ok()))
     }
 
@@ -3015,7 +3020,8 @@ impl HcomDb {
 
     /// Delete a repo row.
     pub fn remove_repo(&self, id: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM repos WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM repos WHERE id = ?1", params![id])?;
         Ok(())
     }
 }

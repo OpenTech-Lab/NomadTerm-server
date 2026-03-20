@@ -1706,8 +1706,7 @@ fn correlate_paths_to_hcom(
         "SELECT name, transcript_path, session_id
          FROM instances
          WHERE transcript_path IS NOT NULL",
-    )
-    {
+    ) {
         if let Ok(rows) = stmt.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
