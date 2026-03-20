@@ -27,14 +27,33 @@ jobs:
           ref: ${{ env.CHECKOUT_REF }}
       - name: Create release if missing
         run: |
+          NOTES_FILE="scripts/version/${RELEASE_TAG#v}.md"
+          TITLE="NomadTerm ${RELEASE_TAG}"
+
+          if [[ -f "${NOTES_FILE}" ]]; then
+            if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+              gh release edit "${RELEASE_TAG}" \
+                --title "${TITLE}" \
+                --notes-file "${NOTES_FILE}"
+            else
+              gh release create "${RELEASE_TAG}" \
+                --title "${TITLE}" \
+                --notes-file "${NOTES_FILE}" \
+                --verify-tag
+            fi
+
+            exit 0
+          fi
+
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            echo "Release ${RELEASE_TAG} already exists"
+            echo "Release ${RELEASE_TAG} already exists and no notes file was found"
             exit 0
           fi
 
           gh release create "${RELEASE_TAG}" \
-            --title "NomadTerm ${RELEASE_TAG}" \
-            --generate-notes
+            --title "${TITLE}" \
+            --generate-notes \
+            --verify-tag
         env:
           GH_TOKEN: ${{ github.token }}
 

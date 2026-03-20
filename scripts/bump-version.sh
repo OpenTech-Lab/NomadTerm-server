@@ -41,6 +41,24 @@ mkdir -p "$VERSION_DIR"
 cd "$REPO_ROOT"
 git rev-parse --is-inside-work-tree >/dev/null
 
+REMOTE_URL="$(git remote get-url "$REMOTE" 2>/dev/null || true)"
+case "$REMOTE_URL" in
+  https://github.com/*)
+    REPO_SLUG="${REMOTE_URL#https://github.com/}"
+    ;;
+  git@github.com:*)
+    REPO_SLUG="${REMOTE_URL#git@github.com:}"
+    ;;
+  ssh://git@github.com/*)
+    REPO_SLUG="${REMOTE_URL#ssh://git@github.com/}"
+    ;;
+  *)
+    echo "Error: unsupported remote URL for release notes: $REMOTE_URL" >&2
+    exit 1
+    ;;
+esac
+REPO_SLUG="${REPO_SLUG%.git}"
+
 CURRENT_VERSION="$(awk '
   BEGIN{in_pkg=0}
   /^\[package\]$/ {in_pkg=1; next}
@@ -143,24 +161,68 @@ fi
 
 LAST_TAG="$(git -C "$REPO_ROOT" describe --tags --abbrev=0 2>/dev/null || true)"
 if [[ -n "$LAST_TAG" ]]; then
-  CHANGELOG_ENTRIES="$(git -C "$REPO_ROOT" log "${LAST_TAG}..HEAD" --pretty=format:'    %h %s' || true)"
+  CHANGELOG_ENTRIES="$(git -C "$REPO_ROOT" log "${LAST_TAG}..HEAD" --pretty=format:'- `%h` %s' || true)"
 else
-  CHANGELOG_ENTRIES="$(git -C "$REPO_ROOT" log --max-count=20 --pretty=format:'    %h %s' || true)"
+  CHANGELOG_ENTRIES="$(git -C "$REPO_ROOT" log --max-count=20 --pretty=format:'- `%h` %s' || true)"
 fi
 
 if [[ -z "$CHANGELOG_ENTRIES" ]]; then
-  CHANGELOG_ENTRIES="    (no changes)"
+  CHANGELOG_ENTRIES="- (no changes)"
+fi
+
+RELEASE_DATE="$(date -u +"%Y-%m-%d")"
+DOWNLOAD_BASE_URL="https://github.com/${REPO_SLUG}/releases/download/${TAG}"
+if [[ -n "$LAST_TAG" ]]; then
+  FULL_CHANGELOG_URL="https://github.com/${REPO_SLUG}/compare/${LAST_TAG}...${TAG}"
+  FULL_CHANGELOG_TEXT="${LAST_TAG}...${TAG}"
+else
+  FULL_CHANGELOG_URL="https://github.com/${REPO_SLUG}/releases/tag/${TAG}"
+  FULL_CHANGELOG_TEXT="Initial release"
 fi
 
 cat >"$RELEASE_NOTE" <<EOF
-# NomadTerm Server $NEW_VERSION
+# Changelog - $TAG
 
-- Released on: $(date -u +"%Y-%m-%d")
-- Previous version: $CURRENT_VERSION
+Release date: $RELEASE_DATE
 
 ## What's Changed
 
 $CHANGELOG_ENTRIES
+
+## Install
+
+Linux x64:
+\`\`\`bash
+curl -Lo nomadterm ${DOWNLOAD_BASE_URL}/nomadterm-linux-x86_64
+chmod +x nomadterm
+\`\`\`
+
+Linux ARM64:
+\`\`\`bash
+curl -Lo nomadterm ${DOWNLOAD_BASE_URL}/nomadterm-linux-arm64
+chmod +x nomadterm
+\`\`\`
+
+macOS Apple Silicon:
+\`\`\`bash
+curl -Lo nomadterm ${DOWNLOAD_BASE_URL}/nomadterm-darwin-arm64
+chmod +x nomadterm
+\`\`\`
+
+macOS Intel:
+\`\`\`bash
+curl -Lo nomadterm ${DOWNLOAD_BASE_URL}/nomadterm-darwin-x86_64
+chmod +x nomadterm
+\`\`\`
+
+Windows x64:
+\`\`\`powershell
+curl.exe -Lo nomadterm.exe ${DOWNLOAD_BASE_URL}/nomadterm-windows-x86_64.exe
+\`\`\`
+
+## Full Changelog
+
+[$FULL_CHANGELOG_TEXT]($FULL_CHANGELOG_URL)
 EOF
 
 # Keep only latest version note file
