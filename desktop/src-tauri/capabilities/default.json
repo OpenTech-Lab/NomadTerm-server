@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/capabilities.schema.json",
+  "identifier": "default",
+  "description": "Default capability set for NomadTerm desktop",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:default",
+    "core:app:default",
+    "dialog:allow-open",
+    "shell:allow-execute",
+    "shell:allow-open"
+  ]
+}

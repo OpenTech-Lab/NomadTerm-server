@@ -118,6 +118,10 @@ pub enum Action {
         bind_tailscale: bool,
         port: u16,
         no_tls: bool,
+        /// Optional token override (--token FLAG); if absent, loads from disk.
+        token_override: Option<String>,
+        /// Optional workspace directory override (--workspace FLAG); defaults to CWD.
+        workspace_override: Option<std::path::PathBuf>,
     },
     /// Open desktop GUI
     Gui,
@@ -276,7 +280,9 @@ pub fn resolve_action(argv: &[String]) -> Action {
         return Action::Gui;
     }
 
-    // WebSocket server mode: `nomadterm --ws [--bind-tailscale] [--port N] [--no-tls]`
+    // WebSocket server mode:
+    //   nomadterm --ws [--bind-tailscale] [--port N] [--no-tls]
+    //              [--token TOKEN] [--workspace PATH]
     if argv.iter().any(|a| a == "--ws") {
         let bind_tailscale = argv.iter().any(|a| a == "--bind-tailscale");
         let no_tls = argv.iter().any(|a| a == "--no-tls");
@@ -285,10 +291,20 @@ pub fn resolve_action(argv: &[String]) -> Action {
             .find(|w| w[0] == "--port")
             .and_then(|w| w[1].parse::<u16>().ok())
             .unwrap_or(7681);
+        let token_override = argv
+            .windows(2)
+            .find(|w| w[0] == "--token")
+            .map(|w| w[1].clone());
+        let workspace_override = argv
+            .windows(2)
+            .find(|w| w[0] == "--workspace")
+            .map(|w| std::path::PathBuf::from(&w[1]));
         return Action::WsServer {
             bind_tailscale,
             port,
             no_tls,
+            token_override,
+            workspace_override,
         };
     }
 
@@ -504,6 +520,8 @@ pub fn dispatch() -> anyhow::Result<()> {
             bind_tailscale,
             port,
             no_tls,
+            token_override,
+            workspace_override,
         } => {
             let bind_addr = if bind_tailscale {
                 crate::ws::server::detect_tailscale_ip()
@@ -515,12 +533,14 @@ pub fn dispatch() -> anyhow::Result<()> {
                 "0.0.0.0".to_string()
             };
 
-            let workspace_dir =
-                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let workspace_dir = workspace_override.unwrap_or_else(|| {
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+            });
 
             // Extract --go flag to skip trust prompt.
             let raw_argv: Vec<String> = std::env::args().skip(1).collect();
-            let skip_trust_prompt = raw_argv.iter().any(|a| a == "--go");
+            let skip_trust_prompt =
+                raw_argv.iter().any(|a| a == "--go") || token_override.is_some();
 
             let config = crate::ws::WsConfig {
                 bind_addr,
@@ -528,7 +548,7 @@ pub fn dispatch() -> anyhow::Result<()> {
                 no_tls,
                 workspace_dir,
                 skip_trust_prompt,
-                token_override: None,
+                token_override,
                 repo_id: None,
             };
 

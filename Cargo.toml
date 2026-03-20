@@ -55,13 +55,14 @@ bytes = "1"
 rustls = "0.22"
 webpki-roots = "0.26"
 
-# Desktop GUI (optional — compile with --features gui)
+# Desktop GUI (legacy egui — kept for reference, superseded by desktop/ Tauri app)
 eframe = { version = "0.31", optional = true, default-features = false, features = ["glow", "persistence", "wayland", "x11"] }
 egui = { version = "0.31", optional = true }
 rfd = { version = "0.15", optional = true }
 image = { version = "0.25", optional = true, default-features = false, features = ["png"] }
 
 [features]
+# gui feature is deprecated; use `cd desktop && npm run tauri dev` instead.
 gui = ["dep:eframe", "dep:egui", "dep:rfd", "dep:image"]
 
 [dev-dependencies]

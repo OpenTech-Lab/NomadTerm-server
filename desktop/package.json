@@ -1,0 +1,40 @@
+{
+  "name": "nomadterm-desktop",
+  "private": true,
+  "version": "0.2.10",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@xterm/xterm": "^5",
+    "@xterm/addon-fit": "^0.10",
+    "@xterm/addon-web-links": "^0.11",
+    "@radix-ui/react-scroll-area": "^1",
+    "@radix-ui/react-separator": "^1",
+    "@radix-ui/react-slot": "^1",
+    "class-variance-authority": "^0.7",
+    "clsx": "^2",
+    "lucide-react": "^0.400.0",
+    "qrcode.react": "^3",
+    "react": "^18",
+    "react-dom": "^18",
+    "tailwind-merge": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^4",
+    "autoprefixer": "^10",
+    "postcss": "^8",
+    "tailwindcss": "^3",
+    "typescript": "^5",
+    "vite": "^5"
+  }
+}
