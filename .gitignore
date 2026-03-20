@@ -1,0 +1,40 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock.bk
+
+# Python / maturin
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+*.egg
+wheels/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / env
+.env
+.env.local
+.env.*.local
+secrets/
+*.key
+*.pem
+
+# Logs
+*.log
+logs/
