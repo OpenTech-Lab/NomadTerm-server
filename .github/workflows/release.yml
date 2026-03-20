@@ -262,8 +262,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  publish-support-files:
-    name: Publish Support Files
+  publish-install-script:
+    name: Publish Install Script
     needs: [create-release]
     runs-on: ubuntu-latest
     env:
@@ -280,14 +280,10 @@ jobs:
             scripts/install.sh > install.sh
           chmod +x install.sh
 
-      - name: Upload support files
+      - name: Upload install script
         run: |
           gh release upload "${RELEASE_TAG}" \
             install.sh \
-            contrib/nomadterm.service \
-            contrib/com.nomadterm.daemon.plist \
-            contrib/windows-service.md \
-            contrib/nomadterm.desktop \
             --clobber
         env:
           GH_TOKEN: ${{ github.token }}
