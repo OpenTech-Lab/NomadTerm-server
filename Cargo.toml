@@ -55,7 +55,7 @@ rustls = "0.22"
 webpki-roots = "0.26"
 
 # Desktop GUI (optional — compile with --features gui)
-eframe = { version = "0.31", optional = true, default-features = false, features = ["glow", "persistence"] }
+eframe = { version = "0.31", optional = true, default-features = false, features = ["glow", "persistence", "wayland", "x11"] }
 egui = { version = "0.31", optional = true }
 rfd = { version = "0.15", optional = true }
 

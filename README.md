@@ -18,13 +18,41 @@ This codebase was originally forked from `aannoo/hcom` and extended into NomadTe
 
 ### 1. Build the binary
 
+**CLI / headless daemon** (default):
+
 ```bash
 cargo build --release
 ```
 
+**Desktop GUI** (requires a display — Linux, macOS, Windows):
+
+```bash
+cargo build --release --features gui
+```
+
 The compiled binary will be available at `target/release/nomadterm`.
 
-### 2. Start the daemon
+---
+
+### Option A — Desktop GUI (recommended)
+
+The GUI lets you register multiple repos, generate per-repo QR codes, and start/stop the daemon with one click.
+
+```bash
+./target/release/nomadterm gui
+```
+
+What you get:
+
+- **Left panel**: add/remove repo folders; each repo gets a stable bearer token
+- **Right panel**: Start/Stop button, live session count, QR code, and a copyable `nomadterm://` URL
+- Scan the QR from the mobile app to connect — the token is saved on the phone for 30 days and auto-renewed on each connect
+
+> Requires a build with `--features gui`. Running `nomadterm gui` without it prints an error asking you to rebuild.
+
+---
+
+### Option B — Headless daemon (original CLI mode)
 
 For the intended phone-to-machine flow over Tailscale:
 
@@ -40,7 +68,7 @@ Useful flags:
 
 If Tailscale is not available, the daemon falls back to localhost. For local testing you can also start it without `--bind-tailscale`.
 
-### 3. Copy the connection info
+### 3. Copy the connection info (headless mode)
 
 At startup the daemon prints:
 
@@ -54,8 +82,9 @@ The token is persisted in `~/.hcom/nomadterm.token`.
 
 Open the NomadTerm mobile app and either:
 
-- scan the QR code shown by the daemon, or
+- scan the QR code shown by the daemon or GUI, or
 - enter the host, port, and token manually
+- tap a saved repo from the list (after the first scan)
 
 ### 5. Use the remote session manager
 
