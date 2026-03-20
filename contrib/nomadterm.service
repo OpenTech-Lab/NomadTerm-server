@@ -1,0 +1,18 @@
+[Unit]
+Description=NomadTerm — Secure Remote PTY Daemon for Multi-AI CLI
+After=network.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# IMPORTANT: change to your own non-root user
+User=YOUR_USERNAME
+Group=YOUR_GROUP
+WorkingDirectory=/home/YOUR_USERNAME/NomadTerm/server
+ExecStart=/usr/local/bin/nomadterm --ws --bind-tailscale --port 7681
+Restart=always
+RestartSec=3
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=multi-user.target

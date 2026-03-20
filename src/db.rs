@@ -1474,6 +1474,21 @@ impl HcomDb {
         Ok(())
     }
 
+    /// Get the inject port for a named instance from notify_endpoints.
+    /// Returns None if not yet registered (PTY still starting).
+    pub fn get_inject_port(&self, name: &str) -> Result<Option<u16>> {
+        let result = self.conn.query_row(
+            "SELECT port FROM notify_endpoints WHERE instance = ? AND kind = 'inject' LIMIT 1",
+            params![name],
+            |row| row.get::<_, i64>(0),
+        );
+        match result {
+            Ok(port) => Ok(Some(port as u16)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
     /// Delete a specific notify endpoint by instance and kind.
     pub fn delete_notify_endpoint(&self, name: &str, kind: &str) -> Result<()> {
         self.conn.execute(

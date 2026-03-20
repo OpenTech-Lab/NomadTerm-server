@@ -2,6 +2,7 @@
 
 mod bootstrap;
 mod cli_context;
+pub mod ws;
 pub mod commands;
 mod config;
 pub mod core;

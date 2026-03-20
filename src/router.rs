@@ -7,6 +7,7 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use anyhow::Context as _;
 use clap::Parser;
 
 use crate::log::{log_error, log_info, log_warn};
@@ -113,6 +114,12 @@ pub enum Action {
     NewTerminal,
     /// Run relay-worker process
     RelayWorker,
+    /// Run WebSocket server daemon (nomadterm --ws)
+    WsServer {
+        bind_tailscale: bool,
+        port: u16,
+        no_tls: bool,
+    },
 }
 
 /// Global flags extracted from argv before dispatch.
@@ -263,7 +270,19 @@ pub fn resolve_action(argv: &[String]) -> Action {
         _ => {}
     }
 
-    // Relay worker mode: `hcom relay-worker`
+    // WebSocket server mode: `nomadterm --ws [--bind-tailscale] [--port N] [--no-tls]`
+    if argv.iter().any(|a| a == "--ws") {
+        let bind_tailscale = argv.iter().any(|a| a == "--bind-tailscale");
+        let no_tls = argv.iter().any(|a| a == "--no-tls");
+        let port = argv
+            .windows(2)
+            .find(|w| w[0] == "--port")
+            .and_then(|w| w[1].parse::<u16>().ok())
+            .unwrap_or(7681);
+        return Action::WsServer { bind_tailscale, port, no_tls };
+    }
+
+    // Relay worker mode: `nomadterm relay-worker`
     if first == "relay-worker" {
         return Action::RelayWorker;
     }
@@ -454,6 +473,27 @@ pub fn dispatch() -> anyhow::Result<()> {
             if exit_code != 0 {
                 std::process::exit(exit_code);
             }
+        }
+        Action::WsServer { bind_tailscale, port, no_tls } => {
+            let bind_addr = if bind_tailscale {
+                crate::ws::server::detect_tailscale_ip()
+                    .unwrap_or_else(|| {
+                        eprintln!("[nomadterm] --bind-tailscale: Tailscale IP not found, falling back to 127.0.0.1");
+                        "127.0.0.1".to_string()
+                    })
+            } else {
+                "0.0.0.0".to_string()
+            };
+
+            let config = crate::ws::WsConfig { bind_addr, port, no_tls };
+
+            // Start a tokio runtime for the async axum server.
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .context("Failed to build tokio runtime")?
+                .block_on(crate::ws::run(config))
+                .context("WebSocket server error")?;
         }
         Action::Hook { ref hook, ref args } if hook == "codex-notify" => {
             // Codex notify hook — handled natively in Rust.

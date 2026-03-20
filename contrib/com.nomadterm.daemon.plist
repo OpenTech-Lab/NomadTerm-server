@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nomadterm.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/nomadterm</string>
+        <string>--ws</string>
+        <string>--bind-tailscale</string>
+        <string>--port</string>
+        <string>7681</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/nomadterm.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/nomadterm.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>RUST_LOG</key>
+        <string>info</string>
+    </dict>
+</dict>
+</plist>
