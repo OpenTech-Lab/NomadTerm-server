@@ -77,16 +77,18 @@ jobs:
             name: linux-arm64
             deb_arch: arm64
             linker: gcc-aarch64-linux-gnu
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            name: darwin-arm64
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
-            name: darwin-x86_64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            name: windows-x86_64
-            ext: .exe
+          # Restore when macOS daemon releases are needed again.
+          # - os: macos-latest
+          #   target: aarch64-apple-darwin
+          #   name: darwin-arm64
+          # - os: macos-15-intel
+          #   target: x86_64-apple-darwin
+          #   name: darwin-x86_64
+          # Restore when Windows daemon releases are needed again.
+          # - os: windows-latest
+          #   target: x86_64-pc-windows-msvc
+          #   name: windows-x86_64
+          #   ext: .exe
 
     steps:
       - uses: actions/checkout@v4
@@ -167,13 +169,27 @@ jobs:
           PKG="nomadterm_${VERSION}_${DEB_ARCH}"
 
           mkdir -p "${PKG}/DEBIAN"
+          chmod 755 "${PKG}/DEBIAN"
           mkdir -p "${PKG}/usr/bin"
           mkdir -p "${PKG}/lib/systemd/system"
           cp "target/${{ matrix.target }}/release/nomadterm" "${PKG}/usr/bin/nomadterm"
           cp contrib/nomadterm.service "${PKG}/lib/systemd/system/"
 
+          # Desktop integration — icons (pre-sized, no imagemagick needed) + .desktop file.
+          for SIZE_DIR in 32x32 128x128 256x256; do
+            mkdir -p "${PKG}/usr/share/icons/hicolor/${SIZE_DIR}/apps"
+          done
+          cp desktop/src-tauri/icons/32x32.png \
+             "${PKG}/usr/share/icons/hicolor/32x32/apps/nomadterm.png"
+          cp desktop/src-tauri/icons/128x128.png \
+             "${PKG}/usr/share/icons/hicolor/128x128/apps/nomadterm.png"
+          cp desktop/src-tauri/icons/128x128@2x.png \
+             "${PKG}/usr/share/icons/hicolor/256x256/apps/nomadterm.png"
+          mkdir -p "${PKG}/usr/share/applications"
+          cp contrib/nomadterm.desktop "${PKG}/usr/share/applications/"
+
           INSTALLED_SIZE=$(du -sk "${PKG}" | cut -f1)
-          printf 'Package: nomadterm\nVersion: %s\nArchitecture: %s\nMaintainer: NomadTerm <noreply@nomadterm.dev>\nInstalled-Size: %s\nSection: utils\nPriority: optional\nDescription: NomadTerm -- Secure Remote PTY Daemon for Multi-AI CLI\n PTY daemon for Claude Code, Codex, Copilot and Gemini CLI\n with Flutter mobile client integration.\n' \
+          printf 'Package: nomadterm\nVersion: %s\nArchitecture: %s\nMaintainer: NomadTerm <noreply@nomadterm.dev>\nInstalled-Size: %s\nSection: utils\nPriority: optional\nRecommends: nomadterm-desktop\nDescription: NomadTerm -- Secure Remote PTY Daemon for Multi-AI CLI\n PTY daemon for Claude Code, Codex, Copilot and Gemini CLI\n with Flutter mobile client integration.\n' \
             "${VERSION}" "${DEB_ARCH}" "${INSTALLED_SIZE}" \
             > "${PKG}/DEBIAN/control"
 
@@ -307,18 +323,20 @@ jobs:
             runner: ubuntu-22.04
             rust_target: ""
             tauri_args: ""
-          - platform: macos-arm64
-            runner: macos-latest
-            rust_target: aarch64-apple-darwin
-            tauri_args: "--target aarch64-apple-darwin"
-          - platform: macos-x86_64
-            runner: macos-13
-            rust_target: x86_64-apple-darwin
-            tauri_args: "--target x86_64-apple-darwin"
-          - platform: windows-x86_64
-            runner: windows-latest
-            rust_target: ""
-            tauri_args: ""
+          # Restore when macOS desktop releases are needed again.
+          # - platform: macos-arm64
+          #   runner: macos-latest
+          #   rust_target: aarch64-apple-darwin
+          #   tauri_args: "--target aarch64-apple-darwin"
+          # - platform: macos-x86_64
+          #   runner: macos-15-intel
+          #   rust_target: x86_64-apple-darwin
+          #   tauri_args: "--target x86_64-apple-darwin"
+          # Restore when Windows desktop releases are needed again.
+          # - platform: windows-x86_64
+          #   runner: windows-latest
+          #   rust_target: ""
+          #   tauri_args: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -356,6 +374,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: desktop
         run: npm install
+
+      - name: Generate Tauri bundle icons
+        working-directory: desktop
+        run: npm run tauri icon src-tauri/icons/128x128@2x.png
 
       - name: Build and upload Tauri desktop app
         uses: tauri-apps/tauri-action@v0

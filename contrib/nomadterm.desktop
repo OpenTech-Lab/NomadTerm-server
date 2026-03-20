@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=NomadTerm
 Comment=Secure Remote PTY Daemon for Multi-AI CLI
-Exec=/usr/bin/nomadterm gui
+Exec=/usr/bin/nomadterm-desktop
 Icon=nomadterm
 Terminal=false
 Type=Application
