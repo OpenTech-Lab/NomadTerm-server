@@ -341,6 +341,7 @@ jobs:
             libssl-dev \
             pkg-config \
             file \
+            python3-pil \
             libayatana-appindicator3-dev \
             librsvg2-dev
 
@@ -380,7 +381,7 @@ jobs:
 
       - name: Generate Tauri bundle icons
         working-directory: desktop
-        run: npm run tauri icon src-tauri/icons/128x128@2x.png
+        run: npm run tauri:icons
 
       - name: Clear existing desktop assets before upload
         if: matrix.platform == 'linux-x86_64'

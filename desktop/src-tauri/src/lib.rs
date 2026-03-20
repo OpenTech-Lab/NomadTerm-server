@@ -228,18 +228,19 @@ fn detect_tailscale_ip() -> Option<String> {
 }
 
 fn detect_lan_ip() -> Option<String> {
-    use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
-    // Connect to a public address to discover the outbound interface.
-    let target = "8.8.8.8:80";
-    if let Ok(addrs) = target.to_socket_addrs() {
-        for addr in addrs {
-            if let Ok(sock) = TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(300)) {
-                if let Ok(local) = sock.local_addr() {
-                    if let std::net::IpAddr::V4(v4) = local.ip() {
-                        if v4 != Ipv4Addr::LOCALHOST && !v4.is_loopback() {
-                            return Some(v4.to_string());
-                        }
-                    }
+    use std::net::{IpAddr, UdpSocket};
+    // Bind a UDP socket and "connect" it to a public address — no packets are
+    // sent, but the OS routing table chooses the correct outbound interface,
+    // giving us the LAN IP instantly without any network round-trip.
+    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
+    for remote in ["192.0.2.1:80", "8.8.8.8:80"] {
+        if socket.connect(remote).is_err() {
+            continue;
+        }
+        if let Ok(local_addr) = socket.local_addr() {
+            if let IpAddr::V4(v4) = local_addr.ip() {
+                if !v4.is_loopback() && !v4.is_unspecified() {
+                    return Some(v4.to_string());
                 }
             }
         }
