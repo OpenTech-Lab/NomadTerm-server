@@ -9,6 +9,17 @@ pub mod state;
 
 use anyhow::Result;
 
+/// Decode the embedded `assets/logo.png` into an [`egui::IconData`] at startup.
+fn app_icon() -> egui::IconData {
+    // Path is relative to this source file: server/src/gui/ → up 3 → repo root.
+    let bytes = include_bytes!("../../contrib/logo.png");
+    let img = image::load_from_memory(bytes)
+        .expect("embedded logo.png must be a valid PNG")
+        .into_rgba8();
+    let (w, h) = img.dimensions();
+    egui::IconData { rgba: img.into_raw(), width: w, height: h }
+}
+
 /// Launch the eframe desktop window (blocks until window is closed).
 pub fn run() -> Result<()> {
     // Create tokio runtime for WS server tasks.
@@ -40,7 +51,8 @@ pub fn run() -> Result<()> {
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("NomadTerm")
-            .with_inner_size([800.0, 560.0]),
+            .with_inner_size([800.0, 560.0])
+            .with_icon(app_icon()),
         ..Default::default()
     };
 

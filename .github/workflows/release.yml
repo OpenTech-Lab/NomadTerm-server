@@ -71,20 +71,28 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             name: linux-x86_64
+            deb_arch: amd64
+            features: --features gui
+            gui_deps: true
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             name: linux-arm64
+            deb_arch: arm64
             linker: gcc-aarch64-linux-gnu
+            # GUI omitted: cross-compiling wayland/x11 for ARM64 is unsupported here.
           - os: macos-latest
             target: aarch64-apple-darwin
             name: darwin-arm64
+            features: --features gui
           - os: macos-15-intel
             target: x86_64-apple-darwin
             name: darwin-x86_64
+            features: --features gui
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             name: windows-x86_64
             ext: .exe
+            features: --features gui
 
     steps:
       - uses: actions/checkout@v4
@@ -99,12 +107,26 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Install Linux GUI dependencies
+        if: matrix.gui_deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwayland-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libx11-dev \
+            libgl1-mesa-dev \
+            libfontconfig-dev \
+            pkg-config \
+            imagemagick
+
       - name: Install cross-linker (ARM Linux)
         if: matrix.linker != ''
         run: sudo apt-get install -y ${{ matrix.linker }}
 
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} ${{ matrix.features }}
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
@@ -154,6 +176,54 @@ jobs:
             nomadterm-server-${{ matrix.name }}.tar.gz --clobber
         env:
           GH_TOKEN: ${{ github.token }}
+
+      - name: Build .deb package
+        if: startsWith(matrix.name, 'linux-')
+        shell: bash
+        env:
+          FEATURES: ${{ matrix.features }}
+          DEB_ARCH: ${{ matrix.deb_arch }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          PKG="nomadterm_${VERSION}_${DEB_ARCH}"
+
+          mkdir -p "${PKG}/DEBIAN"
+          mkdir -p "${PKG}/usr/bin"
+          mkdir -p "${PKG}/lib/systemd/system"
+          cp "target/${{ matrix.target }}/release/nomadterm" "${PKG}/usr/bin/nomadterm"
+          cp contrib/nomadterm.service "${PKG}/lib/systemd/system/"
+
+          if [[ "${FEATURES}" == *gui* ]]; then
+            for SIZE in 48 128 256; do
+              mkdir -p "${PKG}/usr/share/icons/hicolor/${SIZE}x${SIZE}/apps"
+              convert -resize "${SIZE}x${SIZE}" \
+                contrib/logo.png \
+                "${PKG}/usr/share/icons/hicolor/${SIZE}x${SIZE}/apps/nomadterm.png"
+            done
+            mkdir -p "${PKG}/usr/share/applications"
+            cp contrib/nomadterm.desktop "${PKG}/usr/share/applications/"
+          fi
+
+          INSTALLED_SIZE=$(du -sk "${PKG}" | cut -f1)
+          printf 'Package: nomadterm\nVersion: %s\nArchitecture: %s\nMaintainer: NomadTerm <noreply@nomadterm.dev>\nInstalled-Size: %s\nSection: utils\nPriority: optional\nDescription: NomadTerm -- Secure Remote PTY Daemon for Multi-AI CLI\n PTY daemon for Claude Code, Codex, Copilot and Gemini CLI\n with Flutter mobile client integration.\n' \
+            "${VERSION}" "${DEB_ARCH}" "${INSTALLED_SIZE}" \
+            > "${PKG}/DEBIAN/control"
+
+          cp contrib/debian/postinst "${PKG}/DEBIAN/postinst"
+          cp contrib/debian/prerm    "${PKG}/DEBIAN/prerm"
+          chmod 755 "${PKG}/DEBIAN/postinst" "${PKG}/DEBIAN/prerm"
+
+          dpkg-deb --build --root-owner-group "${PKG}"
+          echo "DEB_FILE=${PKG}.deb" >> "$GITHUB_ENV"
+
+      - name: Upload .deb to release
+        if: startsWith(matrix.name, 'linux-')
+        shell: bash
+        run: |
+          gh release upload "${RELEASE_TAG}" "$DEB_FILE" --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEB_FILE: ${{ env.DEB_FILE }}
 
       - name: Create macOS server bundle
         if: startsWith(matrix.name, 'darwin-')
@@ -249,6 +319,7 @@ jobs:
             contrib/nomadterm.service \
             contrib/com.nomadterm.daemon.plist \
             contrib/windows-service.md \
+            contrib/nomadterm.desktop \
             --clobber
         env:
           GH_TOKEN: ${{ github.token }}
