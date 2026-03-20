@@ -1,6 +1,6 @@
 [package]
 name = "nomadterm"
-version = "0.2.10"
+version = "0.3.0"
 edition = "2024"
 authors = ["NomadTerm"]
 description = "Secure remote PTY daemon for multi-AI CLI (Claude Code, Codex, Copilot, Gemini) with Flutter mobile client"
