@@ -3,7 +3,6 @@
 //! All hooks and commands are handled natively in Rust.
 
 use std::env;
-use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -413,13 +412,23 @@ pub fn maybe_reexec_dev_root() {
 
     // Re-exec: replace this process with the dev root's binary
     let args: Vec<String> = env::args().collect();
-    let err = Command::new(target_binary).args(&args[1..]).exec();
-    // exec() only returns on error
-    log_error(
-        "router",
-        "dev_root_reexec_failed",
-        &format!("failed to exec {}: {}", target_binary.display(), err),
-    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        let err = Command::new(target_binary).args(&args[1..]).exec();
+        // exec() only returns on error
+        log_error(
+            "router",
+            "dev_root_reexec_failed",
+            &format!("failed to exec {}: {}", target_binary.display(), err),
+        );
+    }
+    #[cfg(not(unix))]
+    {
+        // Windows: spawn the new process and exit this one
+        let _ = Command::new(target_binary).args(&args[1..]).spawn();
+        std::process::exit(0);
+    }
 }
 
 fn get_platform_tag() -> String {

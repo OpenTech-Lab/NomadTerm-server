@@ -48,8 +48,15 @@ pub(crate) fn daemon_stop() -> i32 {
         }
     };
 
+    #[cfg(unix)]
     unsafe {
         libc::kill(pid as i32, libc::SIGTERM);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/F"])
+            .status();
     }
     println!("Sent SIGTERM to daemon (PID {pid})");
 

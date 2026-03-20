@@ -1369,7 +1369,10 @@ pub fn run_delivery_loop(
 
         // 2. Set status to "inactive" with appropriate context
         // exit:closed = normal exit, exit:killed = SIGHUP/SIGTERM
+        #[cfg(unix)]
         let was_killed = crate::pty::EXIT_WAS_KILLED.load(std::sync::atomic::Ordering::Acquire);
+        #[cfg(not(unix))]
+        let was_killed = false;
         let (exit_context, exit_reason) = if was_killed {
             ("exit:killed", "killed")
         } else {
