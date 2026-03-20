@@ -23,7 +23,12 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use tokio::sync::broadcast;
+
 use crate::ws::{handler, session::SessionPool};
+
+/// Capacity of the control broadcast channel (number of JSON strings buffered).
+const CONTROL_BROADCAST_CAPACITY: usize = 64;
 
 /// Shared state for the axum server (also used by integration tests).
 #[derive(Clone)]
@@ -32,6 +37,8 @@ pub struct AppState {
     pub token: Arc<String>,
     pub workspace: Arc<PathBuf>,
     pub repo_id: Option<String>,
+    /// Broadcast channel for server→client JSON control messages (usage updates, etc.).
+    pub control_tx: Arc<broadcast::Sender<String>>,
 }
 
 /// Configuration for the WebSocket server.
@@ -86,11 +93,19 @@ pub async fn run(config: WsConfig) -> Result<()> {
     let token_arc = Arc::new(token.clone());
     let workspace_arc = Arc::new(workspace.clone());
 
+    let (control_tx, _) = broadcast::channel::<String>(CONTROL_BROADCAST_CAPACITY);
+    let control_tx = Arc::new(control_tx);
+
+    // Spawn usage tracker — broadcasts UsageUpdate JSON every 15 s.
+    let tracker_tx = control_tx.clone();
+    tokio::spawn(crate::usage_tracker::start(tracker_tx));
+
     let state = AppState {
         pool,
         token: token_arc,
         workspace: workspace_arc,
         repo_id: config.repo_id,
+        control_tx,
     };
 
     let app = Router::new()
@@ -129,8 +144,9 @@ async fn ws_upgrade_handler(
     let pool = state.pool.clone();
     let workspace = state.workspace.clone();
     let repo_id = state.repo_id.clone();
+    let control_rx = state.control_tx.subscribe();
     ws.on_upgrade(move |socket: WebSocket| async move {
-        handler::handle_socket(socket, pool, workspace, repo_id).await;
+        handler::handle_socket(socket, pool, workspace, repo_id, control_rx).await;
     })
 }
 

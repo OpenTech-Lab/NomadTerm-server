@@ -15,7 +15,13 @@ use crate::ws::protocol::{ClientMessage, ServerMessage};
 use crate::ws::session::SessionPool;
 
 /// Drive a single WebSocket connection to completion.
-pub async fn handle_socket(socket: WebSocket, pool: Arc<SessionPool>, workspace: Arc<PathBuf>, repo_id: Option<String>) {
+pub async fn handle_socket(
+    socket: WebSocket,
+    pool: Arc<SessionPool>,
+    workspace: Arc<PathBuf>,
+    repo_id: Option<String>,
+    mut control_rx: broadcast::Receiver<String>,
+) {
     let (mut sender, mut receiver) = socket.split();
 
     // Send current session list + workspace on connect.
@@ -38,11 +44,32 @@ pub async fn handle_socket(socket: WebSocket, pool: Arc<SessionPool>, workspace:
     // Channel to forward PTY output → sender task.
     let (pty_tx, mut pty_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
 
-    // Spawn sender task: reads from pty_tx and writes binary frames to WS.
+    // Spawn sender task: reads PTY binary output AND JSON control messages, writes to WS.
     let mut send_task = tokio::spawn(async move {
-        while let Some(data) = pty_rx.recv().await {
-            if sender.send(Message::Binary(data.into())).await.is_err() {
-                break;
+        loop {
+            tokio::select! {
+                data = pty_rx.recv() => {
+                    match data {
+                        Some(bytes) => {
+                            if sender.send(Message::Binary(bytes.into())).await.is_err() {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
+                }
+                ctrl = control_rx.recv() => {
+                    match ctrl {
+                        Ok(json) => {
+                            if sender.send(Message::Text(json.into())).await.is_err() {
+                                break;
+                            }
+                        }
+                        // Lagged: skip missed messages and keep going.
+                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(broadcast::error::RecvError::Closed) => break,
+                    }
+                }
             }
         }
     });

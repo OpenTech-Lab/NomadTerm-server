@@ -5,6 +5,7 @@
 //!   - Binary frames: raw PTY bytes forwarded directly to xterm on the client
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Messages sent from the Rust daemon → Flutter client (JSON text frames).
 #[derive(Serialize, Clone, Debug)]
@@ -32,6 +33,36 @@ pub enum ServerMessage {
     SessionStarted { session_id: String, cli: String },
     /// Session ended.
     SessionEnded { session_id: String },
+    /// Periodic usage snapshot — AI tokens/cost + hardware power.
+    UsageUpdate {
+        /// Unix timestamp in milliseconds.
+        timestamp: u64,
+        /// Per-CLI usage stats; key is CLI name ("claude", "codex", etc.).
+        ai_usage: HashMap<String, AiUsage>,
+        /// Hardware power readings (None if unavailable on this platform).
+        hardware: Option<HardwarePower>,
+    },
+}
+
+/// Per-AI-CLI token and cost statistics.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct AiUsage {
+    pub session_id: Option<String>,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub estimated_cost_usd: f64,
+    /// Cumulative cost aggregated across all sessions today.
+    pub cumulative_day_usd: f64,
+}
+
+/// System hardware power readings.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct HardwarePower {
+    pub cpu_watts: f64,
+    pub gpu_watts: Option<f64>,
+    pub total_watts: f64,
+    /// Rolling average since daemon startup.
+    pub average_since_session: f64,
 }
 
 /// Messages sent from Flutter client → Rust daemon (JSON text frames).

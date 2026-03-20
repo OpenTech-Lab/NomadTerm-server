@@ -32,6 +32,7 @@ mod tui;
 #[cfg(feature = "gui")]
 mod gui;
 mod update;
+pub mod usage_tracker;
 
 use anyhow::{Context, Result, bail};
 use std::panic;
