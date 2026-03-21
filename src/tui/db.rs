@@ -1,7 +1,7 @@
 //! Real database-backed DataSource for the TUI.
 //!
-//! Reads from ~/.nomadterm/nomadterm.db (or HCOM_DIR/nomadterm.db) to populate DataState.
-//! Used when HCOM_MOCK_TUI is not set.
+//! Reads from ~/.nomadterm/nomadterm.db (or NOMADTERM_DIR/nomadterm.db) to populate DataState.
+//! Used when NOMADTERM_MOCK_TUI is not set.
 
 use rusqlite::{Connection, params};
 use std::path::PathBuf;
@@ -192,7 +192,7 @@ fn load_all(conn: &Connection, default_limit: usize) -> DataState {
 
     // Load one shared timeline window, then split into message vs status/life
     // so both panes stay aligned to the same event-id/time range.
-    let timeline_limit = env_usize("HCOM_TUI_TIMELINE_LIMIT", default_limit);
+    let timeline_limit = env_usize("NOMADTERM_TUI_TIMELINE_LIMIT", default_limit);
     let (mut messages, mut events) = load_timeline(conn, timeline_limit);
     messages.sort_by(|a, b| a.time.total_cmp(&b.time));
     events.sort_by(|a, b| a.time.total_cmp(&b.time));

@@ -78,8 +78,8 @@ pub fn run_pty(args: &[String]) -> Result<()> {
         eprintln!("  - Ready detection for tool startup");
         eprintln!();
         eprintln!("Environment:");
-        eprintln!("  HCOM_INSTANCE_NAME    Instance name for logging");
-        eprintln!("  HCOM_DIR              Custom nomadterm directory");
+        eprintln!("  NOMADTERM_INSTANCE_NAME    Instance name for logging");
+        eprintln!("  NOMADTERM_DIR              Custom nomadterm directory");
         if args.is_empty() {
             bail!("Tool name required");
         }

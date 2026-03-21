@@ -36,7 +36,7 @@ pub fn run() -> Result<()> {
 
     // Load existing repos from DB.
     let mut gui_state = state::GuiState::new();
-    if let Ok(mut db) = crate::db::HcomDb::open() {
+    if let Ok(mut db) = crate::db::NomadtermDb::open() {
         if db.ensure_schema().is_ok() {
             if let Ok(rows) = db.list_repos() {
                 gui_state.repos = rows

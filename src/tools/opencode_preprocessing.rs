@@ -11,13 +11,13 @@ const OPENCODE_PERMISSION_JSON: &str = r#"{"bash":{"nomadterm *":"allow"}}"#;
 ///
 /// Sets:
 /// - `OPENCODE_PERMISSION`: Auto-approve all `nomadterm *` bash commands
-/// - `HCOM_NAME`: Instance name for plugin diagnostics (set before identity binding)
+/// - `NOMADTERM_NAME`: Instance name for plugin diagnostics (set before identity binding)
 pub fn preprocess_opencode_env(env: &mut HashMap<String, String>, instance_name: &str) {
     env.insert(
         "OPENCODE_PERMISSION".to_string(),
         OPENCODE_PERMISSION_JSON.to_string(),
     );
-    env.insert("HCOM_NAME".to_string(), instance_name.to_string());
+    env.insert("NOMADTERM_NAME".to_string(), instance_name.to_string());
 }
 
 #[cfg(test)]
@@ -34,18 +34,18 @@ mod tests {
     }
 
     #[test]
-    fn test_preprocess_sets_hcom_name() {
+    fn test_preprocess_sets_nomadterm_name() {
         let mut env = HashMap::new();
         preprocess_opencode_env(&mut env, "nova");
-        assert_eq!(env.get("HCOM_NAME").unwrap(), "nova");
+        assert_eq!(env.get("NOMADTERM_NAME").unwrap(), "nova");
     }
 
     #[test]
     fn test_preprocess_overwrites_existing() {
         let mut env = HashMap::new();
-        env.insert("HCOM_NAME".to_string(), "old".to_string());
+        env.insert("NOMADTERM_NAME".to_string(), "old".to_string());
         preprocess_opencode_env(&mut env, "nova");
-        assert_eq!(env.get("HCOM_NAME").unwrap(), "nova");
+        assert_eq!(env.get("NOMADTERM_NAME").unwrap(), "nova");
     }
 
     #[test]

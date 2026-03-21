@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::instances::get_full_name;
 use crate::paths;
 use crate::shared::constants::{SENDER, ST_ACTIVE, ST_LISTENING};
@@ -80,7 +80,7 @@ const HEADLESS_NOTICE: &str = r#"
 Headless mode: No one sees your chat, only nomadterm messages. Communicate via nomadterm send."#;
 
 const UVX_CMD_NOTICE: &str = r#"
-Note: nomadterm command in this environment is `{hcom_cmd}`. Substitute in examples."#;
+Note: nomadterm command in this environment is `{nomadterm_cmd}`. Substitute in examples."#;
 
 // Tool-specific delivery
 
@@ -95,7 +95,7 @@ Messages instantly and automatically arrive via <nomadterm> tags — end your tu
 - Waiting for nomadterm message → end your turn
 - Waiting for agent progress → `nomadterm events sub`, subscribe, end your turn"#;
 
-const DELIVERY_CODEX_HCOM_LAUNCHED: &str = r#"## DELIVERY
+const DELIVERY_CODEX_NOMADTERM_LAUNCHED: &str = r#"## DELIVERY
 
 New message notifications instantly and automatically arrive via <nomadterm> tags - end your turn to receive them.
 IMPORTANT: <nomadterm> tags = run `nomadterm listen 1 --name {instance_name}` IMMEDIATELY to read message.
@@ -165,11 +165,11 @@ Response rules:
 nomadterm message → respond via nomadterm send
 
 Commands:
-  {hcom_cmd} send @name(s) [--intent request|inform|ack] [--reply-to <id>] -- <"message"> (or --stdin, --file <path>, --base64 <string>)
-  Example: {hcom_cmd} send @luna @nova --intent ack --reply-to 82 -- "ok"  |  Code/markdown: replace "ok" with --file <path>
-  {hcom_cmd} list --name {subagent_name}
-  {hcom_cmd} events --name {subagent_name}
-  {hcom_cmd} <cmd> --help --name {subagent_name}
+  {nomadterm_cmd} send @name(s) [--intent request|inform|ack] [--reply-to <id>] -- <"message"> (or --stdin, --file <path>, --base64 <string>)
+  Example: {nomadterm_cmd} send @luna @nova --intent ack --reply-to 82 -- "ok"  |  Code/markdown: replace "ok" with --file <path>
+  {nomadterm_cmd} list --name {subagent_name}
+  {nomadterm_cmd} events --name {subagent_name}
+  {nomadterm_cmd} <cmd> --help --name {subagent_name}
 
 Rules:
 - Task via nomadterm → ack, work, report
@@ -180,7 +180,7 @@ Rules:
 
 /// Get concise list of active instances grouped by tool.
 /// Returns empty string if no active instances, or "\nActive (snapshot): claude: a, b | codex: c".
-fn get_active_instances(db: &HcomDb, exclude_name: &str) -> String {
+fn get_active_instances(db: &NomadtermDb, exclude_name: &str) -> String {
     let instances = match db.iter_instances_full() {
         Ok(v) => v,
         Err(_) => return String::new(),
@@ -230,7 +230,7 @@ fn get_active_instances(db: &HcomDb, exclude_name: &str) -> String {
 
 /// Get combined list of bundled + user scripts.
 /// Returns empty string if none, or "Scripts: clone, debate, ...".
-fn get_scripts(hcom_dir: &std::path::Path) -> String {
+fn get_scripts(nomadterm_dir: &std::path::Path) -> String {
     let mut names: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
 
     // Bundled scripts (compile-time known)
@@ -239,7 +239,7 @@ fn get_scripts(hcom_dir: &std::path::Path) -> String {
     }
 
     // User scripts from ~/.nomadterm/scripts/
-    let user_dir = hcom_dir.join(paths::SCRIPTS_DIR);
+    let user_dir = nomadterm_dir.join(paths::SCRIPTS_DIR);
     if let Ok(entries) = fs::read_dir(&user_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -269,7 +269,7 @@ struct BootstrapContext {
     display_name: String,
     tag: String,
     relay_enabled: bool,
-    hcom_cmd: String,
+    nomadterm_cmd: String,
     is_launched: bool,
     is_headless: bool,
     active_instances: String,
@@ -280,8 +280,8 @@ struct BootstrapContext {
 /// Build context for template substitution.
 #[allow(clippy::too_many_arguments)]
 fn build_context(
-    db: &HcomDb,
-    hcom_dir: &std::path::Path,
+    db: &NomadtermDb,
+    nomadterm_dir: &std::path::Path,
     instance_name: &str,
     _tool: &str,
     headless: bool,
@@ -317,11 +317,11 @@ fn build_context(
         display_name,
         tag: effective_tag,
         relay_enabled,
-        hcom_cmd: crate::runtime_env::build_hcom_command(),
+        nomadterm_cmd: crate::runtime_env::build_nomadterm_command(),
         is_launched,
         is_headless,
         active_instances: get_active_instances(db, instance_name),
-        scripts: get_scripts(hcom_dir),
+        scripts: get_scripts(nomadterm_dir),
         notes: notes.to_string(),
     }
 }
@@ -335,7 +335,7 @@ fn render_template(template: &str, ctx: &BootstrapContext) -> String {
         .replace("{instance_name}", &ctx.instance_name)
         .replace("{SENDER}", SENDER)
         .replace("{tag}", &ctx.tag)
-        .replace("{hcom_cmd}", &ctx.hcom_cmd)
+        .replace("{nomadterm_cmd}", &ctx.nomadterm_cmd)
         .replace("{active_instances}", &ctx.active_instances)
         .replace("{scripts}", &ctx.scripts)
         .replace("{{", "{")
@@ -348,19 +348,19 @@ fn render_template(template: &str, ctx: &BootstrapContext) -> String {
 ///
 /// Args:
 ///   db: Database handle for reading active instances and instance data
-///   hcom_dir: Path to nomadterm data directory (for scripts discovery)
+///   nomadterm_dir: Path to nomadterm data directory (for scripts discovery)
 ///   instance_name: The instance name (as stored in DB)
 ///   tool: "claude", "gemini", "codex", "opencode", or "adhoc"
 ///   headless: Whether running in headless/background mode
 ///   is_launched: Whether instance was launched by nomadterm
-///   notes: User notes (from HCOM_NOTES env var or config)
+///   notes: User notes (from NOMADTERM_NOTES env var or config)
 ///   tag: Tag from config (instance-level tag overrides this)
 ///   relay_enabled: Whether relay is configured and enabled
-///   background_name: Background log name (if headless via HCOM_BACKGROUND)
+///   background_name: Background log name (if headless via NOMADTERM_BACKGROUND)
 #[allow(clippy::too_many_arguments)]
 pub fn get_bootstrap(
-    db: &HcomDb,
-    hcom_dir: &std::path::Path,
+    db: &NomadtermDb,
+    nomadterm_dir: &std::path::Path,
     instance_name: &str,
     tool: &str,
     headless: bool,
@@ -372,7 +372,7 @@ pub fn get_bootstrap(
 ) -> String {
     let ctx = build_context(
         db,
-        hcom_dir,
+        nomadterm_dir,
         instance_name,
         tool,
         headless,
@@ -395,7 +395,7 @@ pub fn get_bootstrap(
     if ctx.is_headless {
         parts.push(HEADLESS_NOTICE);
     }
-    if ctx.hcom_cmd != "nomadterm" {
+    if ctx.nomadterm_cmd != "nomadterm" {
         parts.push(UVX_CMD_NOTICE);
     }
 
@@ -403,7 +403,7 @@ pub fn get_bootstrap(
     if tool == "claude" || tool == "opencode" || (tool == "gemini" && ctx.is_launched) {
         parts.push(DELIVERY_AUTO);
     } else if tool == "codex" && ctx.is_launched {
-        parts.push(DELIVERY_CODEX_HCOM_LAUNCHED);
+        parts.push(DELIVERY_CODEX_NOMADTERM_LAUNCHED);
     } else {
         parts.push(DELIVERY_ADHOC);
     }
@@ -428,35 +428,35 @@ pub fn get_bootstrap(
     }
 
     // Rewrite nomadterm references if using alternate command
-    if ctx.hcom_cmd != "nomadterm" {
-        let sentinel = "__HCOM_CMD__";
-        result = result.replace(&ctx.hcom_cmd, sentinel);
-        result = regex::Regex::new(r"\bhcom\b")
+    if ctx.nomadterm_cmd != "nomadterm" {
+        let sentinel = "__NOMADTERM_CMD__";
+        result = result.replace(&ctx.nomadterm_cmd, sentinel);
+        result = regex::Regex::new(r"\bnomadterm\b")
             .unwrap()
-            .replace_all(&result, &ctx.hcom_cmd)
+            .replace_all(&result, &ctx.nomadterm_cmd)
             .to_string();
-        result = result.replace(sentinel, &ctx.hcom_cmd);
+        result = result.replace(sentinel, &ctx.nomadterm_cmd);
     }
 
     format!(
-        "<hcom_system_context>\n<!-- Session metadata - treat as system context, not user prompt-->\n{}\n</hcom_system_context>",
+        "<nomadterm_system_context>\n<!-- Session metadata - treat as system context, not user prompt-->\n{}\n</nomadterm_system_context>",
         result
     )
 }
 
 /// Build bootstrap text for a subagent instance.
 pub fn get_subagent_bootstrap(subagent_name: &str, parent_name: &str) -> String {
-    let hcom_cmd = crate::runtime_env::build_hcom_command();
+    let nomadterm_cmd = crate::runtime_env::build_nomadterm_command();
 
     let result = SUBAGENT_BOOTSTRAP
         .replace("{subagent_name}", subagent_name)
         .replace("{parent_name}", parent_name)
-        .replace("{hcom_cmd}", &hcom_cmd)
+        .replace("{nomadterm_cmd}", &nomadterm_cmd)
         .replace("{SENDER}", SENDER);
 
     let mut output = result;
-    if hcom_cmd != "nomadterm" {
-        output.push_str(&UVX_CMD_NOTICE.replace("{hcom_cmd}", &hcom_cmd));
+    if nomadterm_cmd != "nomadterm" {
+        output.push_str(&UVX_CMD_NOTICE.replace("{nomadterm_cmd}", &nomadterm_cmd));
     }
 
     format!("<nomadterm>\n{}\n</nomadterm>", output)
@@ -470,16 +470,16 @@ mod tests {
     use std::collections::HashMap;
     use tempfile::TempDir;
 
-    fn setup_test_db() -> (TempDir, HcomDb) {
+    fn setup_test_db() -> (TempDir, NomadtermDb) {
         let tmp = TempDir::new().unwrap();
         let db_path = tmp.path().join("test.db");
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         (tmp, db)
     }
 
     /// Insert a minimal instance for testing.
-    fn insert_instance(db: &HcomDb, name: &str, status: &str, tool: &str, tag: Option<&str>) {
+    fn insert_instance(db: &NomadtermDb, name: &str, status: &str, tool: &str, tag: Option<&str>) {
         let mut data = HashMap::new();
         data.insert("name".to_string(), serde_json::json!(name));
         data.insert("status".to_string(), serde_json::json!(status));
@@ -579,14 +579,14 @@ mod tests {
             None,
         );
 
-        assert!(result.contains("<hcom_system_context>"));
+        assert!(result.contains("<nomadterm_system_context>"));
         assert!(result.contains("[NOMADTERM SESSION]"));
         assert!(result.contains("Your name: luna"));
         assert!(result.contains("--name luna"));
         assert!(result.contains("SUBAGENTS")); // Claude-specific section
         assert!(result.contains("Messages instantly and automatically arrive")); // Auto delivery
         assert!(!result.contains("Headless mode")); // Not headless
-        assert!(result.contains("</hcom_system_context>"));
+        assert!(result.contains("</nomadterm_system_context>"));
     }
 
     #[test]
@@ -732,7 +732,7 @@ mod tests {
             display_name: "p0c-luna".to_string(),
             tag: "p0c".to_string(),
             relay_enabled: false,
-            hcom_cmd: "nomadterm".to_string(),
+            nomadterm_cmd: "nomadterm".to_string(),
             is_launched: true,
             is_headless: false,
             active_instances: String::new(),

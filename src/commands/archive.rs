@@ -6,8 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::db::HcomDb;
-use crate::paths::{ARCHIVE_DIR, hcom_dir};
+use crate::db::NomadtermDb;
+use crate::paths::{ARCHIVE_DIR, nomadterm_dir};
 use crate::shared::CommandContext;
 
 /// Parsed arguments for `nomadterm archive`.
@@ -34,7 +34,7 @@ pub struct ArchiveArgs {
 
 /// Get list of archive sessions with metadata.
 fn list_archives(here_filter: bool) -> Vec<serde_json::Value> {
-    let archive_dir = hcom_dir().join(ARCHIVE_DIR);
+    let archive_dir = nomadterm_dir().join(ARCHIVE_DIR);
     if !archive_dir.exists() {
         return Vec::new();
     }
@@ -265,7 +265,7 @@ fn query_archive_instances(
 
 use crate::shared::shorten_path;
 
-pub fn cmd_archive(_db: &HcomDb, args: &ArchiveArgs, _ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_archive(_db: &NomadtermDb, args: &ArchiveArgs, _ctx: Option<&CommandContext>) -> i32 {
     let json_output = args.json;
     let here_filter = args.here;
     let last_count = args.last;

@@ -94,7 +94,7 @@ impl ScreenTracker {
         instance_name: Option<&str>,
     ) -> Self {
         let config = Config::get();
-        let debug_flag_path = config.hcom_dir.join(".tmp").join("pty_debug_on");
+        let debug_flag_path = config.nomadterm_dir.join(".tmp").join("pty_debug_on");
         // Enable if runtime flag file exists
         let debug_enabled = debug_flag_path.exists();
         let debug_file = if debug_enabled {
@@ -132,7 +132,7 @@ impl ScreenTracker {
 
     /// Open debug log file
     fn open_debug_file(instance_name: Option<&str>) -> Option<File> {
-        let base = Config::get().hcom_dir;
+        let base = Config::get().nomadterm_dir;
 
         let debug_dir = base.join(".tmp").join("logs").join("pty_debug");
         if create_dir_all(&debug_dir).is_err() {
@@ -555,7 +555,7 @@ impl ScreenTracker {
         false
     }
 
-    /// Dump screen state to debug log (when HCOM_PTY_DEBUG=1)
+    /// Dump screen state to debug log (when NOMADTERM_PTY_DEBUG=1)
     pub fn dump_screen(&mut self, tool: &str, inject_port: u16, label: &str) {
         if !self.debug_enabled {
             return;

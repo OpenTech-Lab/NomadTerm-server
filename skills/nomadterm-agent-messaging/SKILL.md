@@ -110,7 +110,7 @@ nomadterm claude          # Fresh start
 ### Sandbox / Permission Issues
 
 ```bash
-export HCOM_DIR="$PWD/.nomadterm"     # Project-local mode
+export NOMADTERM_DIR="$PWD/.nomadterm"     # Project-local mode
 nomadterm hooks add                   # Installs to project dir
 ```
 
@@ -124,7 +124,7 @@ nomadterm hooks add                   # Installs to project dir
 | Config | `~/.nomadterm/config.toml` |
 | Logs | `~/.nomadterm/.tmp/logs/nomadterm.log` |
 
-With `HCOM_DIR` set, uses that path instead of `~/.nomadterm`.
+With `NOMADTERM_DIR` set, uses that path instead of `~/.nomadterm`.
 
 ---
 

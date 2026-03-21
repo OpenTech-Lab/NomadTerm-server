@@ -9,12 +9,12 @@ use rusqlite::params;
 use serde_json::Value;
 
 use crate::bootstrap;
-use crate::db::{HcomDb, InstanceRow, Message};
+use crate::db::{NomadtermDb, InstanceRow, Message};
 use crate::instances;
 use crate::log;
 use crate::messages;
 use crate::shared::constants::{BIND_MARKER_RE, MAX_MESSAGES_PER_DELIVERY};
-use crate::shared::context::HcomContext;
+use crate::shared::context::NomadtermContext;
 use crate::shared::{ST_ACTIVE, ST_INACTIVE, ST_LISTENING};
 
 /// Run a hook handler with panic safety.
@@ -46,7 +46,7 @@ pub(crate) fn dispatch_with_panic_guard<R>(
 /// agents need to run without user approval prompts.
 /// Excluded: `stop`, `kill`, `run`, `reset` — these are destructive or
 /// admin-level and require explicit user approval.
-pub(crate) const SAFE_HCOM_COMMANDS: &[&str] = &[
+pub(crate) const SAFE_NOMADTERM_COMMANDS: &[&str] = &[
     "send",
     "start",
     "help",
@@ -75,7 +75,7 @@ pub(crate) const SAFE_HCOM_COMMANDS: &[&str] = &[
 /// - Otherwise: check if DB has any instances → if not, skip (exit 0, empty output)
 ///
 /// This prevents outputting hints/errors when nomadterm is installed but not actively used.
-pub fn hook_gate_check(ctx: &HcomContext, db: &HcomDb) -> bool {
+pub fn hook_gate_check(ctx: &NomadtermContext, db: &NomadtermDb) -> bool {
     if ctx.process_id.is_some() || ctx.is_launched {
         return true;
     }
@@ -126,13 +126,13 @@ pub(crate) fn message_to_value(m: &Message) -> Value {
 /// Load config hints string (from instance-level or global config).
 /// Call once per hook invocation and pass to format functions.
 pub(crate) fn load_config_hints() -> String {
-    crate::config::HcomConfig::load(None)
+    crate::config::NomadtermConfig::load(None)
         .map(|c| c.hints.clone())
         .unwrap_or_default()
 }
 
 /// Build instance-data lookup function for message formatting.
-pub(crate) fn make_instance_lookup(db: &HcomDb) -> impl Fn(&str) -> Option<Value> + '_ {
+pub(crate) fn make_instance_lookup(db: &NomadtermDb) -> impl Fn(&str) -> Option<Value> + '_ {
     |name: &str| db.get_instance(name).ok().flatten()
 }
 
@@ -141,7 +141,7 @@ pub(crate) fn make_instance_lookup(db: &HcomDb) -> impl Fn(&str) -> Option<Value
 /// Returns (delivered_messages, formatted_json). Empty vec and None if no messages.
 /// Callers that need additional formatting can use the returned messages vec.
 ///
-pub fn deliver_pending_messages(db: &HcomDb, instance_name: &str) -> (Vec<Value>, Option<String>) {
+pub fn deliver_pending_messages(db: &NomadtermDb, instance_name: &str) -> (Vec<Value>, Option<String>) {
     let raw_messages = db.get_unread_messages(instance_name);
     deliver_raw_messages(db, instance_name, raw_messages)
 }
@@ -151,7 +151,7 @@ pub fn deliver_pending_messages(db: &HcomDb, instance_name: &str) -> (Vec<Value>
 /// Shared by `deliver_pending_messages` (fetches then calls this) and `poll_loop`
 /// (fetches once for orphan check, then calls this to avoid double-fetch).
 fn deliver_raw_messages(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     raw_messages: Vec<Message>,
 ) -> (Vec<Value>, Option<String>) {
@@ -218,7 +218,7 @@ fn deliver_raw_messages(
 /// Stop hook polling loop — NOT used by main PTY path.
 ///
 /// Runs for: headless instances, vanilla tool instances, subagent polling.
-/// Main PTY path bypasses this (HCOM_PTY_MODE=1, PTY wrapper handles injection).
+/// Main PTY path bypasses this (NOMADTERM_PTY_MODE=1, PTY wrapper handles injection).
 ///
 /// Uses select() on a TCP socket for efficient wake-on-message delivery.
 /// Senders call notify_instance() which connects to wake the select().
@@ -229,7 +229,7 @@ fn deliver_raw_messages(
 /// - timed_out: true if polling timed out without messages
 ///
 pub fn poll_messages(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     timeout_secs: u64,
     is_background: bool,
@@ -248,7 +248,7 @@ pub fn poll_messages(
 }
 
 fn poll_messages_inner(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     timeout_secs: u64,
     is_background: bool,
@@ -301,7 +301,7 @@ fn poll_messages_inner(
 }
 
 fn poll_loop(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     timeout: Duration,
     start: Instant,
@@ -480,7 +480,7 @@ fn setup_tcp_notification(instance_name: &str) -> (Option<TcpListener>, bool) {
 }
 
 /// Register hook notify port in DB.
-fn register_hook_notify_port(db: &HcomDb, instance_name: &str, port: u16) {
+fn register_hook_notify_port(db: &NomadtermDb, instance_name: &str, port: u16) {
     if let Err(e) = db.upsert_notify_endpoint(instance_name, "hook", port) {
         log::log_warn(
             "native",
@@ -494,7 +494,7 @@ fn register_hook_notify_port(db: &HcomDb, instance_name: &str, port: u16) {
 }
 
 /// Remove hook notify endpoint from DB.
-fn delete_hook_notify_endpoint(db: &HcomDb, instance_name: &str) {
+fn delete_hook_notify_endpoint(db: &NomadtermDb, instance_name: &str) {
     let _ = db.conn().execute(
         "DELETE FROM notify_endpoints WHERE instance = ? AND kind = 'hook'",
         params![instance_name],
@@ -591,8 +591,8 @@ fn rfind_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 /// None if already announced.
 ///
 pub fn inject_bootstrap_once(
-    db: &HcomDb,
-    ctx: &HcomContext,
+    db: &NomadtermDb,
+    ctx: &NomadtermContext,
     instance_name: &str,
     instance_data: &InstanceRow,
     tool: &str,
@@ -602,12 +602,12 @@ pub fn inject_bootstrap_once(
     }
 
     let tag = instance_data.tag.as_deref().unwrap_or("");
-    let hcom_config = crate::config::HcomConfig::load(None).unwrap_or_default();
-    let relay_enabled = crate::relay::is_relay_enabled(&hcom_config);
+    let nomadterm_config = crate::config::NomadtermConfig::load(None).unwrap_or_default();
+    let relay_enabled = crate::relay::is_relay_enabled(&nomadterm_config);
 
     let bootstrap_text = bootstrap::get_bootstrap(
         db,
-        &ctx.hcom_dir,
+        &ctx.nomadterm_dir,
         instance_name,
         tool,
         ctx.is_background,
@@ -629,7 +629,7 @@ pub fn inject_bootstrap_once(
 /// Initialize instance context from hook data via binding lookup.
 ///
 /// Primary gate for hook participation. Resolution order:
-/// 1. HCOM_PROCESS_ID → process_bindings → instance_name
+/// 1. NOMADTERM_PROCESS_ID → process_bindings → instance_name
 /// 2. session_id → session_bindings → instance_name
 /// 3. Transcript marker fallback
 /// 4. Not found → (None, empty, false)
@@ -637,8 +637,8 @@ pub fn inject_bootstrap_once(
 /// Returns (instance_name, metadata_updates, is_matched_resume).
 ///
 pub fn init_hook_context(
-    db: &HcomDb,
-    ctx: &HcomContext,
+    db: &NomadtermDb,
+    ctx: &NomadtermContext,
     session_id: &str,
     transcript_path: &str,
 ) -> (Option<String>, serde_json::Map<String, Value>, bool) {
@@ -703,7 +703,7 @@ pub fn init_hook_context(
     if ctx.is_background {
         if let Some(ref bg_name) = ctx.background_name {
             updates.insert("background".into(), serde_json::json!(true));
-            let log_file = ctx.hcom_dir.join(".tmp").join("logs").join(bg_name);
+            let log_file = ctx.nomadterm_dir.join(".tmp").join("logs").join(bg_name);
             updates.insert(
                 "background_log_file".into(),
                 Value::String(log_file.to_string_lossy().to_string()),
@@ -742,7 +742,7 @@ pub fn init_hook_context(
 /// if instance is pending. Fast path: skips file I/O if no pending instances.
 ///
 fn try_bind_from_transcript(
-    db: &HcomDb,
+    db: &NomadtermDb,
     session_id: &str,
     transcript_path: &str,
 ) -> Option<String> {
@@ -801,7 +801,7 @@ fn try_bind_from_transcript(
 /// been bound to a tool session yet. Used as fast-path optimization before
 /// doing expensive transcript marker search.
 ///
-pub fn get_pending_instances(db: &HcomDb) -> Vec<String> {
+pub fn get_pending_instances(db: &NomadtermDb) -> Vec<String> {
     // Purge leaked launch placeholders before treating them as bindable.
     // Otherwise an old transcript marker can silently re-bind a stale row.
     crate::instances::cleanup_stale_placeholders(db);
@@ -824,13 +824,13 @@ pub fn get_pending_instances(db: &HcomDb) -> Vec<String> {
 /// handles PTY-side notification.
 ///
 pub fn notify_hook_instance(instance_name: &str) {
-    if let Ok(db) = HcomDb::open() {
+    if let Ok(db) = NomadtermDb::open() {
         notify_hook_instance_with_db(&db, instance_name);
     }
 }
 
 /// Wake hook poll loop with an existing DB handle.
-pub fn notify_hook_instance_with_db(db: &HcomDb, instance_name: &str) {
+pub fn notify_hook_instance_with_db(db: &NomadtermDb, instance_name: &str) {
     instances::notify_instance_endpoints(db, instance_name, &["hook"]);
 }
 
@@ -838,7 +838,7 @@ pub fn notify_hook_instance_with_db(db: &HcomDb, instance_name: &str) {
 ///
 /// Handles: snapshot capture, session/process/notify/subscription cleanup,
 /// life event logging, and instance deletion.
-pub fn stop_instance(db: &HcomDb, instance_name: &str, initiated_by: &str, reason: &str) {
+pub fn stop_instance(db: &NomadtermDb, instance_name: &str, initiated_by: &str, reason: &str) {
     stop_instance_inner(db, instance_name, initiated_by, reason, 0);
 }
 
@@ -847,7 +847,7 @@ pub fn stop_instance(db: &HcomDb, instance_name: &str, initiated_by: &str, reaso
 const MAX_STOP_DEPTH: u32 = 10;
 
 fn stop_instance_inner(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     initiated_by: &str,
     reason: &str,
@@ -908,7 +908,7 @@ fn stop_instance_inner(
             // Track surviving PTY processes in pidtrack
             let alive = crate::pidtrack::is_alive(pid_u32);
             if alive {
-                let hcom_dir = crate::paths::hcom_dir();
+                let nomadterm_dir = crate::paths::nomadterm_dir();
 
                 // Extract terminal info from launch_context
                 let mut terminal_preset = String::new();
@@ -985,7 +985,7 @@ fn stop_instance_inner(
                 }
 
                 crate::pidtrack::record_pid(&crate::pidtrack::PidRecord {
-                    hcom_dir: &hcom_dir,
+                    nomadterm_dir: &nomadterm_dir,
                     pid: pid_val as u32,
                     tool: &instance_data.tool,
                     name: instance_name,
@@ -1115,7 +1115,7 @@ fn stop_instance_inner(
     }
 
     // Trigger relay push (best-effort)
-    let prefix = crate::runtime_env::get_hcom_prefix();
+    let prefix = crate::runtime_env::get_nomadterm_prefix();
     if let Some((cmd, prefix_args)) = prefix.split_first() {
         let _ = std::process::Command::new(cmd)
             .args(prefix_args)
@@ -1132,7 +1132,7 @@ fn stop_instance_inner(
 /// internally — callers don't need error handling.
 ///
 pub fn finalize_session(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     reason: &str,
     updates: Option<&serde_json::Map<String, Value>>,
@@ -1167,7 +1167,7 @@ pub fn finalize_session(
 /// then sets status to active with tool context.
 ///
 pub fn update_tool_status(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     tool: &str,
     tool_name: &str,
@@ -1300,14 +1300,14 @@ mod tests {
     #[test]
     fn test_notify_hook_instance_no_db() {
         // Best-effort function should not panic even with no DB
-        // (HcomDb::open() will fail in test env without ~/.nomadterm)
+        // (NomadtermDb::open() will fail in test env without ~/.nomadterm)
         notify_hook_instance("nonexistent");
     }
 
-    fn make_test_db() -> (tempfile::TempDir, crate::db::HcomDb) {
+    fn make_test_db() -> (tempfile::TempDir, crate::db::NomadtermDb) {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = crate::db::HcomDb::open_at(&db_path).unwrap();
+        let db = crate::db::NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         (dir, db)
     }
@@ -1612,7 +1612,7 @@ mod tests {
         let transcript = dir.path().join("transcript.jsonl");
         std::fs::write(&transcript, "assistant output [nomadterm:luna]\n").unwrap();
 
-        let ctx = crate::shared::context::HcomContext::from_env(
+        let ctx = crate::shared::context::NomadtermContext::from_env(
             &std::collections::HashMap::new(),
             dir.path().to_path_buf(),
         );

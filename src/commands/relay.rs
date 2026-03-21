@@ -1,7 +1,7 @@
 //! `nomadterm relay` command — cross-device sync via MQTT pub/sub.
 
 use crate::config;
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::relay::{self, DEFAULT_BROKERS};
 use crate::shared::CommandContext;
 use crate::shared::ansi::{FG_GRAY, FG_GREEN, FG_RED, FG_YELLOW, RESET};
@@ -80,7 +80,7 @@ fn get_device_short_id() -> String {
 }
 
 /// Show relay status.
-fn relay_status(db: &HcomDb) -> i32 {
+fn relay_status(db: &NomadtermDb) -> i32 {
     let config = config::load_config_snapshot().core;
 
     if config.relay_id.is_empty() {
@@ -267,7 +267,7 @@ fn relay_status(db: &HcomDb) -> i32 {
 }
 
 /// Enable or disable relay sync.
-fn relay_toggle(db: &HcomDb, enable: bool) -> i32 {
+fn relay_toggle(db: &NomadtermDb, enable: bool) -> i32 {
     let config = config::load_config_snapshot().core;
 
     if config.relay_id.is_empty() {
@@ -307,7 +307,7 @@ fn relay_toggle(db: &HcomDb, enable: bool) -> i32 {
 }
 
 /// Create a new relay group.
-fn relay_new(_db: &HcomDb, argv: &[String]) -> i32 {
+fn relay_new(_db: &NomadtermDb, argv: &[String]) -> i32 {
     let (broker_url, auth_token, _) = parse_broker_flags(argv);
 
     let config = config::load_config_snapshot().core;
@@ -402,7 +402,7 @@ fn relay_new(_db: &HcomDb, argv: &[String]) -> i32 {
 }
 
 /// Connect to relay — re-enable or join with token.
-fn relay_connect(db: &HcomDb, argv: &[String]) -> i32 {
+fn relay_connect(db: &NomadtermDb, argv: &[String]) -> i32 {
     let (broker_url, auth_token, remaining) = parse_broker_flags(argv);
 
     let token_str = remaining.first().filter(|s| !s.starts_with("-")).cloned();
@@ -528,7 +528,7 @@ fn update_toml_key(content: &str, field: &str, value: &str) -> String {
     doc.to_string()
 }
 
-pub fn cmd_relay(db: &HcomDb, args: &RelayArgs, _ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_relay(db: &NomadtermDb, args: &RelayArgs, _ctx: Option<&CommandContext>) -> i32 {
     // --name already stripped by router's extract_global_flags_full()
     let argv = &args.args;
 

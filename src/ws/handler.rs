@@ -36,7 +36,7 @@ pub async fn handle_socket(
 
     // Touch repo to update last_seen on connect.
     if let Some(ref rid) = repo_id {
-        if let Ok(db) = crate::db::HcomDb::open() {
+        if let Ok(db) = crate::db::NomadtermDb::open() {
             let _ = db.touch_repo(rid);
         }
     }

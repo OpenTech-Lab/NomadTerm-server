@@ -14,8 +14,8 @@ pub mod push;
 pub mod token;
 pub mod worker;
 
-use crate::config::HcomConfig;
-use crate::db::HcomDb;
+use crate::config::NomadtermConfig;
+use crate::db::NomadtermDb;
 
 /// Public MQTT brokers (TLS, port 8883/8886). Tried in order during initial setup;
 /// first success gets pinned to config. Append-only (never insert/reorder) to preserve
@@ -27,7 +27,7 @@ pub const DEFAULT_BROKERS: &[(&str, u16)] = &[
 ];
 
 /// Check if relay is configured AND enabled (relay_id set + relay_enabled flag).
-pub fn is_relay_enabled(config: &HcomConfig) -> bool {
+pub fn is_relay_enabled(config: &NomadtermConfig) -> bool {
     !config.relay_id.is_empty() && config.relay_enabled
 }
 
@@ -67,7 +67,7 @@ pub fn parse_broker_url(url: &str) -> Option<(String, u16, bool)> {
 }
 
 /// Get broker (host, port, use_tls) from config. Returns None if relay not configured.
-pub fn get_broker_from_config(config: &HcomConfig) -> Option<(String, u16, bool)> {
+pub fn get_broker_from_config(config: &NomadtermConfig) -> Option<(String, u16, bool)> {
     if !is_relay_enabled(config) {
         return None;
     }
@@ -80,7 +80,7 @@ pub fn get_broker_from_config(config: &HcomConfig) -> Option<(String, u16, bool)
 /// Get or create persistent device UUID
 /// Reads from ~/.nomadterm/.tmp/device_id; creates with a new UUID if missing.
 pub fn read_device_uuid() -> String {
-    let path = crate::paths::hcom_dir().join(".tmp").join("device_id");
+    let path = crate::paths::nomadterm_dir().join(".tmp").join("device_id");
     if let Ok(content) = std::fs::read_to_string(&path) {
         let trimmed = content.trim().to_string();
         if !trimmed.is_empty() {
@@ -107,12 +107,12 @@ pub fn add_device_suffix(name: &str, short_id: &str) -> String {
 }
 
 /// Safe KV get that won't crash on DB errors.
-pub(crate) fn safe_kv_get(db: &HcomDb, key: &str) -> Option<String> {
+pub(crate) fn safe_kv_get(db: &NomadtermDb, key: &str) -> Option<String> {
     db.kv_get(key).ok().flatten()
 }
 
 /// Safe KV set that won't crash on DB errors.
-pub(crate) fn safe_kv_set(db: &HcomDb, key: &str, value: Option<&str>) {
+pub(crate) fn safe_kv_set(db: &NomadtermDb, key: &str, value: Option<&str>) {
     let _ = db.kv_set(key, value);
 }
 
@@ -128,7 +128,7 @@ pub struct RelayStatus {
 }
 
 /// Get relay status from config + DB.
-pub fn get_relay_status(config: &HcomConfig, db: &HcomDb) -> RelayStatus {
+pub fn get_relay_status(config: &NomadtermConfig, db: &NomadtermDb) -> RelayStatus {
     RelayStatus {
         configured: !config.relay_id.is_empty(),
         enabled: config.relay_enabled,
@@ -149,7 +149,7 @@ pub fn get_relay_status(config: &HcomConfig, db: &HcomDb) -> RelayStatus {
 ///
 /// Validates port is actually reachable via TCP probe to handle stale ports from crashed daemons.
 /// Only clears port after 3 consecutive failures to avoid stampede from transient timeouts.
-pub fn is_relay_handled_by_daemon(db: &HcomDb) -> bool {
+pub fn is_relay_handled_by_daemon(db: &NomadtermDb) -> bool {
     let port_str = match safe_kv_get(db, "relay_daemon_port") {
         Some(p) => p,
         None => return false,
@@ -194,7 +194,7 @@ pub fn is_relay_handled_by_daemon(db: &HcomDb) -> bool {
 /// Notify the relay daemon to push immediately via TCP connect.
 /// Returns true if daemon was successfully notified.
 pub fn notify_relay_daemon() -> bool {
-    let db = match HcomDb::open() {
+    let db = match NomadtermDb::open() {
         Ok(db) => db,
         Err(_) => return false,
     };
@@ -245,7 +245,7 @@ pub fn trigger_push() {
 /// Wait for relay data. Returns true if new remote events arrived in DB.
 /// Polls for events with ':' in instance name (relay-imported events).
 pub fn relay_wait(timeout_secs: f64) -> bool {
-    let db = match HcomDb::open() {
+    let db = match NomadtermDb::open() {
         Ok(db) => db,
         Err(_) => return false,
     };
@@ -279,7 +279,7 @@ pub fn relay_wait(timeout_secs: f64) -> bool {
 /// Non-worker callers bail if a daemon is actively handling relay (relay_daemon_port set).
 /// On "ok", the caller claims ownership via relay_status_owner PID.
 /// On error, only the owning PID (or non-daemon callers) can write.
-pub fn set_relay_status(db: &HcomDb, status: &str, error: Option<&str>, is_worker: bool) {
+pub fn set_relay_status(db: &NomadtermDb, status: &str, error: Option<&str>, is_worker: bool) {
     let pid = std::process::id().to_string();
     let daemon_active = if !is_worker {
         is_relay_handled_by_daemon(db)
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn test_is_relay_enabled() {
-        let mut config = HcomConfig::default();
+        let mut config = NomadtermConfig::default();
         // Default: relay_id empty, relay_enabled true → not enabled
         assert!(!is_relay_enabled(&config));
 

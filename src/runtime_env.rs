@@ -1,8 +1,8 @@
 //! Shared runtime helpers for invoking nomadterm and locating tool config roots.
 
 /// Cached nomadterm invocation prefix (computed once per process lifetime).
-static HCOM_PREFIX: std::sync::LazyLock<Vec<String>> = std::sync::LazyLock::new(|| {
-    if std::env::var("HCOM_DEV_ROOT").is_ok() {
+static NOMADTERM_PREFIX: std::sync::LazyLock<Vec<String>> = std::sync::LazyLock::new(|| {
+    if std::env::var("NOMADTERM_DEV_ROOT").is_ok() {
         return vec!["nomadterm".into()];
     }
 
@@ -19,24 +19,24 @@ static HCOM_PREFIX: std::sync::LazyLock<Vec<String>> = std::sync::LazyLock::new(
 });
 
 /// Detect nomadterm invocation prefix based on execution context.
-pub(crate) fn get_hcom_prefix() -> Vec<String> {
-    HCOM_PREFIX.clone()
+pub(crate) fn get_nomadterm_prefix() -> Vec<String> {
+    NOMADTERM_PREFIX.clone()
 }
 
 /// Get the base directory for tool config files (e.g. .codex/, .gemini/).
 pub(crate) fn tool_config_root() -> std::path::PathBuf {
     let env: std::collections::HashMap<String, String> = std::env::vars().collect();
     let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    let (hcom_dir, _) = crate::paths::resolve_hcom_dir_from_env(&env, &cwd);
-    hcom_dir
+    let (nomadterm_dir, _) = crate::paths::resolve_nomadterm_dir_from_env(&env, &cwd);
+    nomadterm_dir
         .parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| dirs::home_dir().unwrap_or_default())
 }
 
 /// Build nomadterm command string for prompts, config, and hook commands.
-pub(crate) fn build_hcom_command() -> String {
-    get_hcom_prefix().join(" ")
+pub(crate) fn build_nomadterm_command() -> String {
+    get_nomadterm_prefix().join(" ")
 }
 
 /// Set terminal title via escape codes written to /dev/tty.
@@ -55,7 +55,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn tool_config_root_uses_home_when_hcom_dir_has_no_parent() {
+    fn tool_config_root_uses_home_when_nomadterm_dir_has_no_parent() {
         let _guard = EnvGuard::new();
         let temp = tempfile::tempdir().unwrap();
         let home = temp.path().join("home");
@@ -63,7 +63,7 @@ mod tests {
 
         unsafe {
             std::env::set_var("HOME", &home);
-            std::env::set_var("HCOM_DIR", "/");
+            std::env::set_var("NOMADTERM_DIR", "/");
         }
 
         assert_eq!(super::tool_config_root(), home);
@@ -71,7 +71,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn tool_config_root_uses_parent_of_resolved_hcom_dir() {
+    fn tool_config_root_uses_parent_of_resolved_nomadterm_dir() {
         let _guard = EnvGuard::new();
         let temp = tempfile::tempdir().unwrap();
         let workspace = temp.path().join("workspace");
@@ -85,7 +85,7 @@ mod tests {
         std::env::set_current_dir(&workspace).unwrap();
         unsafe {
             std::env::set_var("HOME", &home);
-            std::env::set_var("HCOM_DIR", ".sandbox/.nomadterm");
+            std::env::set_var("NOMADTERM_DIR", ".sandbox/.nomadterm");
         }
 
         let root = super::tool_config_root();

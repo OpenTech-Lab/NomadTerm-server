@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::path::Path;
 
 use super::detail_levels::validate_detail_level;
-use crate::shared::errors::HcomError;
+use crate::shared::errors::NomadtermError;
 use crate::shared::{SenderIdentity, SenderKind};
 
 /// Parse comma-separated list into list of non-empty trimmed strings.
@@ -248,7 +248,7 @@ pub fn validate_bundle(bundle: &mut Value) -> Result<(), String> {
 ///
 /// Warns to stderr if parent not found (non-fatal).
 /// Call after validate_bundle when a DB handle is available.
-pub fn validate_extends_reference(bundle: &Value, db: &crate::db::HcomDb) {
+pub fn validate_extends_reference(bundle: &Value, db: &crate::db::NomadtermDb) {
     let extends_val = match bundle.get("extends").and_then(|v| v.as_str()) {
         Some(v) if !v.is_empty() => v,
         _ => return,
@@ -291,9 +291,9 @@ pub fn create_bundle_event(
     bundle: &mut Value,
     instance: &str,
     created_by: Option<&str>,
-    db: &crate::db::HcomDb,
-) -> Result<String, HcomError> {
-    validate_bundle(bundle).map_err(HcomError::InvalidInput)?;
+    db: &crate::db::NomadtermDb,
+) -> Result<String, NomadtermError> {
+    validate_bundle(bundle).map_err(NomadtermError::InvalidInput)?;
     validate_extends_reference(bundle, db);
 
     let obj = bundle.as_object_mut().unwrap();
@@ -311,7 +311,7 @@ pub fn create_bundle_event(
     }
 
     db.log_event("bundle", instance, &bundle.clone())
-        .map_err(|e| HcomError::DatabaseError(format!("Failed to persist bundle event: {e}")))?;
+        .map_err(|e| NomadtermError::DatabaseError(format!("Failed to persist bundle event: {e}")))?;
 
     Ok(bundle_id)
 }

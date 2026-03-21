@@ -77,9 +77,9 @@ impl From<(u32, &PidEntry)> for OrphanProcess {
     }
 }
 
-/// Resolve the pidfile path from hcom_dir.
-fn pidfile_path(hcom_dir: &Path) -> PathBuf {
-    hcom_dir.join(PIDFILE_NAME)
+/// Resolve the pidfile path from nomadterm_dir.
+fn pidfile_path(nomadterm_dir: &Path) -> PathBuf {
+    nomadterm_dir.join(PIDFILE_NAME)
 }
 
 /// Check if a process is alive via `kill(pid, 0)`.
@@ -114,24 +114,24 @@ pub fn is_alive(pid: u32) -> bool {
 }
 
 /// Read raw pidfile data.
-fn read_raw(hcom_dir: &Path) -> HashMap<String, PidEntry> {
-    match std::fs::read_to_string(pidfile_path(hcom_dir)) {
+fn read_raw(nomadterm_dir: &Path) -> HashMap<String, PidEntry> {
+    match std::fs::read_to_string(pidfile_path(nomadterm_dir)) {
         Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
         Err(_) => HashMap::new(),
     }
 }
 
 /// Write pidfile data atomically (temp + rename).
-fn write_raw(hcom_dir: &Path, data: &HashMap<String, PidEntry>) {
+fn write_raw(nomadterm_dir: &Path, data: &HashMap<String, PidEntry>) {
     if let Ok(content) = serde_json::to_string(data) {
-        crate::paths::atomic_write(&pidfile_path(hcom_dir), &content);
+        crate::paths::atomic_write(&pidfile_path(nomadterm_dir), &content);
     }
 }
 
 /// Parameters for recording a launched process.
 #[derive(Debug)]
 pub struct PidRecord<'a> {
-    pub hcom_dir: &'a Path,
+    pub nomadterm_dir: &'a Path,
     pub pid: u32,
     pub tool: &'a str,
     pub name: &'a str,
@@ -150,14 +150,14 @@ pub struct PidRecord<'a> {
 impl<'a> PidRecord<'a> {
     /// Create with required fields, defaulting optional ones.
     pub fn new(
-        hcom_dir: &'a Path,
+        nomadterm_dir: &'a Path,
         pid: u32,
         tool: &'a str,
         name: &'a str,
         directory: &'a str,
     ) -> Self {
         Self {
-            hcom_dir,
+            nomadterm_dir,
             pid,
             tool,
             name,
@@ -178,7 +178,7 @@ impl<'a> PidRecord<'a> {
 /// Record a launched process PID.
 pub fn record_pid(rec: &PidRecord<'_>) {
     let PidRecord {
-        hcom_dir,
+        nomadterm_dir,
         pid,
         tool,
         name,
@@ -193,7 +193,7 @@ pub fn record_pid(rec: &PidRecord<'_>) {
         inject_port,
         tag,
     } = rec;
-    let mut data = read_raw(hcom_dir);
+    let mut data = read_raw(nomadterm_dir);
     let key = pid.to_string();
 
     if let Some(entry) = data.get_mut(&key) {
@@ -250,7 +250,7 @@ pub fn record_pid(rec: &PidRecord<'_>) {
         );
     }
 
-    write_raw(hcom_dir, &data);
+    write_raw(nomadterm_dir, &data);
 }
 
 /// Get running nomadterm processes not accounted for by active instances.
@@ -259,10 +259,10 @@ pub fn record_pid(rec: &PidRecord<'_>) {
 /// also prunes PIDs that are now active from the file and filters them
 /// from the result.
 pub fn get_orphan_processes(
-    hcom_dir: &Path,
+    nomadterm_dir: &Path,
     active_pids: Option<&std::collections::HashSet<u32>>,
 ) -> Vec<OrphanProcess> {
-    let data = read_raw(hcom_dir);
+    let data = read_raw(nomadterm_dir);
 
     // Filter to alive processes only
     let mut alive: HashMap<String, PidEntry> = HashMap::new();
@@ -276,7 +276,7 @@ pub fn get_orphan_processes(
 
     // Write back pruned data if anything was removed
     if alive.len() != data.len() {
-        write_raw(hcom_dir, &alive);
+        write_raw(nomadterm_dir, &alive);
     }
 
     // Build result
@@ -302,7 +302,7 @@ pub fn get_orphan_processes(
             for k in &active_in_file {
                 pruned.remove(k);
             }
-            write_raw(hcom_dir, &pruned);
+            write_raw(nomadterm_dir, &pruned);
         }
         result.retain(|p| !active.contains(&p.pid));
     }
@@ -311,11 +311,11 @@ pub fn get_orphan_processes(
 }
 
 /// Remove a PID from tracking (after kill).
-pub fn remove_pid(hcom_dir: &Path, pid: u32) {
-    let mut data = read_raw(hcom_dir);
+pub fn remove_pid(nomadterm_dir: &Path, pid: u32) {
+    let mut data = read_raw(nomadterm_dir);
     let key = pid.to_string();
     if data.remove(&key).is_some() {
-        write_raw(hcom_dir, &data);
+        write_raw(nomadterm_dir, &data);
     }
 }
 
@@ -328,7 +328,7 @@ pub fn remove_pid(hcom_dir: &Path, pid: u32) {
 /// Returns `Err` if the critical instance INSERT fails (caller must not prune
 /// the pidtrack entry on failure —
 pub fn recover_single_orphan_to_db(
-    db: &crate::db::HcomDb,
+    db: &crate::db::NomadtermDb,
     orphan: &OrphanProcess,
     instance_name: &str,
 ) -> Result<(), String> {
@@ -414,7 +414,7 @@ mod tests {
     fn test_record_and_read() {
         let dir = make_temp_dir();
         record_pid(&PidRecord {
-            hcom_dir: dir.path(),
+            nomadterm_dir: dir.path(),
             pid: 12345,
             tool: "claude",
             name: "luna",
@@ -565,7 +565,7 @@ mod tests {
         // DB without init_db → no instances table → INSERT fails
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = crate::db::HcomDb::open_at(&db_path).unwrap();
+        let db = crate::db::NomadtermDb::open_at(&db_path).unwrap();
         // Deliberately NOT calling db.init_db()
 
         let orphan = OrphanProcess {

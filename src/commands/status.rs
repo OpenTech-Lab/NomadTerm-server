@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde_json::json;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::shared::CommandContext;
 
 /// Parsed arguments for `nomadterm status`.
@@ -142,7 +142,7 @@ struct AgentCounts {
     total: i64,
 }
 
-fn get_agent_counts(db: &HcomDb) -> AgentCounts {
+fn get_agent_counts(db: &NomadtermDb) -> AgentCounts {
     let mut c = AgentCounts {
         active: 0,
         listening: 0,
@@ -181,14 +181,14 @@ fn get_agent_counts(db: &HcomDb) -> AgentCounts {
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
 /// Main entry point for `nomadterm status` command.
-pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_status(db: &NomadtermDb, args: &StatusArgs, _ctx: Option<&CommandContext>) -> i32 {
     let json_mode = args.json;
     let show_logs = args.logs;
 
-    let hcom_dir = crate::paths::hcom_dir();
-    let dir_exists = hcom_dir.exists();
+    let nomadterm_dir = crate::paths::nomadterm_dir();
+    let dir_exists = nomadterm_dir.exists();
     let dir_writable = if dir_exists {
-        let test_file = hcom_dir.join(".write_test");
+        let test_file = nomadterm_dir.join(".write_test");
         let writable = std::fs::write(&test_file, "").is_ok();
         let _ = std::fs::remove_file(&test_file);
         writable
@@ -201,7 +201,7 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
 
     // Check config validity
     let mut config_errors: Vec<String> = Vec::new();
-    let config_valid = match std::fs::read_to_string(hcom_dir.join("config.toml")) {
+    let config_valid = match std::fs::read_to_string(nomadterm_dir.join("config.toml")) {
         Ok(c) => match c.parse::<toml::Table>() {
             Ok(_) => true,
             Err(e) => {
@@ -229,7 +229,7 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
     let relay = crate::relay::get_relay_status(&config, db);
 
     // Paths
-    let hcom_dir_override = std::env::var("HCOM_DIR").is_ok();
+    let nomadterm_dir_override = std::env::var("NOMADTERM_DIR").is_ok();
     let project_root = crate::paths::get_project_root();
 
     // Settings paths
@@ -246,10 +246,10 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
                 "update_available": false,
                 "update_cmd": null,
             },
-            "hcom_dir": hcom_dir.to_string_lossy(),
-            "hcom_dir_override": hcom_dir_override,
-            "hcom_exists": dir_exists,
-            "hcom_writable": dir_writable,
+            "nomadterm_dir": nomadterm_dir.to_string_lossy(),
+            "nomadterm_dir_override": nomadterm_dir_override,
+            "nomadterm_exists": dir_exists,
+            "nomadterm_writable": dir_writable,
             "project_root": project_root.to_string_lossy(),
             "config_valid": config_valid,
             "config_errors": config_errors,
@@ -322,11 +322,11 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
     } else {
         "missing"
     };
-    println!("dir:       {} ({dir_status})", hcom_dir.display());
-    if std::env::var("HCOM_DIR").is_ok() {
+    println!("dir:       {} ({dir_status})", nomadterm_dir.display());
+    if std::env::var("NOMADTERM_DIR").is_ok() {
         println!(
-            "           HCOM_DIR={}",
-            std::env::var("HCOM_DIR").unwrap_or_default()
+            "           NOMADTERM_DIR={}",
+            std::env::var("NOMADTERM_DIR").unwrap_or_default()
         );
     }
 
@@ -398,7 +398,7 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
 
     // Relay worker process status — only show when relay is enabled
     if relay.configured && relay.enabled {
-        let relay_pid_path = crate::paths::hcom_dir().join(".tmp").join("relay.pid");
+        let relay_pid_path = crate::paths::nomadterm_dir().join(".tmp").join("relay.pid");
         let relay_running = if let Ok(pid_str) = std::fs::read_to_string(&relay_pid_path) {
             if let Ok(pid) = pid_str.trim().parse::<u32>() {
                 crate::pidtrack::is_alive(pid)
@@ -450,7 +450,7 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
     }
 
     if show_logs {
-        let log_path = hcom_dir.join(".tmp/logs/nomadterm.log");
+        let log_path = nomadterm_dir.join(".tmp/logs/nomadterm.log");
         if log_path.exists() {
             println!("           {}", log_path.display());
             let entries = crate::log::get_recent_logs(1.0, &["ERROR", "WARN"], 20);

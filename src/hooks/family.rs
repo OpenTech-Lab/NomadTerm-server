@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::instances;
 use crate::log;
 
@@ -83,7 +83,7 @@ pub fn extract_tool_detail(tool: &str, tool_name: &str, tool_input: &serde_json:
 /// Returns instance_name on success or error, None only if nothing to bind.
 ///
 pub fn bind_vanilla_instance(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     session_id: Option<&str>,
     transcript_path: Option<&str>,
@@ -218,15 +218,15 @@ mod tests {
         assert_eq!(extract_tool_detail("claude", "Bash", &input), "");
     }
 
-    fn make_test_db() -> (tempfile::TempDir, crate::db::HcomDb) {
+    fn make_test_db() -> (tempfile::TempDir, crate::db::NomadtermDb) {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = crate::db::HcomDb::open_at(&db_path).unwrap();
+        let db = crate::db::NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         (dir, db)
     }
 
-    fn insert_test_instance(db: &crate::db::HcomDb, name: &str) {
+    fn insert_test_instance(db: &crate::db::NomadtermDb, name: &str) {
         let now = chrono::Utc::now().timestamp() as f64;
         db.conn().execute(
             "INSERT INTO instances (name, status, created_at, tool) VALUES (?1, 'active', ?2, 'claude')",

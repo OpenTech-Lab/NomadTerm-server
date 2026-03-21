@@ -103,7 +103,7 @@ impl SessionPool {
 
     /// Spawn a new PTY session for the given AI CLI tool.
     ///
-    /// Launches `nomadterm pty <cli>` with `HCOM_INSTANCE_NAME=<uuid>`, then polls
+    /// Launches `nomadterm pty <cli>` with `NOMADTERM_INSTANCE_NAME=<uuid>`, then polls
     /// the SQLite DB until the PTY registers its inject port.
     pub fn spawn(&self, cli: &str) -> Result<String> {
         let session_id = Uuid::new_v4().to_string();
@@ -117,7 +117,7 @@ impl SessionPool {
 
         let mut child = std::process::Command::new(&binary)
             .args(["pty", cli])
-            .env("HCOM_INSTANCE_NAME", &session_id)
+            .env("NOMADTERM_INSTANCE_NAME", &session_id)
             .current_dir(self.workspace_dir.as_ref())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
@@ -165,7 +165,7 @@ impl SessionPool {
         let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
 
         let db =
-            crate::db::HcomDb::open().context("Failed to open DB for inject port discovery")?;
+            crate::db::NomadtermDb::open().context("Failed to open DB for inject port discovery")?;
 
         while std::time::Instant::now() < deadline {
             if let Ok(Some(port)) = db.get_inject_port(instance_name) {

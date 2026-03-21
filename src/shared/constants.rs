@@ -67,15 +67,15 @@ pub const TOOL_MARKER_VARS: &[&str] = &[
 ];
 
 /// NOMADTERM identity vars — set per-instance, cleared to prevent parent identity leakage.
-pub const HCOM_IDENTITY_VARS: &[&str] = &[
-    "HCOM_PROCESS_ID",
-    "HCOM_LAUNCHED",
-    // HCOM_LAUNCHED_PRESET excluded — must survive into Rust binary for hook forwarding
-    "HCOM_PTY_MODE",
-    "HCOM_BACKGROUND",
-    "HCOM_LAUNCHED_BY",
-    "HCOM_LAUNCH_BATCH_ID",
-    "HCOM_LAUNCH_EVENT_ID",
+pub const NOMADTERM_IDENTITY_VARS: &[&str] = &[
+    "NOMADTERM_PROCESS_ID",
+    "NOMADTERM_LAUNCHED",
+    // NOMADTERM_LAUNCHED_PRESET excluded — must survive into Rust binary for hook forwarding
+    "NOMADTERM_PTY_MODE",
+    "NOMADTERM_BACKGROUND",
+    "NOMADTERM_LAUNCHED_BY",
+    "NOMADTERM_LAUNCH_BATCH_ID",
+    "NOMADTERM_LAUNCH_EVENT_ID",
 ];
 
 pub const ST_ACTIVE: &str = "active";

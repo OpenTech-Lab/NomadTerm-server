@@ -54,7 +54,7 @@ pub fn get_sandbox_flags(mode: &str) -> Vec<String> {
 ///
 /// If no sandbox flags are present (mode="none"), skip adding --add-dir
 /// since user is using codex's own folder settings.
-pub fn ensure_hcom_writable(tokens: &[String]) -> Vec<String> {
+pub fn ensure_nomadterm_writable(tokens: &[String]) -> Vec<String> {
     let spec = resolve_codex_args(Some(tokens), None);
 
     // If no sandbox flags, assume mode="none" — skip --add-dir
@@ -71,20 +71,20 @@ pub fn ensure_hcom_writable(tokens: &[String]) -> Vec<String> {
         return tokens.to_vec();
     }
 
-    let hcom_dir = paths::hcom_dir().to_string_lossy().to_string();
+    let nomadterm_dir = paths::nomadterm_dir().to_string_lossy().to_string();
 
     // Check if --add-dir with nomadterm path already exists
     for (i, token) in spec.clean_tokens.iter().enumerate() {
         if token == "--add-dir"
             && i + 1 < spec.clean_tokens.len()
-            && spec.clean_tokens[i + 1] == hcom_dir
+            && spec.clean_tokens[i + 1] == nomadterm_dir
         {
             return tokens.to_vec(); // Already present
         }
     }
 
     // Prepend --add-dir at the beginning
-    let mut result = vec!["--add-dir".to_string(), hcom_dir];
+    let mut result = vec!["--add-dir".to_string(), nomadterm_dir];
     result.extend(tokens.iter().cloned());
     result
 }
@@ -206,11 +206,11 @@ pub fn preprocess_codex_args(
     // Warn if mode is "none"
     if sandbox_mode == "none" {
         eprintln!("[nomadterm] Warning: Sandbox mode is 'none' - --add-dir ~/.nomadterm disabled.");
-        eprintln!("[nomadterm] nomadterm commands may fail unless HCOM_DIR is within workspace.");
+        eprintln!("[nomadterm] nomadterm commands may fail unless NOMADTERM_DIR is within workspace.");
     }
 
     // 2. Ensure --add-dir ~/.nomadterm is present (skips if mode="none")
-    args = ensure_hcom_writable(&args);
+    args = ensure_nomadterm_writable(&args);
 
     // 3. Add bootstrap to developer_instructions
     args = add_codex_developer_instructions(&args, bootstrap_text);
@@ -228,7 +228,7 @@ mod tests {
     }
 
     fn init_config() {
-        // Config::init is idempotent-ish but needs to be called before paths::hcom_dir()
+        // Config::init is idempotent-ish but needs to be called before paths::nomadterm_dir()
         crate::config::Config::init();
     }
 
@@ -271,30 +271,30 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_ensure_hcom_writable_adds_dir() {
+    fn test_ensure_nomadterm_writable_adds_dir() {
         init_config();
         // With --full-auto, sandbox is active → should add --add-dir
         let tokens = s(&["--full-auto"]);
-        let result = ensure_hcom_writable(&tokens);
+        let result = ensure_nomadterm_writable(&tokens);
         assert_eq!(result[0], "--add-dir");
         assert!(result.len() > 2);
     }
 
     #[test]
-    fn test_ensure_hcom_writable_skips_no_sandbox() {
+    fn test_ensure_nomadterm_writable_skips_no_sandbox() {
         // No sandbox flags → mode="none" → skip (doesn't use paths)
         let tokens = s(&["-m", "o3"]);
-        let result = ensure_hcom_writable(&tokens);
+        let result = ensure_nomadterm_writable(&tokens);
         assert_eq!(result, tokens);
     }
 
     #[test]
     #[serial]
-    fn test_ensure_hcom_writable_no_duplicate() {
+    fn test_ensure_nomadterm_writable_no_duplicate() {
         init_config();
-        let hcom_dir = paths::hcom_dir().to_string_lossy().to_string();
-        let tokens = vec!["--full-auto".to_string(), "--add-dir".to_string(), hcom_dir];
-        let result = ensure_hcom_writable(&tokens);
+        let nomadterm_dir = paths::nomadterm_dir().to_string_lossy().to_string();
+        let tokens = vec!["--full-auto".to_string(), "--add-dir".to_string(), nomadterm_dir];
+        let result = ensure_nomadterm_writable(&tokens);
         let add_dir_count = result.iter().filter(|t| *t == "--add-dir").count();
         assert_eq!(add_dir_count, 1);
     }

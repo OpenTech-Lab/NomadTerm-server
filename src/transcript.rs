@@ -11,7 +11,7 @@ use std::time::Duration;
 use regex::Regex;
 use serde_json::Value;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::log::{log_error, log_info, log_warn};
 
 /// Regex to extract file paths from apply_patch input
@@ -52,7 +52,7 @@ impl TranscriptWatcher {
     /// Parse new transcript entries, log tool calls and prompts to events DB
     ///
     /// Returns number of file edits logged (apply_patch only).
-    pub fn sync(&mut self, db: &HcomDb) -> u32 {
+    pub fn sync(&mut self, db: &NomadtermDb) -> u32 {
         let path = match &self.transcript_path {
             Some(p) => p.clone(),
             None => return 0,
@@ -113,7 +113,7 @@ impl TranscriptWatcher {
     }
 
     /// Process a single transcript entry
-    fn process_entry(&mut self, entry: &Value, db: &HcomDb) -> u32 {
+    fn process_entry(&mut self, entry: &Value, db: &NomadtermDb) -> u32 {
         if entry.get("type").and_then(|v| v.as_str()) != Some("response_item") {
             return 0;
         }
@@ -252,7 +252,7 @@ impl TranscriptWatcher {
     }
 
     /// Log a file edit status event for collision detection
-    fn log_file_edit(&self, filepath: &str, timestamp: &str, db: &HcomDb) {
+    fn log_file_edit(&self, filepath: &str, timestamp: &str, db: &NomadtermDb) {
         if let Err(e) = db.log_status_event(
             &self.instance_name,
             "active",
@@ -289,7 +289,7 @@ impl TranscriptWatcher {
     }
 
     /// Log a shell command status event
-    fn log_shell_command(&self, command: &str, timestamp: &str, db: &HcomDb) {
+    fn log_shell_command(&self, command: &str, timestamp: &str, db: &NomadtermDb) {
         if let Err(e) = db.log_status_event(
             &self.instance_name,
             "active",
@@ -326,7 +326,7 @@ impl TranscriptWatcher {
     }
 
     /// Log user prompt status event
-    fn log_user_prompt(&self, timestamp: &str, db: &HcomDb) {
+    fn log_user_prompt(&self, timestamp: &str, db: &NomadtermDb) {
         if let Err(e) = db.log_status_event(
             &self.instance_name,
             "active",
@@ -376,7 +376,7 @@ pub fn run_transcript_watcher(
     let mut watcher = TranscriptWatcher::new(&instance_name);
 
     // Open database
-    let db = match HcomDb::open() {
+    let db = match NomadtermDb::open() {
         Ok(db) => db,
         Err(e) => {
             log_error(
@@ -450,7 +450,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let test_id = COUNTER.fetch_add(1, Ordering::Relaxed);
         let db_path = temp_dir.join(format!(
-            "test_hcom_transcript_{}_{}.db",
+            "test_nomadterm_transcript_{}_{}.db",
             std::process::id(),
             test_id
         ));
@@ -559,7 +559,7 @@ mod tests {
     #[test]
     fn logged_call_ids_bounds_memory() {
         let db_path = setup_test_db();
-        let db = crate::db::HcomDb::open_at(&db_path).unwrap();
+        let db = crate::db::NomadtermDb::open_at(&db_path).unwrap();
         let mut w = watcher();
 
         for i in 0..10001 {

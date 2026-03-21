@@ -206,7 +206,7 @@ fn prompt_trust_folder(path: &std::path::Path) -> Result<()> {
 
 /// Load token from disk or generate + persist a new one.
 fn load_or_create_token() -> Result<String> {
-    let token_path = crate::paths::hcom_dir().join("nomadterm.token");
+    let token_path = crate::paths::nomadterm_dir().join("nomadterm.token");
 
     if let Ok(token) = std::fs::read_to_string(&token_path) {
         let trimmed = token.trim().to_string();

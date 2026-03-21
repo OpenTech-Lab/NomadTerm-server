@@ -102,20 +102,20 @@ pub fn shorten_path_max(path: &str, max_width: usize) -> String {
     format!("...{}", &shortened[start..])
 }
 
-/// Whether running inside any AI tool (env-var check, no HcomContext needed).
+/// Whether running inside any AI tool (env-var check, no NomadtermContext needed).
 ///
-/// Uses the same env vars as HcomContext::from_env() for tool detection.
-/// For code that already has an HcomContext, prefer `ctx.is_inside_ai_tool()`.
+/// Uses the same env vars as NomadtermContext::from_env() for tool detection.
+/// For code that already has an NomadtermContext, prefer `ctx.is_inside_ai_tool()`.
 pub fn is_inside_ai_tool() -> bool {
     use std::env;
     let is_set = |k: &str| env::var(k).is_ok();
     let is_eq = |k: &str, v: &str| env::var(k).ok().as_deref() == Some(v);
     let nonempty = |k: &str| env::var(k).ok().filter(|v| !v.is_empty()).is_some();
-    // Claude (matches HcomContext: CLAUDECODE=1 || CLAUDE_ENV_FILE non-empty)
+    // Claude (matches NomadtermContext: CLAUDECODE=1 || CLAUDE_ENV_FILE non-empty)
     is_eq("CLAUDECODE", "1") || nonempty("CLAUDE_ENV_FILE")
         // Gemini
         || is_eq("GEMINI_CLI", "1")
-        // Codex (all 5 markers from HcomContext)
+        // Codex (all 5 markers from NomadtermContext)
         || is_set("CODEX_SANDBOX")
         || is_set("CODEX_SANDBOX_NETWORK_DISABLED")
         || is_set("CODEX_MANAGED_BY_NPM")
@@ -124,12 +124,12 @@ pub fn is_inside_ai_tool() -> bool {
         // OpenCode
         || is_eq("OPENCODE", "1")
         // nomadterm-launched
-        || is_eq("HCOM_LAUNCHED", "1")
+        || is_eq("NOMADTERM_LAUNCHED", "1")
 }
 
-/// Detect current AI tool from environment (no HcomContext needed).
+/// Detect current AI tool from environment (no NomadtermContext needed).
 ///
-/// Uses the same env vars as HcomContext::from_env() for tool detection.
+/// Uses the same env vars as NomadtermContext::from_env() for tool detection.
 pub fn detect_current_tool_from_env() -> &'static str {
     use std::env;
     let is_set = |k: &str| env::var(k).is_ok();

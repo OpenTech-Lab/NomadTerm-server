@@ -8,14 +8,14 @@ use std::time::UNIX_EPOCH;
 
 use serde_json::Value;
 
-use crate::db::{HcomDb, InstanceRow};
+use crate::db::{NomadtermDb, InstanceRow};
 use crate::hooks::common;
 use crate::hooks::family;
 use crate::instances;
 use crate::log;
 use crate::paths;
 use crate::shared::ST_LISTENING;
-use crate::shared::context::HcomContext;
+use crate::shared::context::NomadtermContext;
 
 /// Derive Codex transcript path from thread_id.
 ///
@@ -67,7 +67,7 @@ pub fn derive_codex_transcript_path(thread_id: &str) -> Option<String> {
 /// Resolve Codex instance via process binding or session binding.
 ///
 /// Resolve Codex instance from process or session binding.
-fn resolve_instance_codex(db: &HcomDb, ctx: &HcomContext, thread_id: &str) -> Option<InstanceRow> {
+fn resolve_instance_codex(db: &NomadtermDb, ctx: &NomadtermContext, thread_id: &str) -> Option<InstanceRow> {
     instances::resolve_instance_from_binding(
         db,
         Some(thread_id).filter(|s| !s.is_empty()),
@@ -78,7 +78,7 @@ fn resolve_instance_codex(db: &HcomDb, ctx: &HcomContext, thread_id: &str) -> Op
 /// Bind vanilla Codex instance by searching transcript for marker.
 ///
 fn bind_vanilla_instance_codex(
-    db: &HcomDb,
+    db: &NomadtermDb,
     thread_id: &str,
     transcript_path: Option<&str>,
 ) -> Option<String> {
@@ -123,7 +123,7 @@ fn bind_vanilla_instance_codex(
 /// }
 /// ```
 ///
-fn handle_notify(db: &HcomDb, ctx: &HcomContext, raw: &Value) -> i32 {
+fn handle_notify(db: &NomadtermDb, ctx: &NomadtermContext, raw: &Value) -> i32 {
     // Only process agent-turn-complete events
     let event_type = raw.get("type").and_then(|v| v.as_str()).unwrap_or("");
     if event_type != "agent-turn-complete" {
@@ -261,7 +261,7 @@ pub fn dispatch_codex_hook(args: &[String]) -> i32 {
     };
 
     // Open DB — soft-fail on error (exit 0, don't break Codex)
-    let db = match HcomDb::open() {
+    let db = match NomadtermDb::open() {
         Ok(db) => db,
         Err(e) => {
             log::log_warn(
@@ -274,7 +274,7 @@ pub fn dispatch_codex_hook(args: &[String]) -> i32 {
     };
 
     // Build context from environment
-    let ctx = HcomContext::from_os();
+    let ctx = NomadtermContext::from_os();
 
     // Pre-gate: non-participants with empty DB → exit 0, no output
     if !common::hook_gate_check(&ctx, &db) {
@@ -299,15 +299,15 @@ pub fn dispatch_codex_hook(args: &[String]) -> i32 {
 }
 
 /// Safe nomadterm commands that Codex should auto-approve.
-use super::common::SAFE_HCOM_COMMANDS;
+use super::common::SAFE_NOMADTERM_COMMANDS;
 
 /// Tool names that support --help/-h flags.
-const HCOM_TOOL_NAMES: &[&str] = &["claude", "gemini", "codex", "opencode"];
+const NOMADTERM_TOOL_NAMES: &[&str] = &["claude", "gemini", "codex", "opencode"];
 
 /// Get path to Codex config file.
 ///
-/// Base directory for Codex config: HCOM_DIR parent if set (sandbox), otherwise $HOME.
-/// Reads HCOM_DIR directly (not cached Config) so tests can override via env var.
+/// Base directory for Codex config: NOMADTERM_DIR parent if set (sandbox), otherwise $HOME.
+/// Reads NOMADTERM_DIR directly (not cached Config) so tests can override via env var.
 fn codex_base_dir() -> PathBuf {
     crate::runtime_env::tool_config_root()
 }
@@ -326,7 +326,7 @@ pub fn get_codex_rules_path() -> PathBuf {
 ///
 /// Handles both formats: array `notify = ["nomadterm", "codex-notify"]`
 /// and string `notify = "nomadterm codex-notify"`.
-fn is_hcom_notify_line(line: &str) -> bool {
+fn is_nomadterm_notify_line(line: &str) -> bool {
     let stripped = line.trim();
     if !stripped.starts_with("notify") {
         return false;
@@ -343,7 +343,7 @@ fn is_hcom_notify_line(line: &str) -> bool {
 ///
 /// Dynamically detects invocation mode (nomadterm vs uvx nomadterm) to match
 fn build_expected_notify_line() -> String {
-    let mut parts = crate::runtime_env::get_hcom_prefix();
+    let mut parts = crate::runtime_env::get_nomadterm_prefix();
     parts.push("codex-notify".into());
     let array_str = parts
         .iter()
@@ -371,7 +371,7 @@ fn extract_notify_line(content: &str) -> Option<String> {
 ///
 /// Dynamically detects invocation prefix (nomadterm vs uvx nomadterm) to match
 fn build_codex_rules() -> String {
-    let prefix = crate::runtime_env::get_hcom_prefix();
+    let prefix = crate::runtime_env::get_nomadterm_prefix();
     let prefix_parts: String = prefix
         .iter()
         .map(|p| format!("\"{}\"", p))
@@ -379,13 +379,13 @@ fn build_codex_rules() -> String {
         .join(", ");
 
     let mut rules = vec!["# nomadterm integration - auto-approve safe commands".to_string()];
-    for cmd in SAFE_HCOM_COMMANDS {
+    for cmd in SAFE_NOMADTERM_COMMANDS {
         rules.push(format!(
             "prefix_rule(pattern=[{}, \"{}\"], decision=\"allow\")",
             prefix_parts, cmd
         ));
     }
-    for tool in HCOM_TOOL_NAMES {
+    for tool in NOMADTERM_TOOL_NAMES {
         rules.push(format!(
             "prefix_rule(pattern=[{}, \"{}\", \"--help\"], decision=\"allow\")",
             prefix_parts, tool
@@ -617,7 +617,7 @@ fn remove_hooks_from_path(config_path: &Path) -> bool {
     let mut skip_next_blank = false;
 
     for line in content.lines() {
-        if is_hcom_notify_line(line) {
+        if is_nomadterm_notify_line(line) {
             skip_next_blank = true;
             continue;
         }
@@ -683,34 +683,34 @@ mod tests {
         }
     }
 
-    // -- is_hcom_notify_line --
+    // -- is_nomadterm_notify_line --
 
     #[test]
-    fn test_is_hcom_notify_line_array() {
-        assert!(is_hcom_notify_line("notify = [\"nomadterm\", \"codex-notify\"]"));
+    fn test_is_nomadterm_notify_line_array() {
+        assert!(is_nomadterm_notify_line("notify = [\"nomadterm\", \"codex-notify\"]"));
     }
 
     #[test]
-    fn test_is_hcom_notify_line_string() {
-        assert!(is_hcom_notify_line("notify = \"nomadterm codex-notify\""));
+    fn test_is_nomadterm_notify_line_string() {
+        assert!(is_nomadterm_notify_line("notify = \"nomadterm codex-notify\""));
     }
 
     #[test]
-    fn test_is_hcom_notify_line_non_hcom() {
-        assert!(!is_hcom_notify_line(
+    fn test_is_nomadterm_notify_line_non_nomadterm() {
+        assert!(!is_nomadterm_notify_line(
             "notify = [\"other-tool\", \"some-hook\"]"
         ));
     }
 
     #[test]
-    fn test_is_hcom_notify_line_not_notify() {
-        assert!(!is_hcom_notify_line("model = \"gpt-4\""));
+    fn test_is_nomadterm_notify_line_not_notify() {
+        assert!(!is_nomadterm_notify_line("model = \"gpt-4\""));
     }
 
     #[test]
-    fn test_is_hcom_notify_stale_command() {
+    fn test_is_nomadterm_notify_stale_command() {
         // Detects stale nomadterm commands by codex-notify substring
-        assert!(is_hcom_notify_line(
+        assert!(is_nomadterm_notify_line(
             "notify = [\"/old/path/nomadterm\", \"codex-notify\"]"
         ));
     }
@@ -781,10 +781,10 @@ mod tests {
         std::fs::write(&config_path, "[model]\nname = \"o1\"\n").unwrap();
 
         // Setup (using env to redirect paths)
-        let saved = std::env::var("HCOM_DIR").ok();
-        let hcom_dir = dir.path().join(".nomadterm");
-        std::fs::create_dir_all(&hcom_dir).unwrap();
-        unsafe { std::env::set_var("HCOM_DIR", &hcom_dir) };
+        let saved = std::env::var("NOMADTERM_DIR").ok();
+        let nomadterm_dir = dir.path().join(".nomadterm");
+        std::fs::create_dir_all(&nomadterm_dir).unwrap();
+        unsafe { std::env::set_var("NOMADTERM_DIR", &nomadterm_dir) };
 
         let success = setup_codex_hooks(false);
         assert!(success, "setup should succeed");
@@ -807,9 +807,9 @@ mod tests {
 
         // Restore env
         if let Some(v) = saved {
-            unsafe { std::env::set_var("HCOM_DIR", v) };
+            unsafe { std::env::set_var("NOMADTERM_DIR", v) };
         } else {
-            unsafe { std::env::remove_var("HCOM_DIR") };
+            unsafe { std::env::remove_var("NOMADTERM_DIR") };
         }
     }
 
@@ -817,11 +817,11 @@ mod tests {
     #[serial]
     fn test_setup_codex_hooks_creates_new_config() {
         let dir = tempfile::tempdir().unwrap();
-        let hcom_dir = dir.path().join(".nomadterm");
-        std::fs::create_dir_all(&hcom_dir).unwrap();
+        let nomadterm_dir = dir.path().join(".nomadterm");
+        std::fs::create_dir_all(&nomadterm_dir).unwrap();
 
-        let saved = std::env::var("HCOM_DIR").ok();
-        unsafe { std::env::set_var("HCOM_DIR", &hcom_dir) };
+        let saved = std::env::var("NOMADTERM_DIR").ok();
+        unsafe { std::env::set_var("NOMADTERM_DIR", &nomadterm_dir) };
 
         let config_path = get_codex_config_path();
         assert!(!config_path.exists());
@@ -834,9 +834,9 @@ mod tests {
         assert!(content.contains("codex-notify"));
 
         if let Some(v) = saved {
-            unsafe { std::env::set_var("HCOM_DIR", v) };
+            unsafe { std::env::set_var("NOMADTERM_DIR", v) };
         } else {
-            unsafe { std::env::remove_var("HCOM_DIR") };
+            unsafe { std::env::remove_var("NOMADTERM_DIR") };
         }
     }
 
@@ -905,13 +905,13 @@ mod tests {
     use serial_test::serial;
 
     fn codex_test_env() -> (tempfile::TempDir, PathBuf, PathBuf, EnvGuard) {
-        let (dir, _hcom_dir, test_home, guard) = isolated_test_env();
+        let (dir, _nomadterm_dir, test_home, guard) = isolated_test_env();
         let config_path = test_home.join(".codex").join("config.toml");
         (dir, test_home, config_path, guard)
     }
 
     /// Independent verification: no nomadterm notify lines in TOML content.
-    fn independently_verify_no_hcom_in_toml(content: &str) -> Vec<String> {
+    fn independently_verify_no_nomadterm_in_toml(content: &str) -> Vec<String> {
         let mut violations = Vec::new();
         for (i, line) in content.lines().enumerate() {
             let stripped = line.trim();
@@ -1081,7 +1081,7 @@ mod tests {
         assert!(content.contains("name = \"gpt-4\""));
         assert!(content.contains("[other]"));
 
-        let violations = independently_verify_no_hcom_in_toml(&content);
+        let violations = independently_verify_no_nomadterm_in_toml(&content);
         assert!(violations.is_empty(), "nomadterm still present: {violations:?}");
 
         drop(_guard);
@@ -1168,7 +1168,7 @@ mod tests {
         // Remove
         assert!(remove_codex_hooks());
         let content = std::fs::read_to_string(&config_path).unwrap();
-        let violations = independently_verify_no_hcom_in_toml(&content);
+        let violations = independently_verify_no_nomadterm_in_toml(&content);
         assert!(
             violations.is_empty(),
             "nomadterm still present after remove: {violations:?}"

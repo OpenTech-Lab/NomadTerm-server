@@ -1,7 +1,7 @@
 use std::fs;
 
-use crate::db::HcomDb;
-use crate::paths::{ARCHIVE_DIR, FLAGS_DIR, LAUNCH_DIR, LOGS_DIR, hcom_dir};
+use crate::db::NomadtermDb;
+use crate::paths::{ARCHIVE_DIR, FLAGS_DIR, LAUNCH_DIR, LOGS_DIR, nomadterm_dir};
 use crate::shared::shorten_path;
 
 /// Get timestamp for archive directory names.
@@ -11,7 +11,7 @@ pub(crate) fn get_archive_timestamp() -> String {
 
 /// Archive the current database to ~/.nomadterm/archive/session-{timestamp}/.
 pub(crate) fn archive_and_clear_db() -> Result<Option<String>, String> {
-    let base = hcom_dir();
+    let base = nomadterm_dir();
     let db_file = base.join("nomadterm.db");
     let db_wal = base.join("nomadterm.db-wal");
     let db_shm = base.join("nomadterm.db-shm");
@@ -63,7 +63,7 @@ pub(crate) fn archive_and_clear_db() -> Result<Option<String>, String> {
 
 /// Clean temp files (launch scripts, prompts, old logs).
 pub(crate) fn clean_temp_files() {
-    let base = hcom_dir();
+    let base = nomadterm_dir();
     let cutoff_24h = crate::shared::time::now_epoch_f64() - 86400.0;
     let cutoff_30d = crate::shared::time::now_epoch_f64() - 30.0 * 86400.0;
 
@@ -127,7 +127,7 @@ pub(crate) fn clean_temp_files() {
 
 /// Archive and reset config files.
 pub(crate) fn reset_config() -> i32 {
-    let base = hcom_dir();
+    let base = nomadterm_dir();
     let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
     let archive_config_dir = base.join(ARCHIVE_DIR).join("config");
 
@@ -171,18 +171,18 @@ pub(crate) fn reset_config() -> i32 {
 }
 
 pub(crate) fn clear_full_reset_artifacts() {
-    let pidtrack = hcom_dir().join(".tmp").join("launched_pids.json");
+    let pidtrack = nomadterm_dir().join(".tmp").join("launched_pids.json");
     let _ = fs::remove_file(pidtrack);
 
-    let device_id_file = hcom_dir().join(".tmp").join("device_id");
+    let device_id_file = nomadterm_dir().join(".tmp").join("device_id");
     let _ = fs::remove_file(&device_id_file);
 
-    let instance_count_file = hcom_dir().join(FLAGS_DIR).join("instance_count");
+    let instance_count_file = nomadterm_dir().join(FLAGS_DIR).join("instance_count");
     let _ = fs::remove_file(&instance_count_file);
 }
 
 pub(crate) fn bootstrap_fresh_db() {
-    if let Ok(fresh_db) = HcomDb::open() {
+    if let Ok(fresh_db) = NomadtermDb::open() {
         let _ = fresh_db.init_db();
         let _ = fresh_db.log_reset_event();
     }

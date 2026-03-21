@@ -19,17 +19,17 @@ use crate::tui::rpc::Response;
 ///
 /// In normal operation (TUI running), this is the current executable.
 /// The binary is cached per-process since it never changes at runtime.
-fn hcom_binary() -> Result<PathBuf, String> {
+fn nomadterm_binary() -> Result<PathBuf, String> {
     std::env::current_exe().map_err(|e| format!("cannot find nomadterm binary: {e}"))
 }
 
 /// Run an nomadterm command natively, returning captured stdout/stderr.
 ///
 /// Spawns the current binary as a subprocess with the given argv.
-/// Inherits environment (HCOM_DEV_ROOT, HCOM_DIR, etc.) so routing
+/// Inherits environment (NOMADTERM_DEV_ROOT, NOMADTERM_DIR, etc.) so routing
 /// and config resolution work identically to CLI invocations.
 pub fn run_native(argv: &[String]) -> Result<Response, String> {
-    let binary = hcom_binary()?;
+    let binary = nomadterm_binary()?;
 
     let output = Command::new(&binary)
         .args(argv)

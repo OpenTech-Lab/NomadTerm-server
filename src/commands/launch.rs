@@ -6,19 +6,19 @@
 
 use anyhow::{Result, bail};
 
-use crate::config::HcomConfig;
-use crate::db::HcomDb;
+use crate::config::NomadtermConfig;
+use crate::db::NomadtermDb;
 use crate::hooks::claude_args;
 use crate::identity;
 use crate::launcher::{self, LaunchParams};
 use crate::log::log_info;
 use crate::router::GlobalFlags;
-use crate::shared::HcomContext;
+use crate::shared::NomadtermContext;
 use crate::tools::{codex_args, gemini_args};
 
 /// Run the launch command. `argv` is the full argv[1..] including count/tool.
 pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
-    let (count, tool, hcom_flags, tool_args) = parse_launch_argv(argv)?;
+    let (count, tool, nomadterm_flags, tool_args) = parse_launch_argv(argv)?;
 
     // Count validation
     if count == 0 {
@@ -29,19 +29,19 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
         bail!("Too many agents requested (max {}).", max_count);
     }
 
-    let tag = hcom_flags.tag;
-    let terminal = hcom_flags.terminal;
-    let headless = hcom_flags.headless;
+    let tag = nomadterm_flags.tag;
+    let terminal = nomadterm_flags.terminal;
+    let headless = nomadterm_flags.headless;
 
     // Load config for env-based args
-    let hcom_config = HcomConfig::load(None).unwrap_or_else(|_| {
-        let mut c = HcomConfig::default();
+    let nomadterm_config = NomadtermConfig::load(None).unwrap_or_else(|_| {
+        let mut c = NomadtermConfig::default();
         c.normalize();
         c
     });
 
     // Merge env config args with CLI args
-    let mut merged_args = merge_tool_args(&tool, &tool_args, &hcom_config);
+    let mut merged_args = merge_tool_args(&tool, &tool_args, &nomadterm_config);
 
     // Determine PTY and background
     let background = headless || is_background_from_args(&tool, &merged_args);
@@ -55,21 +55,21 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     }
 
     // --go confirmation gate: preview when args present or large batch
-    let ctx = HcomContext::from_os();
+    let ctx = NomadtermContext::from_os();
     if ctx.is_inside_ai_tool() && !flags.go && (!tool_args.is_empty() || count > 5) {
-        print_launch_preview(&tool, count, background, &tool_args, &tag, &hcom_config);
+        print_launch_preview(&tool, count, background, &tool_args, &tag, &nomadterm_config);
         return Ok(0);
     }
 
     // System/initial prompt handling
-    let system_prompt = hcom_flags.system_prompt;
-    let initial_prompt = hcom_flags.initial_prompt;
+    let system_prompt = nomadterm_flags.system_prompt;
+    let initial_prompt = nomadterm_flags.initial_prompt;
 
     // Open DB
-    let db = HcomDb::open()?;
+    let db = NomadtermDb::open()?;
 
     let launcher_name =
-        resolve_launcher_name(&db, flags, std::env::var("HCOM_PROCESS_ID").ok().as_deref());
+        resolve_launcher_name(&db, flags, std::env::var("NOMADTERM_PROCESS_ID").ok().as_deref());
     let launcher_name_ref = launcher_name.as_str();
 
     // Clone for post-launch tips (originals are moved into LaunchParams)
@@ -94,8 +94,8 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
             ),
             env: None,
             launcher: Some(launcher_name.clone()),
-            run_here: hcom_flags.run_here,
-            batch_id: hcom_flags.batch_id,
+            run_here: nomadterm_flags.run_here,
+            batch_id: nomadterm_flags.batch_id,
             name: None, // --name is caller identity, not instance name
             skip_validation: false,
             terminal,
@@ -153,9 +153,9 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     let terminal_mode = if let Some(t) = terminal_for_tips.as_deref() {
         terminal_auto_detected = false;
         t
-    } else if hcom_config.terminal != "default" && !hcom_config.terminal.is_empty() {
+    } else if nomadterm_config.terminal != "default" && !nomadterm_config.terminal.is_empty() {
         terminal_auto_detected = false;
-        &hcom_config.terminal
+        &nomadterm_config.terminal
     } else {
         detected_terminal =
             crate::terminal::detect_terminal_from_env().unwrap_or_else(|| "default".to_string());
@@ -186,7 +186,7 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     Ok(if result.failed == 0 { 0 } else { 1 })
 }
 
-fn resolve_launcher_name(db: &HcomDb, flags: &GlobalFlags, process_id: Option<&str>) -> String {
+fn resolve_launcher_name(db: &NomadtermDb, flags: &GlobalFlags, process_id: Option<&str>) -> String {
     // Launch caller identity only needs explicit --name, then process binding.
     flags
         .name
@@ -217,7 +217,7 @@ fn print_launch_preview(
     background: bool,
     args: &[String],
     tag: &Option<String>,
-    config: &HcomConfig,
+    config: &NomadtermConfig,
 ) {
     let mode = if background {
         "headless"
@@ -227,7 +227,7 @@ fn print_launch_preview(
     let cwd = std::env::current_dir()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| ".".to_string());
-    let args_key = format!("HCOM_{}_ARGS", tool.to_uppercase());
+    let args_key = format!("NOMADTERM_{}_ARGS", tool.to_uppercase());
     let env_args = match tool {
         "claude" => &config.claude_args,
         "gemini" => &config.gemini_args,
@@ -236,7 +236,7 @@ fn print_launch_preview(
         _ => "",
     };
 
-    let terminal = std::env::var("HCOM_TERMINAL").unwrap_or_else(|_| config.terminal.clone());
+    let terminal = std::env::var("NOMADTERM_TERMINAL").unwrap_or_else(|_| config.terminal.clone());
 
     println!("\n== LAUNCH PREVIEW ==");
     println!("Add --go to proceed.\n");
@@ -264,7 +264,7 @@ fn print_launch_preview(
 
 /// Nomadterm-level flags extracted from launch argv.
 #[derive(Debug, Default)]
-struct HcomLaunchFlags {
+struct NomadtermLaunchFlags {
     tag: Option<String>,
     terminal: Option<String>,
     headless: bool,
@@ -277,7 +277,7 @@ struct HcomLaunchFlags {
 /// Parse launch argv: extract count, tool name, nomadterm flags, and tool-specific args.
 ///
 /// Input forms: `[N] <tool> [--tag X] [--terminal X] [--headless] [--nomadterm-prompt X] [--nomadterm-system-prompt X] [--batch-id X] [tool-args...]`
-fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, HcomLaunchFlags, Vec<String>)> {
+fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, NomadtermLaunchFlags, Vec<String>)> {
     if argv.is_empty() {
         bail!("Usage: nomadterm [N] <tool> [args...]");
     }
@@ -322,7 +322,7 @@ fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, HcomLaunchFlags,
 
     // Extract nomadterm flags from anywhere in remaining args (order-independent).
     // Everything not recognized as an nomadterm flag is passed through as a tool arg.
-    let mut flags = HcomLaunchFlags::default();
+    let mut flags = NomadtermLaunchFlags::default();
     let mut tool_args = Vec::new();
     let remaining = &argv[idx..];
     let mut i = 0;
@@ -400,7 +400,7 @@ fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, HcomLaunchFlags,
 }
 
 /// Merge env config args with CLI args via tool-specific parsers.
-fn merge_tool_args(tool: &str, cli_args: &[String], config: &HcomConfig) -> Vec<String> {
+fn merge_tool_args(tool: &str, cli_args: &[String], config: &NomadtermConfig) -> Vec<String> {
     match tool {
         "claude" | "claude-pty" => {
             let env_str = &config.claude_args;
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn test_merge_tool_args_passthrough() {
-        let config = HcomConfig::default();
+        let config = NomadtermConfig::default();
         let args = s(&["--model", "haiku"]);
         let merged = merge_tool_args("claude", &args, &config);
         assert_eq!(merged, args);
@@ -563,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_launch_argv_hcom_prompt() {
+    fn test_parse_launch_argv_nomadterm_prompt() {
         let (_, _, flags, args) = parse_launch_argv(&s(&[
             "claude",
             "--nomadterm-prompt",
@@ -577,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_launch_argv_hcom_system_prompt() {
+    fn test_parse_launch_argv_nomadterm_system_prompt() {
         let (_, _, flags, args) = parse_launch_argv(&s(&[
             "claude",
             "--nomadterm-system-prompt",
@@ -633,7 +633,7 @@ mod tests {
         crate::config::Config::init();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         let flags = GlobalFlags {
             name: Some("explicit".to_string()),
@@ -649,7 +649,7 @@ mod tests {
         crate::config::Config::init();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         let now = crate::shared::time::now_epoch_f64();
         db.conn()

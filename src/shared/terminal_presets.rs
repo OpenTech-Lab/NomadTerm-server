@@ -94,7 +94,7 @@ pub static TERMINAL_PRESETS: LazyLock<Vec<(&'static str, TerminalPreset)>> = Laz
             p(
                 Some("kitty"),
                 Some("kitty"),
-                "kitty --env HCOM_PROCESS_ID={process_id} {script}",
+                "kitty --env NOMADTERM_PROCESS_ID={process_id} {script}",
                 Some("kitten @ close-window --match id:{pane_id}"),
                 None,
                 DL,
@@ -105,7 +105,7 @@ pub static TERMINAL_PRESETS: LazyLock<Vec<(&'static str, TerminalPreset)>> = Laz
             p(
                 Some("kitty"),
                 Some("kitty"),
-                "kitty --env HCOM_PROCESS_ID={process_id} {script}",
+                "kitty --env NOMADTERM_PROCESS_ID={process_id} {script}",
                 Some("kitten @ close-window --match id:{pane_id}"),
                 None,
                 DL,
@@ -311,7 +311,7 @@ pub static TERMINAL_PRESETS: LazyLock<Vec<(&'static str, TerminalPreset)>> = Laz
             p(
                 Some("kitten"),
                 Some("kitty"),
-                "kitten @ launch --type=tab --env HCOM_PROCESS_ID={process_id} -- bash {script}",
+                "kitten @ launch --type=tab --env NOMADTERM_PROCESS_ID={process_id} -- bash {script}",
                 Some("kitten @ close-tab --match id:{pane_id}"),
                 None,
                 DL,
@@ -322,7 +322,7 @@ pub static TERMINAL_PRESETS: LazyLock<Vec<(&'static str, TerminalPreset)>> = Laz
             p(
                 Some("kitten"),
                 Some("kitty"),
-                "kitten @ launch --type=window --env HCOM_PROCESS_ID={process_id} -- bash {script}",
+                "kitten @ launch --type=window --env NOMADTERM_PROCESS_ID={process_id} -- bash {script}",
                 Some("kitten @ close-window --match id:{pane_id}"),
                 None,
                 DL,

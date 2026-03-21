@@ -180,9 +180,9 @@ fn run_inner(viewport_height: u16) -> Result<()> {
     // Auto-spawn relay-worker if relay is configured
     crate::relay::worker::ensure_worker(true);
 
-    // HCOM_TUI_FULLSCREEN=1 starts directly in alternate screen (fullscreen) mode,
+    // NOMADTERM_TUI_FULLSCREEN=1 starts directly in alternate screen (fullscreen) mode,
     // bypassing inline viewport which requires cursor position queries.
-    if std::env::var("HCOM_TUI_FULLSCREEN").as_deref() == Ok("1") {
+    if std::env::var("NOMADTERM_TUI_FULLSCREEN").as_deref() == Ok("1") {
         app.ui.view_mode = self::model::ViewMode::Vertical;
         app.source.set_timeline_limit(5000);
     }
@@ -353,7 +353,7 @@ pub fn run() -> Result<()> {
         original_hook(info);
     }));
 
-    let viewport_height = std::env::var("HCOM_INLINE_HEIGHT")
+    let viewport_height = std::env::var("NOMADTERM_INLINE_HEIGHT")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(13u16);

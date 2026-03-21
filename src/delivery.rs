@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::log::{log_error, log_info, log_warn};
 use crate::notify::NotifyServer;
 use crate::shared::{ST_ACTIVE, ST_BLOCKED, ST_LISTENING};
@@ -19,7 +19,7 @@ pub(crate) fn truncate_chars(s: &str, max_chars: usize) -> String {
 }
 
 /// Build full display name: "{tag}-{name}" if tag exists, else "{name}".
-fn full_display_name(db: &HcomDb, name: &str) -> String {
+fn full_display_name(db: &NomadtermDb, name: &str) -> String {
     match db.get_instance_tag(name) {
         Some(tag) => format!("{}-{}", tag, name),
         None => name.to_string(),
@@ -29,7 +29,7 @@ fn full_display_name(db: &HcomDb, name: &str) -> String {
 /// Check process binding and update current_name if it changed.
 /// Returns true if the name changed.
 fn refresh_binding(
-    db: &HcomDb,
+    db: &NomadtermDb,
     process_id: &str,
     current_name: &mut String,
     shared_name: &Option<Arc<std::sync::RwLock<String>>>,
@@ -74,7 +74,7 @@ fn refresh_binding(
 
 /// Refresh shared status from DB. Updates current_status if changed.
 fn refresh_status(
-    db: &HcomDb,
+    db: &NomadtermDb,
     current_name: &str,
     current_status: &mut String,
     shared_status: &Option<Arc<std::sync::RwLock<String>>>,
@@ -103,7 +103,7 @@ fn refresh_status(
 
 /// Refresh shared display name (picks up tag changes at runtime).
 fn refresh_display_name(
-    db: &HcomDb,
+    db: &NomadtermDb,
     current_name: &str,
     shared_name: &Option<Arc<std::sync::RwLock<String>>>,
 ) {
@@ -149,7 +149,7 @@ pub(crate) fn gate_block_detail(reason: &str) -> &'static str {
 ///   message context in terminal (like Gemini). Bash command output is truncated for
 ///   agent only (command execution-based delivery). No BeforeAgent-style hook exists -
 ///   Codex executes 'nomadterm listen' as shell command.
-fn build_message_preview_with_db(db: &HcomDb, name: &str) -> String {
+fn build_message_preview_with_db(db: &NomadtermDb, name: &str) -> String {
     let messages = db.get_unread_messages(name);
     if messages.is_empty() {
         return "<nomadterm></nomadterm>".to_string();
@@ -192,7 +192,7 @@ fn build_message_preview_with_db(db: &HcomDb, name: &str) -> String {
 
 /// Build Codex inject text with hint after failed inject
 /// Format: <nomadterm>sender → recipient (+N)</nomadterm> | Run: nomadterm listen
-fn build_codex_inject_with_hint(db: &HcomDb, name: &str) -> String {
+fn build_codex_inject_with_hint(db: &NomadtermDb, name: &str) -> String {
     let preview = build_message_preview_with_db(db, name);
     format!("{} | Run: nomadterm listen", preview)
 }
@@ -516,7 +516,7 @@ enum State {
 #[allow(clippy::too_many_arguments)] // Tracked: hook-comms-8vs (refactor delivery loop)
 pub fn run_delivery_loop(
     running: Arc<AtomicBool>,
-    db: &mut HcomDb,
+    db: &mut NomadtermDb,
     notify: &NotifyServer,
     state: &DeliveryState,
     instance_name: &str,

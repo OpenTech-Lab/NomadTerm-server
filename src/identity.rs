@@ -3,8 +3,8 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-use crate::db::HcomDb;
-use crate::shared::{HcomError, SenderIdentity, SenderKind};
+use crate::db::NomadtermDb;
+use crate::shared::{NomadtermError, SenderIdentity, SenderKind};
 
 /// UUID pattern for agent_id detection.
 static UUID_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
@@ -94,7 +94,7 @@ pub fn validate_name_input(name: &str, max_length: usize, allow_at: bool) -> Res
 /// 1. Instance name lookup (exact) -> kind=Instance if found
 /// 2. Agent ID (UUID) lookup -> kind=Instance if found
 /// 3. Error if not found
-pub fn resolve_from_name(db: &HcomDb, name: &str) -> Result<SenderIdentity, HcomError> {
+pub fn resolve_from_name(db: &NomadtermDb, name: &str) -> Result<SenderIdentity, NomadtermError> {
     let mut resolved_name = name.to_string();
 
     // Reject invalid base names, but allow tag-name format (e.g. "team-luna")
@@ -102,7 +102,7 @@ pub fn resolve_from_name(db: &HcomDb, name: &str) -> Result<SenderIdentity, Hcom
         // Try tag-name resolution before rejecting
         match crate::instances::resolve_display_name(db, name) {
             Some(base) => resolved_name = base,
-            None => return Err(HcomError::InvalidInput(base_name_error(name))),
+            None => return Err(NomadtermError::InvalidInput(base_name_error(name))),
         }
     }
 
@@ -155,7 +155,7 @@ pub fn resolve_from_name(db: &HcomDb, name: &str) -> Result<SenderIdentity, Hcom
         "resolve_from_name.not_found",
         &format!("name={}", resolved_name),
     );
-    Err(HcomError::NotFound(instance_not_found_error(
+    Err(NomadtermError::NotFound(instance_not_found_error(
         &resolved_name,
     )))
 }
@@ -168,7 +168,7 @@ pub fn resolve_from_name(db: &HcomDb, name: &str) -> Result<SenderIdentity, Hcom
 /// * `name` - Instance name from `--name` flag (strict lookup)
 /// * `system_sender` - System notification sender name (e.g., 'nomadterm-launcher')
 /// * `session_id` - Explicit session_id (for hook context, bypasses env detection)
-/// * `process_id` - HCOM_PROCESS_ID (for launched instances)
+/// * `process_id` - NOMADTERM_PROCESS_ID (for launched instances)
 /// * `codex_thread_id` - Codex thread ID for opportunistic session binding
 /// * `transcript_fallback` - Optional closure for transcript marker resolution
 ///
@@ -177,19 +177,19 @@ pub fn resolve_from_name(db: &HcomDb, name: &str) -> Result<SenderIdentity, Hcom
 /// 1. `system_sender` - system notifications
 /// 2. `session_id` - explicit session (internal use)
 /// 3. `name` (--name) - strict instance lookup
-/// 4. Auto-detect from `process_id` (HCOM_PROCESS_ID)
+/// 4. Auto-detect from `process_id` (NOMADTERM_PROCESS_ID)
 /// 5. `transcript_fallback` - transcript marker scan (hook extension point)
 /// 6. Error if no identity
 #[allow(clippy::type_complexity)]
 pub fn resolve_identity(
-    db: &HcomDb,
+    db: &NomadtermDb,
     name: Option<&str>,
     system_sender: Option<&str>,
     session_id: Option<&str>,
     process_id: Option<&str>,
     codex_thread_id: Option<&str>,
-    transcript_fallback: Option<&dyn Fn(&HcomDb) -> Option<SenderIdentity>>,
-) -> Result<SenderIdentity, HcomError> {
+    transcript_fallback: Option<&dyn Fn(&NomadtermDb) -> Option<SenderIdentity>>,
+) -> Result<SenderIdentity, NomadtermError> {
     // 1. System sender (internal use)
     if let Some(sender) = system_sender {
         return Ok(SenderIdentity {
@@ -205,13 +205,13 @@ pub fn resolve_identity(
         if !sid.is_empty() {
             let resolved_name = db
                 .get_session_binding(sid)
-                .map_err(|e| HcomError::DatabaseError(e.to_string()))?;
+                .map_err(|e| NomadtermError::DatabaseError(e.to_string()))?;
 
             match resolved_name {
                 Some(inst_name) => {
                     let data = db
                         .get_instance(&inst_name)
-                        .map_err(|e| HcomError::DatabaseError(e.to_string()))?;
+                        .map_err(|e| NomadtermError::DatabaseError(e.to_string()))?;
 
                     match data {
                         Some(d) => {
@@ -228,7 +228,7 @@ pub fn resolve_identity(
                             });
                         }
                         None => {
-                            return Err(HcomError::NotFound(
+                            return Err(NomadtermError::NotFound(
                                 "Instance not found for session_id".to_string(),
                             ));
                         }
@@ -240,7 +240,7 @@ pub fn resolve_identity(
                         "resolve.session_id_not_found",
                         &format!("session_id={}", &sid[..sid.len().min(8)]),
                     );
-                    return Err(HcomError::NotFound(
+                    return Err(NomadtermError::NotFound(
                         "Instance not found for session_id".to_string(),
                     ));
                 }
@@ -260,13 +260,13 @@ pub fn resolve_identity(
         if !pid.is_empty() {
             let bound_name = db
                 .get_process_binding(pid)
-                .map_err(|e| HcomError::DatabaseError(e.to_string()))?;
+                .map_err(|e| NomadtermError::DatabaseError(e.to_string()))?;
 
             match bound_name {
                 Some(inst_name) => {
                     let data = db
                         .get_instance(&inst_name)
-                        .map_err(|e| HcomError::DatabaseError(e.to_string()))?;
+                        .map_err(|e| NomadtermError::DatabaseError(e.to_string()))?;
 
                     match data {
                         Some(d) => {
@@ -296,7 +296,7 @@ pub fn resolve_identity(
                             // Re-read instance data — session_id may have been set during binding
                             let final_data = db
                                 .get_instance(&final_name)
-                                .map_err(|e| HcomError::DatabaseError(e.to_string()))?
+                                .map_err(|e| NomadtermError::DatabaseError(e.to_string()))?
                                 .unwrap_or(d);
 
                             let sid = final_data
@@ -326,7 +326,7 @@ pub fn resolve_identity(
                                 "resolve.process_instance_missing",
                                 &format!("process_id={}, bound_name={}", pid, inst_name),
                             );
-                            return Err(HcomError::NotFound(instance_not_found_error(&inst_name)));
+                            return Err(NomadtermError::NotFound(instance_not_found_error(&inst_name)));
                         }
                     }
                 }
@@ -336,7 +336,7 @@ pub fn resolve_identity(
                         "resolve.process_binding_expired",
                         &format!("process_id={}", pid),
                     );
-                    return Err(HcomError::IdentityRequired(
+                    return Err(NomadtermError::IdentityRequired(
                         "Session expired. Run 'nomadterm start' to reconnect.".to_string(),
                     ));
                 }
@@ -361,7 +361,7 @@ pub fn resolve_identity(
             name.is_some_and(|s| !s.is_empty()),
         ),
     );
-    Err(HcomError::IdentityRequired(
+    Err(NomadtermError::IdentityRequired(
         "No nomadterm identity. Run 'nomadterm start' first, then use --name <yourname> on commands."
             .to_string(),
     ))
@@ -381,7 +381,7 @@ pub fn require_identity_gate(
     cmd: &str,
     explicit_name: Option<&str>,
     has_from_flag: bool,
-) -> Result<(), HcomError> {
+) -> Result<(), NomadtermError> {
     if !requires_identity(cmd) {
         return Ok(());
     }
@@ -396,7 +396,7 @@ pub fn require_identity_gate(
         return Ok(());
     }
 
-    Err(HcomError::IdentityRequired(format!(
+    Err(NomadtermError::IdentityRequired(format!(
         "'{cmd}' requires identity. Use --name <yourname> or run inside an nomadterm-launched session."
     )))
 }
@@ -405,15 +405,15 @@ pub fn require_identity_gate(
 mod tests {
     use super::*;
 
-    fn make_test_db() -> (HcomDb, tempfile::TempDir) {
+    fn make_test_db() -> (NomadtermDb, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         (db, dir)
     }
 
-    fn insert_instance(db: &HcomDb, name: &str, session_id: Option<&str>, tag: Option<&str>) {
+    fn insert_instance(db: &NomadtermDb, name: &str, session_id: Option<&str>, tag: Option<&str>) {
         let now = chrono::Utc::now().timestamp() as f64;
         db.conn()
             .execute(
@@ -424,7 +424,7 @@ mod tests {
             .unwrap();
     }
 
-    fn insert_process_binding(db: &HcomDb, process_id: &str, instance_name: &str) {
+    fn insert_process_binding(db: &NomadtermDb, process_id: &str, instance_name: &str) {
         let now = chrono::Utc::now().timestamp() as f64;
         db.conn()
             .execute(
@@ -435,7 +435,7 @@ mod tests {
             .unwrap();
     }
 
-    fn insert_session_binding(db: &HcomDb, session_id: &str, instance_name: &str) {
+    fn insert_session_binding(db: &NomadtermDb, session_id: &str, instance_name: &str) {
         let now = chrono::Utc::now().timestamp() as f64;
         db.conn()
             .execute(
@@ -646,7 +646,7 @@ mod tests {
         let (db, _dir) = make_test_db();
         insert_instance(&db, "nova", Some("sess-2"), None);
 
-        let fallback = |_db: &HcomDb| -> Option<SenderIdentity> {
+        let fallback = |_db: &NomadtermDb| -> Option<SenderIdentity> {
             Some(SenderIdentity {
                 kind: SenderKind::Instance,
                 name: "nova".to_string(),

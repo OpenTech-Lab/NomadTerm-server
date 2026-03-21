@@ -8,14 +8,14 @@
 use rusqlite::params;
 use serde_json::Value;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::log;
 
 use super::{device_short_id, safe_kv_get, safe_kv_set};
 
 /// Handle device gone (empty retained payload = LWT or graceful disconnect).
 /// Removes all instances belonging to the disconnected device.
-pub fn handle_device_gone(db: &HcomDb, device_id: &str) {
+pub fn handle_device_gone(db: &NomadtermDb, device_id: &str) {
     if let Err(e) = db.conn().execute(
         "DELETE FROM instances WHERE origin_device_id = ?",
         params![device_id],
@@ -34,7 +34,7 @@ pub fn handle_device_gone(db: &HcomDb, device_id: &str) {
 }
 
 /// Handle a control message from the control topic.
-pub fn handle_control_message(db: &HcomDb, payload: &[u8], own_device: &str) {
+pub fn handle_control_message(db: &NomadtermDb, payload: &[u8], own_device: &str) {
     let data: Value = match serde_json::from_slice(payload) {
         Ok(v) => v,
         Err(e) => {
@@ -66,7 +66,7 @@ pub fn handle_control_message(db: &HcomDb, payload: &[u8], own_device: &str) {
 }
 
 /// Handle a state message from a remote device.
-pub fn handle_state_message(db: &HcomDb, device_id: &str, payload: &[u8], own_device: &str) {
+pub fn handle_state_message(db: &NomadtermDb, device_id: &str, payload: &[u8], own_device: &str) {
     let t0 = std::time::Instant::now();
 
     let data: Value = match serde_json::from_slice(payload) {
@@ -345,7 +345,7 @@ pub fn handle_state_message(db: &HcomDb, device_id: &str, payload: &[u8], own_de
 
 /// Import remote events with cursor-based dedup.
 fn import_remote_events(
-    db: &HcomDb,
+    db: &NomadtermDb,
     device_id: &str,
     short_id: &str,
     events: &[Value],
@@ -537,7 +537,7 @@ fn parse_ts(value: Option<&Value>) -> f64 {
 }
 
 /// Clear short_id mapping for a device (reverse lookup by value).
-fn clear_short_id(db: &HcomDb, device_id: &str) {
+fn clear_short_id(db: &NomadtermDb, device_id: &str) {
     if let Ok(entries) = db.kv_prefix("relay_short_") {
         for (key, val) in entries {
             if val == device_id {

@@ -13,7 +13,7 @@ pub fn show(ui: &mut Ui, state: &mut GuiState) {
             if let Some(path) = rfd::FileDialog::new().pick_folder() {
                 let path_str = path.to_string_lossy().to_string();
                 // Upsert in DB
-                if let Ok(mut db) = crate::db::HcomDb::open() {
+                if let Ok(mut db) = crate::db::NomadtermDb::open() {
                     if db.ensure_schema().is_ok() {
                         if let Ok(row) = db.upsert_repo(&path_str) {
                             let entry = RepoEntry {
@@ -54,7 +54,7 @@ pub fn show(ui: &mut Ui, state: &mut GuiState) {
                 if let Some(idx) = state.selected_idx {
                     if idx < state.repos.len() {
                         let repo_id = state.repos[idx].id.clone();
-                        if let Ok(db) = crate::db::HcomDb::open() {
+                        if let Ok(db) = crate::db::NomadtermDb::open() {
                             let _ = db.remove_repo(&repo_id);
                         }
                         state.repos.remove(idx);

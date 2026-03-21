@@ -8,7 +8,7 @@ use std::net::TcpStream;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 
 /// Parsed arguments for `nomadterm term`.
 #[derive(clap::Parser, Debug)]
@@ -22,16 +22,16 @@ pub struct TermArgs {
     pub args: Vec<String>,
 }
 use crate::instances::resolve_display_name;
-use crate::paths::hcom_dir;
+use crate::paths::nomadterm_dir;
 use crate::shared::CommandContext;
 
 /// PTY debug flag file path.
 fn flag_path() -> PathBuf {
-    hcom_dir().join(".tmp").join("pty_debug_on")
+    nomadterm_dir().join(".tmp").join("pty_debug_on")
 }
 
 /// Look up inject port for an instance from notify_endpoints table.
-fn get_inject_port(db: &HcomDb, instance_name: &str) -> Option<i32> {
+fn get_inject_port(db: &NomadtermDb, instance_name: &str) -> Option<i32> {
     db.conn()
         .query_row(
             "SELECT port FROM notify_endpoints WHERE instance = ?1 AND kind = 'inject'",
@@ -42,7 +42,7 @@ fn get_inject_port(db: &HcomDb, instance_name: &str) -> Option<i32> {
 }
 
 /// Get all instances that have inject ports registered.
-fn get_pty_instances(db: &HcomDb) -> Vec<(String, i32)> {
+fn get_pty_instances(db: &NomadtermDb) -> Vec<(String, i32)> {
     let mut stmt = match db
         .conn()
         .prepare("SELECT instance, port FROM notify_endpoints WHERE kind = 'inject'")
@@ -69,7 +69,7 @@ fn inject_raw(port: i32, data: &[u8]) -> Result<(), String> {
 }
 
 /// Inject text into PTY via inject port.
-fn inject_text(db: &HcomDb, name: &str, text: &str, enter: bool) -> i32 {
+fn inject_text(db: &NomadtermDb, name: &str, text: &str, enter: bool) -> i32 {
     let port = match get_inject_port(db, name) {
         Some(p) => p,
         None => {
@@ -205,7 +205,7 @@ fn handle_debug(argv: &[String]) -> i32 {
 
 /// List PTY debug log files.
 fn list_logs() -> i32 {
-    let debug_dir = hcom_dir().join(".tmp").join("logs").join("pty_debug");
+    let debug_dir = nomadterm_dir().join(".tmp").join("logs").join("pty_debug");
     if !debug_dir.exists() {
         println!("No PTY debug logs found.");
         return 0;
@@ -251,7 +251,7 @@ fn list_logs() -> i32 {
 }
 
 /// Handle screen query: nomadterm term [name] [--json]
-fn handle_screen(db: &HcomDb, argv: &[String]) -> i32 {
+fn handle_screen(db: &NomadtermDb, argv: &[String]) -> i32 {
     let raw_json = argv.iter().any(|a| a == "--json");
     let args: Vec<&str> = argv
         .iter()
@@ -317,7 +317,7 @@ fn handle_screen(db: &HcomDb, argv: &[String]) -> i32 {
     }
 }
 
-pub fn cmd_term(db: &HcomDb, args: &TermArgs, _ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_term(db: &NomadtermDb, args: &TermArgs, _ctx: Option<&CommandContext>) -> i32 {
     let argv = &args.args;
     let sub = argv.first().map(|s| s.as_str());
 

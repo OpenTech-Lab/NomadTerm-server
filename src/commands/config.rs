@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::instances;
 use crate::shared::CommandContext;
 
@@ -20,7 +20,7 @@ use crate::shared::CommandContext;
 #[derive(clap::Parser, Debug)]
 #[command(name = "config", about = "View and edit configuration")]
 pub struct ConfigArgs {
-    /// Config key (e.g., "tag", "terminal", "HCOM_TIMEOUT")
+    /// Config key (e.g., "tag", "terminal", "NOMADTERM_TIMEOUT")
     pub key: Option<String>,
     /// Value to set (quote multi-word or dash-prefixed values)
     #[arg(allow_hyphen_values = true)]
@@ -49,83 +49,83 @@ pub struct ConfigArgs {
 
 /// Known config keys with descriptions and types.
 pub const CONFIG_KEYS: &[(&str, &str, &str)] = &[
-    ("HCOM_TAG", "Group tag for launched instances", "string"),
-    ("HCOM_HINTS", "Text injected with all messages", "string"),
+    ("NOMADTERM_TAG", "Group tag for launched instances", "string"),
+    ("NOMADTERM_HINTS", "Text injected with all messages", "string"),
     (
-        "HCOM_NOTES",
+        "NOMADTERM_NOTES",
         "One-time notes appended at bootstrap",
         "string",
     ),
     (
-        "HCOM_TIMEOUT",
+        "NOMADTERM_TIMEOUT",
         "Idle timeout in seconds (default: 86400)",
         "integer",
     ),
     (
-        "HCOM_SUBAGENT_TIMEOUT",
+        "NOMADTERM_SUBAGENT_TIMEOUT",
         "Timeout for Claude subagents in seconds (default: 30)",
         "integer",
     ),
     (
-        "HCOM_CLAUDE_ARGS",
+        "NOMADTERM_CLAUDE_ARGS",
         "Default args for claude on launch",
         "string",
     ),
     (
-        "HCOM_GEMINI_ARGS",
+        "NOMADTERM_GEMINI_ARGS",
         "Default args for gemini on launch",
         "string",
     ),
     (
-        "HCOM_CODEX_ARGS",
+        "NOMADTERM_CODEX_ARGS",
         "Default args for codex on launch",
         "string",
     ),
     (
-        "HCOM_OPENCODE_ARGS",
+        "NOMADTERM_OPENCODE_ARGS",
         "Default args for opencode on launch",
         "string",
     ),
     (
-        "HCOM_CODEX_SANDBOX_MODE",
+        "NOMADTERM_CODEX_SANDBOX_MODE",
         "Codex sandbox mode (e.g., off)",
         "string",
     ),
     (
-        "HCOM_GEMINI_SYSTEM_PROMPT",
+        "NOMADTERM_GEMINI_SYSTEM_PROMPT",
         "System prompt for gemini on launch",
         "string",
     ),
     (
-        "HCOM_CODEX_SYSTEM_PROMPT",
+        "NOMADTERM_CODEX_SYSTEM_PROMPT",
         "System prompt for codex on launch",
         "string",
     ),
     (
-        "HCOM_TERMINAL",
+        "NOMADTERM_TERMINAL",
         "Terminal preset for spawning agent panes",
         "string",
     ),
     (
-        "HCOM_AUTO_APPROVE",
+        "NOMADTERM_AUTO_APPROVE",
         "Auto-approve safe nomadterm commands (true/false)",
         "boolean",
     ),
     (
-        "HCOM_AUTO_SUBSCRIBE",
+        "NOMADTERM_AUTO_SUBSCRIBE",
         "Auto-subscribe event presets (comma-separated)",
         "string",
     ),
     (
-        "HCOM_NAME_EXPORT",
+        "NOMADTERM_NAME_EXPORT",
         "Export instance name to custom env var",
         "string",
     ),
-    ("HCOM_RELAY", "Relay MQTT broker URL", "string"),
-    ("HCOM_RELAY_ID", "Relay group identifier", "string"),
-    ("HCOM_RELAY_TOKEN", "Relay authentication token", "string"),
+    ("NOMADTERM_RELAY", "Relay MQTT broker URL", "string"),
+    ("NOMADTERM_RELAY_ID", "Relay group identifier", "string"),
+    ("NOMADTERM_RELAY_TOKEN", "Relay authentication token", "string"),
     (
-        "HCOM_RELAY_ENABLED",
+        "NOMADTERM_RELAY_ENABLED",
         "Enable relay sync (true/false)",
         "boolean",
     ),
@@ -146,7 +146,7 @@ const INSTANCE_KEYS: &[(&str, &str)] = &[
 
 // ── TOML Key Mapping ────────────────────
 
-/// Maps HCOM_ field name (lowercase, no prefix) to nested TOML dotted path.
+/// Maps NOMADTERM_ field name (lowercase, no prefix) to nested TOML dotted path.
 fn toml_path_for_key(field_name: &str) -> Option<&'static str> {
     match field_name {
         "terminal" => Some("terminal.active"),
@@ -176,7 +176,7 @@ fn toml_path_for_key(field_name: &str) -> Option<&'static str> {
 // ── Config File Operations ───────────────────────────────────────────────
 
 fn config_path() -> PathBuf {
-    crate::paths::hcom_dir().join("config.toml")
+    crate::paths::nomadterm_dir().join("config.toml")
 }
 
 /// Load raw TOML content from config file.
@@ -255,8 +255,8 @@ fn config_set(key: &str, value: &str) -> Result<(), String> {
         .parse()
         .map_err(|e| format!("Failed to parse config.toml: {e}"))?;
 
-    // Map HCOM_KEY to field name, then to nested TOML path
-    let field_name = key.strip_prefix("HCOM_").unwrap_or(key).to_lowercase();
+    // Map NOMADTERM_KEY to field name, then to nested TOML path
+    let field_name = key.strip_prefix("NOMADTERM_").unwrap_or(key).to_lowercase();
 
     if let Some(dotted_path) = toml_path_for_key(&field_name) {
         set_nested_toml(&mut doc, dotted_path, value);
@@ -287,7 +287,7 @@ fn config_get(key: &str) -> (String, &'static str) {
     }
 
     // Map to field name and nested TOML path
-    let field_name = key.strip_prefix("HCOM_").unwrap_or(key).to_lowercase();
+    let field_name = key.strip_prefix("NOMADTERM_").unwrap_or(key).to_lowercase();
 
     let content = load_config_content();
     if let Ok(table) = content.parse::<toml::Table>() {
@@ -321,9 +321,9 @@ fn config_get(key: &str) -> (String, &'static str) {
 
     // Default
     let default = match key {
-        "HCOM_TIMEOUT" => "86400",
-        "HCOM_SUBAGENT_TIMEOUT" => "30",
-        "HCOM_AUTO_APPROVE" => "false",
+        "NOMADTERM_TIMEOUT" => "86400",
+        "NOMADTERM_SUBAGENT_TIMEOUT" => "30",
+        "NOMADTERM_AUTO_APPROVE" => "false",
         _ => "",
     };
     (default.to_string(), "default")
@@ -333,7 +333,7 @@ fn config_get(key: &str) -> (String, &'static str) {
 
 /// Handle instance-level config: `nomadterm config -i <name> [key] [value]`
 fn config_instance(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_arg: &str,
     args: &[String],
     ctx: Option<&CommandContext>,
@@ -568,7 +568,7 @@ fn config_instance(
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
 /// Main entry point for `nomadterm config` command.
-pub fn cmd_config(db: &HcomDb, args: &ConfigArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_config(db: &NomadtermDb, args: &ConfigArgs, ctx: Option<&CommandContext>) -> i32 {
     let json_mode = args.json;
     let edit_mode = args.edit;
     let reset_mode = args.reset;
@@ -652,7 +652,7 @@ pub fn cmd_config(db: &HcomDb, args: &ConfigArgs, ctx: Option<&CommandContext>) 
         || argv.get(1).map(|s| s.as_str()) == Some("info")
         || argv.get(1).map(|s| s.as_str()) == Some("?");
 
-    // Normalize key to HCOM_ prefix
+    // Normalize key to NOMADTERM_ prefix
     let key = normalize_key(key_arg);
 
     if wants_info {
@@ -668,7 +668,7 @@ pub fn cmd_config(db: &HcomDb, args: &ConfigArgs, ctx: Option<&CommandContext>) 
                 println!("Set {key} = {value}");
 
                 // Side effect: auto_approve changes must update tool permissions
-                if key == "HCOM_AUTO_APPROVE" {
+                if key == "NOMADTERM_AUTO_APPROVE" {
                     update_auto_approve_permissions(&value);
                 }
 
@@ -696,13 +696,13 @@ pub fn cmd_config(db: &HcomDb, args: &ConfigArgs, ctx: Option<&CommandContext>) 
     0
 }
 
-/// Normalize a key argument to HCOM_* format.
+/// Normalize a key argument to NOMADTERM_* format.
 fn normalize_key(input: &str) -> String {
     let upper = input.to_uppercase();
-    if upper.starts_with("HCOM_") {
+    if upper.starts_with("NOMADTERM_") {
         upper
     } else {
-        format!("HCOM_{upper}")
+        format!("NOMADTERM_{upper}")
     }
 }
 
@@ -712,7 +712,7 @@ fn normalize_key(input: &str) -> String {
 /// (tag, wait_timeout, hints, subagent_timeout) and returns overrides
 /// where the instance value differs from the global config value.
 fn get_runtime_overrides(
-    db: &HcomDb,
+    db: &NomadtermDb,
     ctx: Option<&CommandContext>,
 ) -> std::collections::HashMap<&'static str, String> {
     use std::collections::HashMap;
@@ -721,10 +721,10 @@ fn get_runtime_overrides(
 
     // DB column -> config key mapping
     const RUNTIME_KEYS: &[(&str, &str)] = &[
-        ("tag", "HCOM_TAG"),
-        ("wait_timeout", "HCOM_TIMEOUT"),
-        ("hints", "HCOM_HINTS"),
-        ("subagent_timeout", "HCOM_SUBAGENT_TIMEOUT"),
+        ("tag", "NOMADTERM_TAG"),
+        ("wait_timeout", "NOMADTERM_TIMEOUT"),
+        ("hints", "NOMADTERM_HINTS"),
+        ("subagent_timeout", "NOMADTERM_SUBAGENT_TIMEOUT"),
     ];
 
     // Use identity from command context (already resolved by CLI router)
@@ -763,7 +763,7 @@ fn get_runtime_overrides(
 }
 
 /// Show all config keys with values and sources.
-fn show_all_config(db: &HcomDb, ctx: Option<&CommandContext>, json_mode: bool) -> i32 {
+fn show_all_config(db: &NomadtermDb, ctx: Option<&CommandContext>, json_mode: bool) -> i32 {
     let runtime_overrides = get_runtime_overrides(db, ctx);
 
     if json_mode {
@@ -771,7 +771,7 @@ fn show_all_config(db: &HcomDb, ctx: Option<&CommandContext>, json_mode: bool) -
         for (key, _, _) in CONFIG_KEYS {
             let (value, _source) = config_get(key);
             // {KEY: value} — mask relay token
-            let display = if *key == "HCOM_RELAY_TOKEN" && value.len() > 4 {
+            let display = if *key == "NOMADTERM_RELAY_TOKEN" && value.len() > 4 {
                 format!("{}***", &value[..4])
             } else {
                 value
@@ -793,7 +793,7 @@ fn show_all_config(db: &HcomDb, ctx: Option<&CommandContext>, json_mode: bool) -
                 let (value, source) = config_get(key);
                 let display = if value.is_empty() {
                     "(not set)".to_string()
-                } else if *key == "HCOM_RELAY_TOKEN" && !value.is_empty() {
+                } else if *key == "NOMADTERM_RELAY_TOKEN" && !value.is_empty() {
                     let visible = value.len().min(4);
                     format!("{}...", &value[..visible])
                 } else {
@@ -815,9 +815,9 @@ fn show_all_config(db: &HcomDb, ctx: Option<&CommandContext>, json_mode: bool) -
 /// Rich per-key help text.
 pub fn config_help(key: &str) -> Option<&'static str> {
     match key {
-        "HCOM_TAG" => Some(
+        "NOMADTERM_TAG" => Some(
             "\
-HCOM_TAG - Group tag for launched instances
+NOMADTERM_TAG - Group tag for launched instances
 
 Purpose:
   Creates named groups of agents that can be addressed together.
@@ -828,7 +828,7 @@ Usage:
   nomadterm config tag \"\"            # Clear tag
 
   # Or via environment:
-  HCOM_TAG=myteam nomadterm 3 claude
+  NOMADTERM_TAG=myteam nomadterm 3 claude
 
 Effect:
   Without tag: launches create → luna, nova, kira
@@ -841,9 +841,9 @@ Addressing:
 Allowed characters: letters, numbers, hyphens (a-z, A-Z, 0-9, -)",
         ),
 
-        "HCOM_HINTS" => Some(
+        "NOMADTERM_HINTS" => Some(
             "\
-HCOM_HINTS - Text injected with all messages
+NOMADTERM_HINTS - Text injected with all messages
 
 Purpose:
   Appends text to every message received by launched agents.
@@ -862,24 +862,24 @@ Notes:
   - Global hints apply to all new launches",
         ),
 
-        "HCOM_NOTES" => Some(
+        "NOMADTERM_NOTES" => Some(
             "\
-HCOM_NOTES - One-time notes appended to bootstrap
+NOMADTERM_NOTES - One-time notes appended to bootstrap
 
   Custom text added to agent system context at startup.
-  Unlike HCOM_HINTS (per-message), this is injected once and does not repeat.
+  Unlike NOMADTERM_HINTS (per-message), this is injected once and does not repeat.
 
 Usage:
   nomadterm config notes \"Always check nomadterm list before spawning new agents\"
   nomadterm config notes \"\"                            # Clear
-  HCOM_NOTES=\"tips\" nomadterm 1 claude                 # Per-launch override
+  NOMADTERM_NOTES=\"tips\" nomadterm 1 claude                 # Per-launch override
 
   Changing after launch has no effect (bootstrap already delivered).",
         ),
 
-        "HCOM_TIMEOUT" => Some(
+        "NOMADTERM_TIMEOUT" => Some(
             "\
-HCOM_TIMEOUT - Advanced: idle timeout for headless/vanilla Claude (seconds)
+NOMADTERM_TIMEOUT - Advanced: idle timeout for headless/vanilla Claude (seconds)
 
 Default: 86400 (24 hours)
 
@@ -897,13 +897,13 @@ How it works:
   - If no message within timeout, instance is unregistered
 
 Usage (if needed):
-  nomadterm config HCOM_TIMEOUT 3600   # 1 hour
-  export HCOM_TIMEOUT=3600        # via environment",
+  nomadterm config NOMADTERM_TIMEOUT 3600   # 1 hour
+  export NOMADTERM_TIMEOUT=3600        # via environment",
         ),
 
-        "HCOM_SUBAGENT_TIMEOUT" => Some(
+        "NOMADTERM_SUBAGENT_TIMEOUT" => Some(
             "\
-HCOM_SUBAGENT_TIMEOUT - Timeout for Claude subagents (seconds)
+NOMADTERM_SUBAGENT_TIMEOUT - Timeout for Claude subagents (seconds)
 
 Default: 30
 
@@ -921,9 +921,9 @@ Notes:
   - Increase for complex subagent tasks",
         ),
 
-        "HCOM_CLAUDE_ARGS" => Some(
+        "NOMADTERM_CLAUDE_ARGS" => Some(
             "\
-HCOM_CLAUDE_ARGS - Default args passed to claude on launch
+NOMADTERM_CLAUDE_ARGS - Default args passed to claude on launch
 
 Example: nomadterm config claude_args \"--model opus\"
 Clear:   nomadterm config claude_args \"\"
@@ -931,9 +931,9 @@ Clear:   nomadterm config claude_args \"\"
 Merged with launch-time cli args (launch args win on conflict).",
         ),
 
-        "HCOM_GEMINI_ARGS" => Some(
+        "NOMADTERM_GEMINI_ARGS" => Some(
             "\
-HCOM_GEMINI_ARGS - Default args passed to gemini on launch
+NOMADTERM_GEMINI_ARGS - Default args passed to gemini on launch
 
 Example: nomadterm config gemini_args \"--model gemini-2.5-flash\"
 Clear:   nomadterm config gemini_args \"\"
@@ -941,9 +941,9 @@ Clear:   nomadterm config gemini_args \"\"
 Merged with launch-time cli args (launch args win on conflict).",
         ),
 
-        "HCOM_CODEX_ARGS" => Some(
+        "NOMADTERM_CODEX_ARGS" => Some(
             "\
-HCOM_CODEX_ARGS - Default args passed to codex on launch
+NOMADTERM_CODEX_ARGS - Default args passed to codex on launch
 
 Example: nomadterm config codex_args \"--search\"
 Clear:   nomadterm config codex_args \"\"
@@ -951,9 +951,9 @@ Clear:   nomadterm config codex_args \"\"
 Merged with launch-time cli args (launch args win on conflict).",
         ),
 
-        "HCOM_RELAY" => Some(
+        "NOMADTERM_RELAY" => Some(
             "\
-HCOM_RELAY - MQTT broker URL
+NOMADTERM_RELAY - MQTT broker URL
 
 Empty = use public brokers (broker.emqx.io, broker.hivemq.com, test.mosquitto.org).
 Set automatically by 'nomadterm relay new' (pins first working broker).
@@ -961,25 +961,25 @@ Set automatically by 'nomadterm relay new' (pins first working broker).
 Private broker: nomadterm relay new --broker mqtts://host:port",
         ),
 
-        "HCOM_RELAY_ID" => Some(
+        "NOMADTERM_RELAY_ID" => Some(
             "\
-HCOM_RELAY_ID - Shared UUID for relay group
+NOMADTERM_RELAY_ID - Shared UUID for relay group
 
 Generated by 'nomadterm relay new'. Other devices join with 'nomadterm relay connect <token>'.
 All devices with the same relay_id sync state via MQTT pub/sub.",
         ),
 
-        "HCOM_RELAY_TOKEN" => Some(
+        "NOMADTERM_RELAY_TOKEN" => Some(
             "\
-HCOM_RELAY_TOKEN - Auth token for MQTT broker
+NOMADTERM_RELAY_TOKEN - Auth token for MQTT broker
 
 Optional. Set via 'nomadterm relay new --password <secret>' or directly here.
 Only needed if your broker requires authentication.",
         ),
 
-        "HCOM_AUTO_APPROVE" => Some(
+        "NOMADTERM_AUTO_APPROVE" => Some(
             "\
-HCOM_AUTO_APPROVE - Auto-approve safe nomadterm commands
+NOMADTERM_AUTO_APPROVE - Auto-approve safe nomadterm commands
 
 Purpose:
   When enabled, Claude/Gemini/Codex auto-approve \"safe\" nomadterm commands
@@ -1001,9 +1001,9 @@ Always require approval:
 Values: 1, true, yes, on (enabled) | 0, false, no, off, \"\" (disabled)",
         ),
 
-        "HCOM_AUTO_SUBSCRIBE" => Some(
+        "NOMADTERM_AUTO_SUBSCRIBE" => Some(
             "\
-HCOM_AUTO_SUBSCRIBE - Auto-subscribe event presets for new instances
+NOMADTERM_AUTO_SUBSCRIBE - Auto-subscribe event presets for new instances
 
 Default: collision
 
@@ -1026,9 +1026,9 @@ Notes:
   - See 'nomadterm events --help' for subscription management",
         ),
 
-        "HCOM_NAME_EXPORT" => Some(
+        "NOMADTERM_NAME_EXPORT" => Some(
             "\
-HCOM_NAME_EXPORT - Export instance name to custom env var
+NOMADTERM_NAME_EXPORT - Export instance name to custom env var
 
 Purpose:
   When set, launched instances will have their name exported to
@@ -1041,23 +1041,23 @@ Usage:
 
 Example:
   # Set export variable
-  nomadterm config name_export \"HCOM_NAME\"
+  nomadterm config name_export \"NOMADTERM_NAME\"
 
   # Now launched instances have:
-  # HCOM_NAME=luna (or whatever name was generated)
+  # NOMADTERM_NAME=luna (or whatever name was generated)
 
   # Scripts can use it:
-  # nomadterm send \"@$HCOM_NAME completed task\"
+  # nomadterm send \"@$NOMADTERM_NAME completed task\"
 
 Notes:
   - Only affects nomadterm-launched instances (nomadterm N claude/gemini/codex)
   - Variable name must be a valid shell identifier
-  - Works alongside HCOM_PROCESS_ID (always set) for identity",
+  - Works alongside NOMADTERM_PROCESS_ID (always set) for identity",
         ),
 
-        "HCOM_OPENCODE_ARGS" => Some(
+        "NOMADTERM_OPENCODE_ARGS" => Some(
             "\
-HCOM_OPENCODE_ARGS - Default args passed to opencode on launch
+NOMADTERM_OPENCODE_ARGS - Default args passed to opencode on launch
 
 Example: nomadterm config opencode_args \"--model o3\"
 Clear:   nomadterm config opencode_args \"\"
@@ -1065,9 +1065,9 @@ Clear:   nomadterm config opencode_args \"\"
 Merged with launch-time cli args (launch args win on conflict).",
         ),
 
-        "HCOM_RELAY_ENABLED" => Some(
+        "NOMADTERM_RELAY_ENABLED" => Some(
             "\
-HCOM_RELAY_ENABLED - Enable or disable relay sync
+NOMADTERM_RELAY_ENABLED - Enable or disable relay sync
 
 Default: true (when relay is configured)
 
@@ -1157,11 +1157,11 @@ pub fn terminal_help_text(show_current: bool) -> String {
     };
 
     let mut lines = Vec::new();
-    lines.push("HCOM_TERMINAL — where nomadterm opens new agent windows".to_string());
+    lines.push("NOMADTERM_TERMINAL — where nomadterm opens new agent windows".to_string());
     lines.push(String::new());
 
     if show_current {
-        let (current, source) = config_get("HCOM_TERMINAL");
+        let (current, source) = config_get("NOMADTERM_TERMINAL");
         if current.is_empty() {
             lines.push("Current: default (auto-detect)".to_string());
         } else {
@@ -1274,7 +1274,7 @@ pub fn terminal_help_text(show_current: bool) -> String {
         "  {pane_id}    = pane/window/workspace ID from pane_id_env; falls back to {id}"
             .to_string(),
     );
-    lines.push("  {process_id} = HCOM_PROCESS_ID for the launched agent".to_string());
+    lines.push("  {process_id} = NOMADTERM_PROCESS_ID for the launched agent".to_string());
     lines.push("  {pid}        = launched terminal process ID".to_string());
     lines.push("  {id}         = first line of stdout captured from the open command".to_string());
     lines.push(String::new());
@@ -1290,8 +1290,8 @@ fn print_terminal_info() {
 
 fn show_key_info(key: &str) -> i32 {
     if CONFIG_KEYS.iter().any(|(k, _, _)| *k == key) {
-        // HCOM_TERMINAL: dynamic help from TERMINAL_PRESETS
-        if key == "HCOM_TERMINAL" {
+        // NOMADTERM_TERMINAL: dynamic help from TERMINAL_PRESETS
+        if key == "NOMADTERM_TERMINAL" {
             print_terminal_info();
             return 0;
         }
@@ -1341,7 +1341,7 @@ fn config_terminal(argv: &[String], setup_mode: bool) -> i32 {
 
     if argv.is_empty() {
         // Show terminal status
-        let (current, source) = config_get("HCOM_TERMINAL");
+        let (current, source) = config_get("NOMADTERM_TERMINAL");
         if current.is_empty() {
             println!("Terminal: (auto-detect)");
         } else {
@@ -1376,7 +1376,7 @@ fn config_terminal(argv: &[String], setup_mode: bool) -> i32 {
     }
 
     if preset_name == "default" || preset_name == "auto" {
-        match config_set("HCOM_TERMINAL", "") {
+        match config_set("NOMADTERM_TERMINAL", "") {
             Ok(()) => {
                 println!("Terminal reset to auto-detect");
                 return 0;
@@ -1408,7 +1408,7 @@ fn config_terminal(argv: &[String], setup_mode: bool) -> i32 {
         return 1;
     }
 
-    match config_set("HCOM_TERMINAL", preset_name) {
+    match config_set("NOMADTERM_TERMINAL", preset_name) {
         Ok(()) => {
             println!("Terminal set to: {preset_name}");
             if preset_name.starts_with("kitty") {
@@ -1578,7 +1578,7 @@ fn kitty_setup() -> i32 {
 fn update_auto_approve_permissions(value: &str) {
     let enabled = !matches!(value, "0" | "false" | "False" | "no" | "off" | "");
     // Re-run hooks setup to update tool permission files
-    let prefix = crate::runtime_env::get_hcom_prefix();
+    let prefix = crate::runtime_env::get_nomadterm_prefix();
     if let Some((cmd, prefix_args)) = prefix.split_first() {
         let _ = std::process::Command::new(cmd)
             .args(prefix_args)
@@ -1599,7 +1599,7 @@ fn update_auto_approve_permissions(value: &str) {
 /// Trigger relay push (best-effort, silent failure). C4 fix.
 fn trigger_relay_push() {
     // Trigger relay push (best-effort)
-    let prefix = crate::runtime_env::get_hcom_prefix();
+    let prefix = crate::runtime_env::get_nomadterm_prefix();
     if let Some((cmd, prefix_args)) = prefix.split_first() {
         let _ = std::process::Command::new(cmd)
             .args(prefix_args)
@@ -1618,10 +1618,10 @@ mod tests {
 
     #[test]
     fn test_normalize_key() {
-        assert_eq!(normalize_key("tag"), "HCOM_TAG");
-        assert_eq!(normalize_key("HCOM_TAG"), "HCOM_TAG");
-        assert_eq!(normalize_key("terminal"), "HCOM_TERMINAL");
-        assert_eq!(normalize_key("hcom_timeout"), "HCOM_TIMEOUT");
+        assert_eq!(normalize_key("tag"), "NOMADTERM_TAG");
+        assert_eq!(normalize_key("NOMADTERM_TAG"), "NOMADTERM_TAG");
+        assert_eq!(normalize_key("terminal"), "NOMADTERM_TERMINAL");
+        assert_eq!(normalize_key("nomadterm_timeout"), "NOMADTERM_TIMEOUT");
     }
 
     #[test]

@@ -5,13 +5,13 @@ use std::time::Instant;
 use serde_json::Value;
 
 use crate::bootstrap;
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::instances;
 use crate::log::{log_error, log_info};
 use crate::messages;
 use crate::shared::ST_LISTENING;
 use crate::shared::constants::MAX_MESSAGES_PER_DELIVERY;
-use crate::shared::context::HcomContext;
+use crate::shared::context::NomadtermContext;
 
 use super::common;
 use super::common::finalize_session;
@@ -30,7 +30,7 @@ fn has_flag(argv: &[String], flag: &str) -> bool {
 }
 
 /// Upsert plugin notify endpoint in DB.
-fn upsert_plugin_notify_endpoint(db: &HcomDb, instance_name: &str, port: u16) {
+fn upsert_plugin_notify_endpoint(db: &NomadtermDb, instance_name: &str, port: u16) {
     if let Err(e) = db.upsert_notify_endpoint(instance_name, "plugin", port) {
         log_error(
             "native",
@@ -47,7 +47,7 @@ fn upsert_plugin_notify_endpoint(db: &HcomDb, instance_name: &str, port: u16) {
 ///
 /// Used by status handler when instance becomes listening.
 /// Queries all kinds (pty, hook, plugin) and sends a brief TCP connect to each.
-fn notify_all_endpoints(db: &HcomDb, instance_name: &str) {
+fn notify_all_endpoints(db: &NomadtermDb, instance_name: &str) {
     instances::notify_instance_endpoints(db, instance_name, &[]);
 }
 
@@ -76,7 +76,7 @@ fn get_opencode_db_path() -> Option<String> {
 /// Expects: nomadterm opencode-start --session-id <id> [--notify-port <port>]
 ///
 /// Returns JSON: {"name": "<instance>", "session_id": "<id>", "bootstrap": "..."}
-fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String) {
+fn handle_start(ctx: &NomadtermContext, db: &NomadtermDb, argv: &[String]) -> (i32, String) {
     let session_id = match parse_flag(argv, "--session-id") {
         Some(sid) => sid,
         None => return (0, r#"{"error":"Missing --session-id"}"#.to_string()),
@@ -86,7 +86,7 @@ fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String
 
     let process_id = match &ctx.process_id {
         Some(pid) => pid.clone(),
-        None => return (0, r#"{"error":"HCOM_PROCESS_ID not set"}"#.to_string()),
+        None => return (0, r#"{"error":"NOMADTERM_PROCESS_ID not set"}"#.to_string()),
     };
 
     // Re-binding detection: session already bound (compaction or reconnect)
@@ -108,17 +108,17 @@ fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String
             Default::default(),
         );
 
-        let hcom_config = crate::config::HcomConfig::load(None).unwrap_or_default();
+        let nomadterm_config = crate::config::NomadtermConfig::load(None).unwrap_or_default();
         let bootstrap_text = bootstrap::get_bootstrap(
             db,
-            &ctx.hcom_dir,
+            &ctx.nomadterm_dir,
             &existing_name,
             "opencode",
             ctx.is_background,
             ctx.is_launched,
             &ctx.notes,
-            &hcom_config.tag,
-            crate::relay::is_relay_enabled(&hcom_config),
+            &nomadterm_config.tag,
+            crate::relay::is_relay_enabled(&nomadterm_config),
             ctx.background_name.as_deref(),
         );
 
@@ -166,7 +166,7 @@ fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String
     // If last_event_id is still 0, ALL historical events get delivered.
     if let Ok(Some(existing)) = db.get_instance_full(&instance_name) {
         if existing.last_event_id == 0 {
-            let launch_event_id: Option<i64> = std::env::var("HCOM_LAUNCH_EVENT_ID")
+            let launch_event_id: Option<i64> = std::env::var("NOMADTERM_LAUNCH_EVENT_ID")
                 .ok()
                 .and_then(|s| s.parse().ok());
             let current_max = db.get_last_event_id();
@@ -218,17 +218,17 @@ fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String
         .and_then(|d| d.tag.clone())
         .unwrap_or_default();
 
-    let hcom_config = crate::config::HcomConfig::load(None).unwrap_or_default();
-    let relay_enabled = crate::relay::is_relay_enabled(&hcom_config);
+    let nomadterm_config = crate::config::NomadtermConfig::load(None).unwrap_or_default();
+    let relay_enabled = crate::relay::is_relay_enabled(&nomadterm_config);
     // Use config tag as fallback when instance has no tag
     let effective_tag = if tag.is_empty() {
-        &hcom_config.tag
+        &nomadterm_config.tag
     } else {
         &tag
     };
     let bootstrap_text = bootstrap::get_bootstrap(
         db,
-        &ctx.hcom_dir,
+        &ctx.nomadterm_dir,
         &instance_name,
         "opencode",
         ctx.is_background,
@@ -254,7 +254,7 @@ fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String
 ///
 /// Called by OpenCode plugin on session.status and session.idle events.
 /// Expects: nomadterm opencode-status --name <name> --status <status> [--context <ctx>] [--detail <d>]
-fn handle_status(db: &HcomDb, argv: &[String]) -> (i32, String) {
+fn handle_status(db: &NomadtermDb, argv: &[String]) -> (i32, String) {
     let name = match parse_flag(argv, "--name") {
         Some(n) => n,
         None => return (0, r#"{"error":"Missing --name or --status"}"#.to_string()),
@@ -294,7 +294,7 @@ fn handle_status(db: &HcomDb, argv: &[String]) -> (i32, String) {
 /// - --check: Return "true" or "false" string
 /// - --ack --up-to <id>: Advance cursor to explicit event_id
 /// - --ack (no --up-to): Advance cursor to max pending event_id (legacy)
-fn handle_read(db: &HcomDb, argv: &[String]) -> (i32, String) {
+fn handle_read(db: &NomadtermDb, argv: &[String]) -> (i32, String) {
     let name = match parse_flag(argv, "--name") {
         Some(n) => n,
         None => return (0, r#"{"error":"Missing --name"}"#.to_string()),
@@ -392,7 +392,7 @@ fn handle_read(db: &HcomDb, argv: &[String]) -> (i32, String) {
 ///
 /// Called by OpenCode plugin on session.deleted event.
 /// Expects: nomadterm opencode-stop --name <name> [--reason <reason>]
-fn handle_stop(db: &HcomDb, argv: &[String]) -> (i32, String) {
+fn handle_stop(db: &NomadtermDb, argv: &[String]) -> (i32, String) {
     let name = match parse_flag(argv, "--name") {
         Some(n) => n,
         None => return (0, r#"{"error":"Missing --name"}"#.to_string()),
@@ -412,14 +412,14 @@ pub fn dispatch_opencode_hook(hook_name: &str, argv: &[String]) -> (i32, String)
     let start = Instant::now();
 
     // Build context
-    let ctx = HcomContext::from_os();
+    let ctx = NomadtermContext::from_os();
 
     // Ensure nomadterm directories exist before opening DB.
-    // On clean HOME/HCOM_DIR the DB parent dir won't exist yet.
-    crate::paths::ensure_hcom_directories_at(&ctx.hcom_dir);
+    // On clean HOME/NOMADTERM_DIR the DB parent dir won't exist yet.
+    crate::paths::ensure_nomadterm_directories_at(&ctx.nomadterm_dir);
 
     // Open DB
-    let db = match HcomDb::open() {
+    let db = match NomadtermDb::open() {
         Ok(db) => db,
         Err(e) => {
             log_error(
@@ -606,10 +606,10 @@ mod tests {
     }
 
     /// Create a fresh test DB in a temp directory with schema initialized.
-    fn test_db() -> (tempfile::TempDir, HcomDb) {
+    fn test_db() -> (tempfile::TempDir, NomadtermDb) {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         (dir, db)
     }
@@ -652,7 +652,7 @@ mod tests {
     #[test]
     fn test_plugin_source_not_empty() {
         assert!(!PLUGIN_SOURCE.is_empty());
-        assert!(PLUGIN_SOURCE.contains("HcomPlugin"));
+        assert!(PLUGIN_SOURCE.contains("NomadtermPlugin"));
     }
 
     #[test]
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn test_handle_start_missing_session_id() {
         crate::config::Config::init();
-        let ctx = HcomContext::from_os();
+        let ctx = NomadtermContext::from_os();
         let (_dir, db) = test_db();
         let argv = sv(&[]);
         let (code, output) = handle_start(&ctx, &db, &argv);

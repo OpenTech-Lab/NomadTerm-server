@@ -3,8 +3,8 @@ import type { Event } from "@opencode-ai/sdk"
 import { appendFileSync } from "fs"
 import { homedir } from "os"
 
-const HCOM_DIR = process.env.HCOM_DIR || `${homedir()}/.nomadterm`
-const LOG_PATH = `${HCOM_DIR}/.tmp/logs/nomadterm.log`
+const NOMADTERM_DIR = process.env.NOMADTERM_DIR || `${homedir()}/.nomadterm`
+const LOG_PATH = `${NOMADTERM_DIR}/.tmp/logs/nomadterm.log`
 
 function log(
   level: "DEBUG" | "INFO" | "WARN" | "ERROR",
@@ -23,9 +23,9 @@ function log(
   try { appendFileSync(LOG_PATH, entry + "\n") } catch {}
 }
 
-export const HcomPlugin: Plugin = async ({ client, $ }) => {
-  let hcomChecked = false
-  let hcomAvailable = false
+export const NomadtermPlugin: Plugin = async ({ client, $ }) => {
+  let nomadtermChecked = false
+  let nomadtermAvailable = false
   let instanceName: string | null = null      // IDEN-03: bound instance name
   let sessionId: string | null = null         // IDEN-02: tracked for messages.transform
   let bootstrapText: string | null = null     // BOOT-01: cached from opencode-start
@@ -37,15 +37,15 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
   let permissionPending = false                  // Exact permission gate from OpenCode events
 
   // SAFE-02: Lazy PATH detection on first hook callback
-  function checkHcom(): boolean {
-    if (!hcomChecked) {
-      hcomChecked = true
-      hcomAvailable = Bun.which("nomadterm") !== null
-      if (!hcomAvailable) {
-        log("WARN", "plugin.no_hcom")
+  function checkNomadterm(): boolean {
+    if (!nomadtermChecked) {
+      nomadtermChecked = true
+      nomadtermAvailable = Bun.which("nomadterm") !== null
+      if (!nomadtermAvailable) {
+        log("WARN", "plugin.no_nomadterm")
       }
     }
-    return hcomAvailable
+    return nomadtermAvailable
   }
 
   function findLastUserMessage(
@@ -131,11 +131,11 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
       if (!statusResult.data) return
       const current = statusResult.data[sessionId]
       const isIdle = !current || current.type === "idle"
-      const hcomStatus = isIdle ? "listening" : "active"
-      if (hcomStatus !== lastReportedStatus) {
-        lastReportedStatus = hcomStatus
-        await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
-        log("INFO", "plugin.reconcile_status", instanceName, { status: hcomStatus })
+      const nomadtermStatus = isIdle ? "listening" : "active"
+      if (nomadtermStatus !== lastReportedStatus) {
+        lastReportedStatus = nomadtermStatus
+        await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${nomadtermStatus}`.quiet()
+        log("INFO", "plugin.reconcile_status", instanceName, { status: nomadtermStatus })
       }
     } catch (e) {
       log("ERROR", "plugin.reconcile_error", instanceName, { error: String(e) })
@@ -187,7 +187,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
 
   async function bindIdentity(sid: string): Promise<void> {
     if (instanceName || bindingPromise) return
-    if (process.env.HCOM_LAUNCHED !== "1") return
+    if (process.env.NOMADTERM_LAUNCHED !== "1") return
 
     bindingPromise = (async () => {
       try {
@@ -220,7 +220,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
   return {
     event: async ({ event }: { event: Event }) => {
       try {
-        if (!checkHcom()) return
+        if (!checkNomadterm()) return
         const eventSessionId = event.properties?.sessionID ?? event.properties?.info?.id
         if (eventSessionId && !sessionId) {
           sessionId = eventSessionId as string
@@ -253,10 +253,10 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
             if (instanceName) {
               const statusResult = await client.session.status()
               const current = eventSessionId ? statusResult.data?.[eventSessionId] : null
-              const hcomStatus = !current || current.type === "idle" ? "listening" : "active"
-              lastReportedStatus = hcomStatus
-              await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
-              if (hcomStatus === "listening" && eventSessionId) {
+              const nomadtermStatus = !current || current.type === "idle" ? "listening" : "active"
+              lastReportedStatus = nomadtermStatus
+              await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${nomadtermStatus}`.quiet()
+              if (nomadtermStatus === "listening" && eventSessionId) {
                 await deliverPendingToIdle(eventSessionId)
               }
             }
@@ -279,10 +279,10 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
               break
             }
             if (instanceName) {
-              const hcomStatus = statusType === "idle" ? "listening" : "active"
-              if (hcomStatus !== lastReportedStatus) {
-                lastReportedStatus = hcomStatus
-                await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
+              const nomadtermStatus = statusType === "idle" ? "listening" : "active"
+              if (nomadtermStatus !== lastReportedStatus) {
+                lastReportedStatus = nomadtermStatus
+                await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${nomadtermStatus}`.quiet()
               }
               // Ensure reconcile timer is running (catches missed idle events)
               startReconcileTimer()
@@ -324,7 +324,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
 
     "chat.message": async (input, output) => {
       try {
-        if (!checkHcom()) return
+        if (!checkNomadterm()) return
         if (input.sessionID && !sessionId) {
           sessionId = input.sessionID
         }
@@ -344,7 +344,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
 
     "experimental.chat.messages.transform": async (input, output) => {
       try {
-        if (!checkHcom()) return
+        if (!checkNomadterm()) return
         if (bindingPromise) await bindingPromise
         if (!instanceName && sessionId) await bindIdentity(sessionId)
         if (!instanceName || !sessionId) return
@@ -386,7 +386,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
 
     "experimental.session.compacting": async (input, output) => {
       try {
-        if (!checkHcom()) return
+        if (!checkNomadterm()) return
         if (!instanceName) return
 
         output.context.push(

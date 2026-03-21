@@ -40,7 +40,7 @@ impl Ejector {
             replay_items: VecDeque::new(),
             replay_lines: VecDeque::new(),
             replay_emitted_any: false,
-            replay_lines_per_tick: std::env::var("HCOM_TUI_REPLAY_LINES_PER_TICK")
+            replay_lines_per_tick: std::env::var("NOMADTERM_TUI_REPLAY_LINES_PER_TICK")
                 .ok()
                 .and_then(|v| v.parse::<usize>().ok())
                 .filter(|n| *n > 0)

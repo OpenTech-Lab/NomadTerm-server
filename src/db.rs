@@ -170,7 +170,7 @@ pub struct RepoRow {
 }
 
 /// Database handle for nomadterm operations
-pub struct HcomDb {
+pub struct NomadtermDb {
     conn: Connection,
     db_path: std::path::PathBuf,
     db_inode: u64,
@@ -189,7 +189,7 @@ fn get_inode(path: &std::path::Path) -> u64 {
     }
 }
 
-impl HcomDb {
+impl NomadtermDb {
     /// Access the underlying SQLite connection (for direct queries).
     pub fn conn(&self) -> &Connection {
         &self.conn
@@ -748,12 +748,12 @@ impl HcomDb {
 
     /// Log _device reset event + set relay timestamp. Call after any DB archive/reset.
     pub fn log_reset_event(&self) -> Result<()> {
-        // Derive hcom_dir from db_path (db is at hcom_dir/nomadterm.db)
-        let hcom_dir = self
+        // Derive nomadterm_dir from db_path (db is at nomadterm_dir/nomadterm.db)
+        let nomadterm_dir = self
             .db_path
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
-        let device_id = std::fs::read_to_string(hcom_dir.join(".tmp").join("device_uuid"))
+        let device_id = std::fs::read_to_string(nomadterm_dir.join(".tmp").join("device_uuid"))
             .unwrap_or_else(|_| "unknown".to_string())
             .trim()
             .to_string();
@@ -1020,8 +1020,8 @@ impl HcomDb {
     ///
     /// Called on first status update (when status_context was "new").
     fn emit_ready_event(&self, name: &str, status: &str, context: &str) -> Result<()> {
-        let launcher = std::env::var("HCOM_LAUNCHED_BY").unwrap_or_else(|_| "unknown".to_string());
-        let batch_id = std::env::var("HCOM_LAUNCH_BATCH_ID").ok();
+        let launcher = std::env::var("NOMADTERM_LAUNCHED_BY").unwrap_or_else(|_| "unknown".to_string());
+        let batch_id = std::env::var("NOMADTERM_LAUNCH_BATCH_ID").ok();
 
         let mut event_data = serde_json::json!({
             "action": "ready",
@@ -3057,7 +3057,7 @@ mod tests {
 
         let temp_dir = std::env::temp_dir();
         let test_id = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let db_path = temp_dir.join(format!("test_hcom_{}_{}.db", std::process::id(), test_id));
+        let db_path = temp_dir.join(format!("test_nomadterm_{}_{}.db", std::process::id(), test_id));
 
         let conn = Connection::open(&db_path).unwrap();
 
@@ -3114,8 +3114,8 @@ mod tests {
         conn.execute("DROP TABLE instances", []).unwrap();
         drop(conn);
 
-        // Now HcomDb will fail when trying to query
-        let db = HcomDb::open_at(&db_path).unwrap();
+        // Now NomadtermDb will fail when trying to query
+        let db = NomadtermDb::open_at(&db_path).unwrap();
 
         let result = db.get_instance_status("test");
 
@@ -3134,7 +3134,7 @@ mod tests {
         // Verify that "not found" is distinguished from "error" via Ok(None)
 
         let (_conn, db_path) = setup_test_db();
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
 
         // Query non-existent instance
         let result = db.get_instance_status("nonexistent");
@@ -3152,7 +3152,7 @@ mod tests {
         conn.execute("DROP TABLE instances", []).unwrap();
         drop(conn);
 
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         let result = db.get_status("test");
 
         let err = result.expect_err("SQL error should propagate as Err");
@@ -3169,7 +3169,7 @@ mod tests {
         conn.execute("DROP TABLE process_bindings", []).unwrap();
         drop(conn);
 
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         let result = db.get_process_binding("test_pid");
 
         let err = result.expect_err("SQL error should propagate as Err");
@@ -3186,7 +3186,7 @@ mod tests {
         conn.execute("DROP TABLE instances", []).unwrap();
         drop(conn);
 
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         let result = db.get_transcript_path("test");
 
         let err = result.expect_err("SQL error should propagate as Err");
@@ -3203,7 +3203,7 @@ mod tests {
         conn.execute("DROP TABLE instances", []).unwrap();
         drop(conn);
 
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         let result = db.get_instance_snapshot("test");
 
         let err = result.expect_err("SQL error should propagate as Err");
@@ -3217,7 +3217,7 @@ mod tests {
     #[test]
     fn test_all_methods_return_ok_none_when_not_found() {
         let (_conn, db_path) = setup_test_db();
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
 
         // All these should return Ok(None) for non-existent data
         assert!(db.get_instance_status("nonexistent").unwrap().is_none());
@@ -3247,7 +3247,7 @@ mod tests {
     #[test]
     fn test_register_inject_port_inserts() {
         let (_conn, db_path) = setup_test_db_with_endpoints();
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
 
         db.register_inject_port("test", 5555).unwrap();
 
@@ -3267,7 +3267,7 @@ mod tests {
     #[test]
     fn test_register_inject_port_upserts() {
         let (_conn, db_path) = setup_test_db_with_endpoints();
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
 
         db.register_inject_port("test", 5555).unwrap();
         db.register_inject_port("test", 6666).unwrap();
@@ -3297,19 +3297,19 @@ mod tests {
     }
 
     /// Create a test DB with full init_db() schema
-    fn setup_full_test_db() -> (HcomDb, PathBuf) {
+    fn setup_full_test_db() -> (NomadtermDb, PathBuf) {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
 
         let temp_dir = std::env::temp_dir();
         let test_id = COUNTER.fetch_add(1, Ordering::Relaxed);
         let db_path = temp_dir.join(format!(
-            "test_hcom_full_{}_{}.db",
+            "test_nomadterm_full_{}_{}.db",
             std::process::id(),
             test_id
         ));
 
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         (db, db_path)
     }
@@ -3453,12 +3453,12 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let test_id = COUNTER.fetch_add(1, Ordering::Relaxed);
         let db_path = temp_dir.join(format!(
-            "test_hcom_ensure_{}_{}.db",
+            "test_nomadterm_ensure_{}_{}.db",
             std::process::id(),
             test_id
         ));
 
-        let mut db = HcomDb::open_at(&db_path).unwrap();
+        let mut db = NomadtermDb::open_at(&db_path).unwrap();
         db.ensure_schema().unwrap();
 
         // Should have full schema
@@ -3479,7 +3479,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let test_id = COUNTER.fetch_add(1, Ordering::Relaxed);
         let db_path = temp_dir.join(format!(
-            "test_hcom_archive_{}_{}.db",
+            "test_nomadterm_archive_{}_{}.db",
             std::process::id(),
             test_id
         ));
@@ -3498,7 +3498,7 @@ mod tests {
             .unwrap();
         }
 
-        let mut db = HcomDb::open_at(&db_path).unwrap();
+        let mut db = NomadtermDb::open_at(&db_path).unwrap();
         db.ensure_schema().unwrap();
 
         // Should have been archived and recreated at current version
@@ -3525,7 +3525,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let test_id = COUNTER.fetch_add(1, Ordering::Relaxed);
         let db_path = temp_dir.join(format!(
-            "test_hcom_colguard_{}_{}.db",
+            "test_nomadterm_colguard_{}_{}.db",
             std::process::id(),
             test_id
         ));
@@ -3545,7 +3545,7 @@ mod tests {
             .unwrap();
         }
 
-        let mut db = HcomDb::open_at(&db_path).unwrap();
+        let mut db = NomadtermDb::open_at(&db_path).unwrap();
 
         // check_schema_compat should detect missing column
         match db.check_schema_compat().unwrap() {
@@ -4111,7 +4111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_subscription_recursion_guard_hcom_events_sender() {
+    fn test_subscription_recursion_guard_nomadterm_events_sender() {
         let (db, db_path) = setup_full_test_db();
 
         db.conn

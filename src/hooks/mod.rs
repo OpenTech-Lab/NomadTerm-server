@@ -16,16 +16,16 @@ use serde_json::Value;
 pub mod test_helpers {
     use std::path::PathBuf;
 
-    /// RAII guard that saves/restores HCOM_DIR and HOME env vars, and resets Config.
+    /// RAII guard that saves/restores NOMADTERM_DIR and HOME env vars, and resets Config.
     pub struct EnvGuard {
-        saved_hcom: Option<String>,
+        saved_nomadterm: Option<String>,
         saved_home: Option<String>,
     }
 
     impl EnvGuard {
         pub fn new() -> Self {
             Self {
-                saved_hcom: std::env::var("HCOM_DIR").ok(),
+                saved_nomadterm: std::env::var("NOMADTERM_DIR").ok(),
                 saved_home: std::env::var("HOME").ok(),
             }
         }
@@ -34,9 +34,9 @@ pub mod test_helpers {
     impl Drop for EnvGuard {
         fn drop(&mut self) {
             unsafe {
-                match &self.saved_hcom {
-                    Some(v) => std::env::set_var("HCOM_DIR", v),
-                    None => std::env::remove_var("HCOM_DIR"),
+                match &self.saved_nomadterm {
+                    Some(v) => std::env::set_var("NOMADTERM_DIR", v),
+                    None => std::env::remove_var("NOMADTERM_DIR"),
                 }
                 match &self.saved_home {
                     Some(v) => std::env::set_var("HOME", v),
@@ -49,20 +49,20 @@ pub mod test_helpers {
     }
 
     /// Create an isolated test env: tempdir with .nomadterm dir, env vars set.
-    /// Returns (tempdir, hcom_dir, test_home, guard).
+    /// Returns (tempdir, nomadterm_dir, test_home, guard).
     pub fn isolated_test_env() -> (tempfile::TempDir, PathBuf, PathBuf, EnvGuard) {
         let guard = EnvGuard::new();
         let dir = tempfile::tempdir().unwrap();
         let test_home = dir.path().to_path_buf();
-        let hcom_dir = test_home.join(".nomadterm");
-        std::fs::create_dir_all(&hcom_dir).unwrap();
+        let nomadterm_dir = test_home.join(".nomadterm");
+        std::fs::create_dir_all(&nomadterm_dir).unwrap();
         unsafe {
-            std::env::set_var("HCOM_DIR", &hcom_dir);
+            std::env::set_var("NOMADTERM_DIR", &nomadterm_dir);
             std::env::set_var("HOME", &test_home);
         }
         crate::config::Config::reset();
         crate::config::Config::init();
-        (dir, hcom_dir, test_home, guard)
+        (dir, nomadterm_dir, test_home, guard)
     }
 }
 

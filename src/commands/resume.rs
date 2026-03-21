@@ -6,7 +6,7 @@
 use anyhow::{Result, bail};
 use serde_json::json;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::hooks::claude_args;
 use crate::identity;
 use crate::launcher::{self, LaunchParams};
@@ -58,7 +58,7 @@ pub fn do_resume(
     extra_args: &[String],
     flags: &GlobalFlags,
 ) -> Result<i32> {
-    let db = HcomDb::open()?;
+    let db = NomadtermDb::open()?;
     let name = crate::instances::resolve_display_name_or_stopped(&db, name)
         .unwrap_or_else(|| name.to_string());
 
@@ -87,7 +87,7 @@ pub fn do_resume(
 
     // Extract nomadterm-level flags (--tag, --terminal, --dir) from extra args before tool parsing
     let (tag_override, terminal_override, dir_override, clean_extra) =
-        extract_hcom_flags(extra_args);
+        extract_nomadterm_flags(extra_args);
 
     // Determine effective working directory:
     // - Explicit --dir flag wins (validated and canonicalized)
@@ -158,7 +158,7 @@ pub fn do_resume(
                 None,
                 None,
                 None,
-                std::env::var("HCOM_PROCESS_ID").ok().as_deref(),
+                std::env::var("NOMADTERM_PROCESS_ID").ok().as_deref(),
                 None,
                 None,
             )
@@ -226,7 +226,7 @@ pub fn do_resume(
 
 /// Extract nomadterm-level flags (--tag, --terminal, --name, --go) from args.
 /// Returns (tag, terminal, remaining) with nomadterm flags stripped.
-fn extract_hcom_flags(
+fn extract_nomadterm_flags(
     args: &[String],
 ) -> (Option<String>, Option<String>, Option<String>, Vec<String>) {
     let mut tag = None;
@@ -268,7 +268,7 @@ fn extract_hcom_flags(
 
 /// Load data from an active or stopped instance.
 fn load_instance_data(
-    db: &HcomDb,
+    db: &NomadtermDb,
     name: &str,
 ) -> Result<(String, String, String, String, bool, i64, String)> {
     // Try active instance first
@@ -290,7 +290,7 @@ fn load_instance_data(
 
 /// Load stopped snapshot from life events.
 fn load_stopped_snapshot(
-    db: &HcomDb,
+    db: &NomadtermDb,
     name: &str,
 ) -> Result<(String, String, String, String, bool, i64, String)> {
     // Query the latest "stopped" life event for this instance
@@ -496,9 +496,9 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_hcom_flags_terminal() {
+    fn test_extract_nomadterm_flags_terminal() {
         let (tag, terminal, dir, remaining) =
-            extract_hcom_flags(&s(&["--terminal", "alacritty", "--model", "opus"]));
+            extract_nomadterm_flags(&s(&["--terminal", "alacritty", "--model", "opus"]));
         assert_eq!(tag, None);
         assert_eq!(terminal, Some("alacritty".to_string()));
         assert_eq!(dir, None);
@@ -506,9 +506,9 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_hcom_flags_tag_and_terminal() {
+    fn test_extract_nomadterm_flags_tag_and_terminal() {
         let (tag, terminal, dir, remaining) =
-            extract_hcom_flags(&s(&["--tag", "test", "--terminal", "kitty"]));
+            extract_nomadterm_flags(&s(&["--tag", "test", "--terminal", "kitty"]));
         assert_eq!(tag, Some("test".to_string()));
         assert_eq!(terminal, Some("kitty".to_string()));
         assert_eq!(dir, None);
@@ -516,9 +516,9 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_hcom_flags_equals_form() {
+    fn test_extract_nomadterm_flags_equals_form() {
         let (tag, terminal, dir, remaining) =
-            extract_hcom_flags(&s(&["--tag=test", "--terminal=alacritty"]));
+            extract_nomadterm_flags(&s(&["--tag=test", "--terminal=alacritty"]));
         assert_eq!(tag, Some("test".to_string()));
         assert_eq!(terminal, Some("alacritty".to_string()));
         assert_eq!(dir, None);
@@ -526,8 +526,8 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_hcom_flags_none() {
-        let (tag, terminal, dir, remaining) = extract_hcom_flags(&s(&["--model", "opus"]));
+    fn test_extract_nomadterm_flags_none() {
+        let (tag, terminal, dir, remaining) = extract_nomadterm_flags(&s(&["--model", "opus"]));
         assert_eq!(tag, None);
         assert_eq!(terminal, None);
         assert_eq!(dir, None);
@@ -535,9 +535,9 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_hcom_flags_dir() {
+    fn test_extract_nomadterm_flags_dir() {
         let (tag, terminal, dir, remaining) =
-            extract_hcom_flags(&s(&["--dir", "/tmp/test", "--model", "opus"]));
+            extract_nomadterm_flags(&s(&["--dir", "/tmp/test", "--model", "opus"]));
         assert_eq!(tag, None);
         assert_eq!(terminal, None);
         assert_eq!(dir, Some("/tmp/test".to_string()));

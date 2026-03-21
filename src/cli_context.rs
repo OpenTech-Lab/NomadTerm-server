@@ -6,7 +6,7 @@
 //! - `maybe_deliver_pending_messages` — append unread for codex/adhoc
 //! - `format_messages_human` — human-readable message formatting
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::identity;
 use crate::instances;
 #[cfg(test)]
@@ -28,7 +28,7 @@ const STATUS_SKIP_COMMANDS: &[&str] = &["listen", "start", "stop", "kill", "rese
 /// propagates to the caller (printed + exit 1).
 /// Without explicit name, resolution errors are swallowed (best-effort).
 pub fn build_ctx_for_command(
-    db: &HcomDb,
+    db: &NomadtermDb,
     cmd: Option<&str>,
     explicit_name: Option<&str>,
     go: bool,
@@ -95,16 +95,16 @@ pub fn check_identity_gate(
         .is_some_and(|id| matches!(id.kind, SenderKind::Instance) && id.instance_data.is_some());
 
     if !is_participant {
-        let hcom_cmd = crate::runtime_env::build_hcom_command();
+        let nomadterm_cmd = crate::runtime_env::build_nomadterm_command();
         let mut msg = format!(
-            "nomadterm identity not found, you need to run '{hcom_cmd} start' first, then use '{hcom_cmd} {cmd}'"
+            "nomadterm identity not found, you need to run '{nomadterm_cmd} start' first, then use '{nomadterm_cmd} {cmd}'"
         );
         if is_inside_ai_tool {
             msg.push_str(&format!(
-                "\nUsage:\n  {hcom_cmd} start              # New nomadterm identity (assigns new name)\n  {hcom_cmd} start --as <name>  # Rebind to existing identity\n  Then use the command: {hcom_cmd} {cmd} --name <name>"
+                "\nUsage:\n  {nomadterm_cmd} start              # New nomadterm identity (assigns new name)\n  {nomadterm_cmd} start --as <name>  # Rebind to existing identity\n  Then use the command: {nomadterm_cmd} {cmd} --name <name>"
             ));
         } else {
-            msg.push_str(&format!("\nUsage: {hcom_cmd} start"));
+            msg.push_str(&format!("\nUsage: {nomadterm_cmd} start"));
         }
         return Err(msg);
     }
@@ -123,7 +123,7 @@ pub fn check_identity_gate(
 /// Status model:
 /// - Adhoc: inactive:tool:* (no hooks to reset, just records "this happened")
 /// - Others: active:tool:* (hooks will reset to idle when turn ends)
-pub fn set_hookless_command_status(db: &HcomDb, cmd_name: &str, ctx: &CommandContext) {
+pub fn set_hookless_command_status(db: &NomadtermDb, cmd_name: &str, ctx: &CommandContext) {
     if STATUS_SKIP_COMMANDS.contains(&cmd_name) {
         return;
     }
@@ -176,7 +176,7 @@ pub fn set_hookless_command_status(db: &HcomDb, cmd_name: &str, ctx: &CommandCon
 ///
 /// Returns formatted output string if messages were delivered, None otherwise.
 pub fn maybe_deliver_pending_messages(
-    db: &HcomDb,
+    db: &NomadtermDb,
     ctx: &CommandContext,
     has_json_flag: bool,
 ) -> Option<String> {
@@ -259,7 +259,7 @@ pub fn maybe_deliver_pending_messages(
 /// With colors: status icon colored, sender bold, metadata dim.
 #[allow(dead_code)]
 pub fn format_messages_human(
-    db: &HcomDb,
+    db: &NomadtermDb,
     messages: &[serde_json::Value],
     instance_name: &str,
 ) -> String {
@@ -374,7 +374,7 @@ fn build_message_prefix(
 ///
 #[allow(dead_code)]
 fn format_hook_messages_simple(
-    db: &HcomDb,
+    db: &NomadtermDb,
     messages: &[serde_json::Value],
     instance_name: &str,
 ) -> String {
@@ -450,7 +450,7 @@ fn format_hook_messages_simple(
 ///
 /// Used by `maybe_deliver_pending_messages` which works with `db::Message` directly.
 fn format_hook_messages_simple_from_msgs(
-    db: &HcomDb,
+    db: &NomadtermDb,
     messages: &[crate::db::Message],
     instance_name: &str,
 ) -> String {
@@ -518,16 +518,16 @@ fn format_hook_messages_simple_from_msgs(
 mod tests {
     use super::*;
 
-    fn make_test_db() -> (HcomDb, tempfile::TempDir) {
+    fn make_test_db() -> (NomadtermDb, tempfile::TempDir) {
         crate::config::Config::init();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test.db");
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         db.init_db().unwrap();
         (db, dir)
     }
 
-    fn insert_instance(db: &HcomDb, name: &str, tool: &str) {
+    fn insert_instance(db: &NomadtermDb, name: &str, tool: &str) {
         let now = chrono::Utc::now().timestamp() as f64;
         db.conn()
             .execute(
@@ -537,7 +537,7 @@ mod tests {
             .unwrap();
     }
 
-    fn insert_process_binding(db: &HcomDb, process_id: &str, instance_name: &str) {
+    fn insert_process_binding(db: &NomadtermDb, process_id: &str, instance_name: &str) {
         let now = chrono::Utc::now().timestamp() as f64;
         db.conn()
             .execute(

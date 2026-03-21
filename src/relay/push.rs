@@ -8,14 +8,14 @@ use rumqttc::v5::mqttbytes::QoS;
 use serde_json::{Value, json};
 use std::time::Instant;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::log;
 
 use super::{device_short_id, safe_kv_get, safe_kv_set, set_relay_status, state_topic};
 
 /// Build current instance state snapshot for publishing.
 /// Only includes local instances (no origin_device_id).
-pub fn build_state(db: &HcomDb) -> Value {
+pub fn build_state(db: &NomadtermDb) -> Value {
     let device_uuid = super::read_device_uuid();
     let short_id = device_short_id(&device_uuid);
 
@@ -113,7 +113,7 @@ pub fn build_state(db: &HcomDb) -> Value {
 
 /// Build push payload: state + events, returning (state, events, max_event_id, has_more).
 /// Fetches 101 rows, sends first 100 — has_more=true if 101st exists.
-pub fn build_push_payload(db: &HcomDb) -> (Value, Vec<Value>, i64, bool) {
+pub fn build_push_payload(db: &NomadtermDb) -> (Value, Vec<Value>, i64, bool) {
     let state = build_state(db);
 
     let last_push_id: i64 = safe_kv_get(db, "relay_last_push_id")
@@ -170,7 +170,7 @@ pub fn build_push_payload(db: &HcomDb) -> (Value, Vec<Value>, i64, bool) {
 /// Push state and events via MQTT. Returns (success, has_more).
 /// `is_worker` should be true when called from the daemon relay thread.
 pub fn push(
-    db: &HcomDb,
+    db: &NomadtermDb,
     client: &Client,
     relay_id: &str,
     device_uuid: &str,

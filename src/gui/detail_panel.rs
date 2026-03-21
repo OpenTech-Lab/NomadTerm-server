@@ -54,7 +54,7 @@ pub fn show(
                     }
                 }
                 state.repos[idx].is_active = false;
-                if let Ok(db) = crate::db::HcomDb::open() {
+                if let Ok(db) = crate::db::NomadtermDb::open() {
                     let _ = db.set_repo_active(&repo_id, false);
                 }
                 *qr_cache = None;
@@ -73,7 +73,7 @@ pub fn show(
                 );
                 handles[idx] = Some(h);
                 state.repos[idx].is_active = true;
-                if let Ok(db) = crate::db::HcomDb::open() {
+                if let Ok(db) = crate::db::NomadtermDb::open() {
                     let _ = db.set_repo_active(&repo_id, true);
                 }
                 *qr_cache = None;

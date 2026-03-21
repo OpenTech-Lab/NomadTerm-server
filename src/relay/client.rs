@@ -11,8 +11,8 @@ use std::sync::{Arc, Condvar, Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::config::HcomConfig;
-use crate::db::HcomDb;
+use crate::config::NomadtermConfig;
+use crate::db::NomadtermDb;
 use crate::log;
 
 use super::{
@@ -73,7 +73,7 @@ impl MqttRelay {
     /// polled in a loop (its iterator drives the network I/O). The command_sender
     /// lets external code trigger pushes or shutdown.
     pub fn connect(
-        config: &HcomConfig,
+        config: &NomadtermConfig,
     ) -> Result<(Self, Connection, mpsc::Sender<RelayCommand>), String> {
         if !is_relay_enabled(config) {
             return Err("relay not configured or disabled".into());
@@ -220,7 +220,7 @@ impl MqttRelay {
                         connected = false;
                         let err_msg = format!("{:?}", conn_err);
                         log::log_warn("relay", "relay.disconnected", &err_msg);
-                        if let Ok(db) = HcomDb::open() {
+                        if let Ok(db) = NomadtermDb::open() {
                             set_relay_status(&db, "error", Some(&err_msg), true);
                         }
                     }
@@ -247,7 +247,7 @@ impl MqttRelay {
                 Packet::ConnAck(_connack) => {
                     *connected = true;
                     log::log_info("relay", "relay.connected", "MQTT connected");
-                    if let Ok(db) = HcomDb::open() {
+                    if let Ok(db) = NomadtermDb::open() {
                         set_relay_status(&db, "ok", None, true);
                     }
                     // Re-subscribe after reconnect
@@ -280,7 +280,7 @@ impl MqttRelay {
         }
         let suffix = &topic[prefix.len()..];
 
-        let db = match HcomDb::open() {
+        let db = match NomadtermDb::open() {
             Ok(db) => db,
             Err(e) => {
                 log::log_error("relay", "relay.db_err", &format!("{}", e));
@@ -310,7 +310,7 @@ impl MqttRelay {
 
     /// Execute a push cycle: build state + events, publish to MQTT.
     fn do_push_cycle(&self) {
-        let db = match HcomDb::open() {
+        let db = match NomadtermDb::open() {
             Ok(db) => db,
             Err(e) => {
                 log::log_error("relay", "relay.db_err", &format!("{}", e));
@@ -331,7 +331,7 @@ impl MqttRelay {
                 Ok((false, _)) => break,
                 Err(e) => {
                     log::log_warn("relay", "relay.push_err", &e);
-                    if let Ok(db) = HcomDb::open() {
+                    if let Ok(db) = NomadtermDb::open() {
                         set_relay_status(&db, "error", Some(&e), true);
                     }
                     break;
@@ -379,7 +379,7 @@ impl MqttRelay {
         }
 
         // Update status in DB
-        if let Ok(db) = HcomDb::open() {
+        if let Ok(db) = NomadtermDb::open() {
             set_relay_status(&db, "disconnected", None, true);
         }
     }
@@ -456,7 +456,7 @@ impl EphemeralClient {
 /// Create an ephemeral MQTT client for one-shot publishes (CLI callers like stop/kill).
 /// Connects, waits for CONNACK (up to 5s), disconnects on failure. Returns None on failure.
 /// The returned EphemeralClient tracks PUBACK so callers can wait for delivery confirmation.
-pub fn create_ephemeral_client(config: &HcomConfig) -> Option<EphemeralClient> {
+pub fn create_ephemeral_client(config: &NomadtermConfig) -> Option<EphemeralClient> {
     let (host, port, use_tls) = super::get_broker_from_config(config)?;
 
     let client_id = format!("nomadterm-ephemeral-{}", std::process::id());
@@ -535,7 +535,7 @@ pub fn create_ephemeral_client(config: &HcomConfig) -> Option<EphemeralClient> {
 }
 
 /// Publish empty retained to clear device state and disconnect an ephemeral client.
-pub fn clear_retained_state(config: &HcomConfig) -> bool {
+pub fn clear_retained_state(config: &NomadtermConfig) -> bool {
     if config.relay_id.is_empty() {
         return false;
     }

@@ -6,7 +6,7 @@
 //!   nomadterm reset hooks        Remove hooks
 //!   nomadterm reset all          Stop all + clear db + remove hooks + reset config
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::shared::{CommandContext, is_inside_ai_tool};
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,7 +23,7 @@ pub struct ResetArgs {
     pub target: Option<ResetTarget>,
 }
 
-pub fn cmd_reset(db: &HcomDb, args: &ResetArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_reset(db: &NomadtermDb, args: &ResetArgs, ctx: Option<&CommandContext>) -> i32 {
     let target = args.target;
 
     // Confirmation gate: inside AI tools, require --go

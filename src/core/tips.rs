@@ -2,7 +2,7 @@
 //!
 //! Uses kv store to track which tips have been shown per instance.
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 
 /// Centralized tip text.
 pub fn get_tip(key: &str) -> Option<&'static str> {
@@ -42,7 +42,7 @@ pub fn get_tip(key: &str) -> Option<&'static str> {
 }
 
 /// Check if instance has seen this tip before.
-pub fn has_seen_tip(db: &HcomDb, instance_name: &str, command: &str) -> bool {
+pub fn has_seen_tip(db: &NomadtermDb, instance_name: &str, command: &str) -> bool {
     if instance_name.is_empty() {
         return true;
     }
@@ -51,7 +51,7 @@ pub fn has_seen_tip(db: &HcomDb, instance_name: &str, command: &str) -> bool {
 }
 
 /// Mark tip as seen for this instance.
-pub fn mark_tip_seen(db: &HcomDb, instance_name: &str, command: &str) {
+pub fn mark_tip_seen(db: &NomadtermDb, instance_name: &str, command: &str) {
     if instance_name.is_empty() {
         return;
     }
@@ -60,7 +60,7 @@ pub fn mark_tip_seen(db: &HcomDb, instance_name: &str, command: &str) {
 }
 
 /// Show one-time tip for command if not seen before.
-pub fn maybe_show_tip(db: &HcomDb, instance_name: &str, command: &str, json_output: bool) {
+pub fn maybe_show_tip(db: &NomadtermDb, instance_name: &str, command: &str, json_output: bool) {
     if json_output {
         return;
     }
@@ -77,7 +77,7 @@ pub fn maybe_show_tip(db: &HcomDb, instance_name: &str, command: &str, json_outp
 
 /// Print contextual tips after launch. One-time tips tracked per launcher via kv.
 pub fn print_launch_tips(
-    db: &HcomDb,
+    db: &NomadtermDb,
     launched: usize,
     tag: Option<&str>,
     launcher_name: Option<&str>,
@@ -90,12 +90,12 @@ pub fn print_launch_tips(
         return;
     }
 
-    let inside_tool = crate::shared::context::HcomContext::from_os().is_inside_ai_tool();
+    let inside_tool = crate::shared::context::NomadtermContext::from_os().is_inside_ai_tool();
     let mut tips: Vec<String> = Vec::new();
 
     /// Append tip if not yet seen by this launcher.
     /// When launcher_name is None (ad-hoc usage), always show — no tracking.
-    fn once(db: &HcomDb, tips: &mut Vec<String>, tip_id: Option<&str>, key: &str, text: &str) {
+    fn once(db: &NomadtermDb, tips: &mut Vec<String>, tip_id: Option<&str>, key: &str, text: &str) {
         if let Some(id) = tip_id {
             if has_seen_tip(db, id, key) {
                 return;

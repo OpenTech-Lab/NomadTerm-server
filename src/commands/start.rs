@@ -12,8 +12,8 @@ use anyhow::{Result, bail};
 use serde_json::json;
 
 use crate::bootstrap;
-use crate::config::HcomConfig;
-use crate::db::HcomDb;
+use crate::config::NomadtermConfig;
+use crate::db::NomadtermDb;
 use crate::identity;
 use crate::instances;
 use crate::log::log_info;
@@ -22,7 +22,7 @@ use crate::pidtrack;
 use crate::relay;
 use crate::router::GlobalFlags;
 use crate::shared::constants::ST_ACTIVE;
-use crate::shared::context::HcomContext;
+use crate::shared::context::NomadtermContext;
 
 /// Parsed arguments for `nomadterm start`.
 #[derive(clap::Parser, Debug)]
@@ -68,10 +68,10 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     let orphan_target = start_args.orphan;
     let rebind_target = start_args.as_name;
 
-    let db = HcomDb::open()?;
-    let hcom_dir = paths::hcom_dir();
+    let db = NomadtermDb::open()?;
+    let nomadterm_dir = paths::nomadterm_dir();
 
-    let ctx = HcomContext::from_os();
+    let ctx = NomadtermContext::from_os();
     let instance_name = flags
         .name
         .as_deref()
@@ -125,7 +125,7 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     let subagent_info = subagent_via_name;
 
     if let Some(orphan) = orphan_target {
-        return start_from_orphan(&db, &hcom_dir, &orphan, &ctx);
+        return start_from_orphan(&db, &nomadterm_dir, &orphan, &ctx);
     }
 
     if let Some(rebind) = rebind_target {
@@ -138,7 +138,7 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     }
 
     // Bare start: auto-detect tool or create adhoc instance
-    start_bare(&db, &hcom_dir, &ctx, instance_name.as_deref())
+    start_bare(&db, &nomadterm_dir, &ctx, instance_name.as_deref())
 }
 
 /// Info about a detected subagent from a parent's running_tasks.
@@ -151,7 +151,7 @@ struct SubagentInfo {
 }
 
 /// Check if `check_id` matches an agent_id in any parent's running_tasks.subagents.
-fn detect_subagent(db: &HcomDb, check_id: &str) -> Option<SubagentInfo> {
+fn detect_subagent(db: &NomadtermDb, check_id: &str) -> Option<SubagentInfo> {
     // Query instances that have subagents tracked
     let mut stmt = db
         .conn()
@@ -197,7 +197,7 @@ fn detect_subagent(db: &HcomDb, check_id: &str) -> Option<SubagentInfo> {
 }
 
 /// Path S: Subagent registration — create structured parent_type_N name.
-fn start_subagent(db: &HcomDb, info: &SubagentInfo) -> Result<i32> {
+fn start_subagent(db: &NomadtermDb, info: &SubagentInfo) -> Result<i32> {
     // Gate: subagents get ONE start. Any stop = permanently dead.
     let stopped_by: Option<String> = db
         .conn()
@@ -371,17 +371,17 @@ fn start_subagent(db: &HcomDb, info: &SubagentInfo) -> Result<i32> {
 
 /// Recover orphaned PTY process by PID or name.
 fn start_from_orphan(
-    db: &HcomDb,
-    hcom_dir: &std::path::Path,
+    db: &NomadtermDb,
+    nomadterm_dir: &std::path::Path,
     target: &str,
-    _ctx: &HcomContext,
+    _ctx: &NomadtermContext,
 ) -> Result<i32> {
     let active_pids: HashSet<u32> = db
         .iter_instances_full()?
         .iter()
         .filter_map(|inst| inst.pid.map(|p| p as u32))
         .collect();
-    let orphans = pidtrack::get_orphan_processes(hcom_dir, Some(&active_pids));
+    let orphans = pidtrack::get_orphan_processes(nomadterm_dir, Some(&active_pids));
 
     if orphans.is_empty() {
         bail!("No orphan processes found.");
@@ -446,7 +446,7 @@ fn start_from_orphan(
     )
     .ok();
 
-    pidtrack::remove_pid(hcom_dir, pid);
+    pidtrack::remove_pid(nomadterm_dir, pid);
 
     println!("[nomadterm:{}]", name);
     if can_reuse {
@@ -469,12 +469,12 @@ fn start_from_orphan(
 
 /// Rebind session identity (`--as <name>`), preserving last_event_id.
 fn start_rebind(
-    db: &HcomDb,
+    db: &NomadtermDb,
     rebind_target: &str,
-    ctx: &HcomContext,
+    ctx: &NomadtermContext,
     explicit_name: Option<&str>,
 ) -> Result<i32> {
-    let hcom_dir = paths::hcom_dir();
+    let nomadterm_dir = paths::nomadterm_dir();
 
     // Resolve the target name
     let target_name = instances::resolve_display_name_or_stopped(db, rebind_target)
@@ -594,22 +594,22 @@ fn start_rebind(
     }
 
     // Print bootstrap
-    let hcom_config = HcomConfig::load(None).unwrap_or_else(|_| {
-        let mut c = HcomConfig::default();
+    let nomadterm_config = NomadtermConfig::load(None).unwrap_or_else(|_| {
+        let mut c = NomadtermConfig::default();
         c.normalize();
         c
     });
 
     let bootstrap_text = bootstrap::get_bootstrap(
         db,
-        &hcom_dir,
+        &nomadterm_dir,
         &target_name,
         tool,
         false,
         false,
         &ctx.notes,
-        &hcom_config.tag,
-        relay::is_relay_enabled(&hcom_config),
+        &nomadterm_config.tag,
+        relay::is_relay_enabled(&nomadterm_config),
         None,
     );
 
@@ -627,7 +627,7 @@ fn start_rebind(
 
 /// Extract last_event_id from a stopped life event snapshot.
 /// Used as fallback when the instance row is already deleted.
-fn load_stopped_snapshot_event_id(db: &HcomDb, name: &str) -> Result<i64> {
+fn load_stopped_snapshot_event_id(db: &NomadtermDb, name: &str) -> Result<i64> {
     let mut stmt = db.conn().prepare(
         "SELECT data FROM events WHERE type='life' AND instance=? ORDER BY id DESC LIMIT 10",
     )?;
@@ -654,9 +654,9 @@ fn load_stopped_snapshot_event_id(db: &HcomDb, name: &str) -> Result<i64> {
 
 /// Path C: Bare start — detect tool or create adhoc instance.
 fn start_bare(
-    db: &HcomDb,
-    hcom_dir: &std::path::Path,
-    ctx: &HcomContext,
+    db: &NomadtermDb,
+    nomadterm_dir: &std::path::Path,
+    ctx: &NomadtermContext,
     explicit_name: Option<&str>,
 ) -> Result<i32> {
     let explicit_name = explicit_name
@@ -723,7 +723,7 @@ fn start_bare(
         if crate::instances::is_remote_instance(existing) {
             if name.contains(':') {
                 let (rname, device_short_id) = name.rsplit_once(':').unwrap();
-                let config = crate::config::HcomConfig::load(None).unwrap_or_default();
+                let config = crate::config::NomadtermConfig::load(None).unwrap_or_default();
                 if crate::relay::control::send_control_ephemeral(
                     &config,
                     "start",
@@ -774,23 +774,23 @@ fn start_bare(
     }
 
     // Print bootstrap
-    let hcom_config = HcomConfig::load(None).unwrap_or_else(|e| {
+    let nomadterm_config = NomadtermConfig::load(None).unwrap_or_else(|e| {
         eprintln!("[nomadterm] warn: config load failed, using defaults: {e}");
-        let mut c = HcomConfig::default();
+        let mut c = NomadtermConfig::default();
         c.normalize();
         c
     });
 
     let bootstrap_text = bootstrap::get_bootstrap(
         db,
-        hcom_dir,
+        nomadterm_dir,
         &name,
         tool,
         false,
         ctx.is_launched,
         &ctx.notes,
-        &hcom_config.tag,
-        relay::is_relay_enabled(&hcom_config),
+        &nomadterm_config.tag,
+        relay::is_relay_enabled(&nomadterm_config),
         None,
     );
 

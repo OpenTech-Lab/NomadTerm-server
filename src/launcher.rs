@@ -12,11 +12,11 @@ use anyhow::{Result, bail};
 use rand::Rng;
 use serde_json::json;
 
-use crate::config::{self, HcomConfig};
-use crate::db::HcomDb;
+use crate::config::{self, NomadtermConfig};
+use crate::db::NomadtermDb;
 use crate::instances;
 use crate::paths;
-use crate::shared::constants::{HCOM_IDENTITY_VARS, TOOL_MARKER_VARS};
+use crate::shared::constants::{NOMADTERM_IDENTITY_VARS, TOOL_MARKER_VARS};
 use crate::terminal;
 use crate::tools::{codex_preprocessing, opencode_preprocessing};
 
@@ -182,18 +182,18 @@ pub fn will_run_in_current_terminal(
 }
 
 /// Build base environment from config.toml + env extras.
-pub fn build_launch_env(hcom_config: &HcomConfig) -> HashMap<String, String> {
+pub fn build_launch_env(nomadterm_config: &NomadtermConfig) -> HashMap<String, String> {
     let mut env: HashMap<String, String> = HashMap::new();
 
-    // HCOM_* settings from config.toml
-    for (key, value) in hcom_config.to_env_dict() {
+    // NOMADTERM_* settings from config.toml
+    for (key, value) in nomadterm_config.to_env_dict() {
         if !value.is_empty() {
             env.insert(key, value);
         }
     }
 
     // Passthrough vars from env file
-    let env_path = paths::hcom_path(&["env"]);
+    let env_path = paths::nomadterm_path(&["env"]);
     for (key, value) in config::load_env_extras(&env_path) {
         if !value.is_empty() {
             env.insert(key, value);
@@ -205,7 +205,7 @@ pub fn build_launch_env(hcom_config: &HcomConfig) -> HashMap<String, String> {
 
 /// Get system prompt file path for Gemini/Codex.
 fn get_system_prompt_path(tool: &str) -> std::path::PathBuf {
-    let prompts_dir = paths::hcom_path(&["system-prompts"]);
+    let prompts_dir = paths::nomadterm_path(&["system-prompts"]);
     fs::create_dir_all(&prompts_dir).ok();
     prompts_dir.join(format!("{}.md", tool))
 }
@@ -309,7 +309,7 @@ fn build_claude_command(args: &[String]) -> String {
 fn tool_extra_env(tool: &str) -> HashMap<String, String> {
     let mut m = HashMap::new();
     if tool == "claude" {
-        m.insert("HCOM_PTY_MODE".to_string(), "1".to_string());
+        m.insert("NOMADTERM_PTY_MODE".to_string(), "1".to_string());
     }
     m
 }
@@ -328,7 +328,7 @@ pub fn create_runner_script(
     let native_bin = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("nomadterm"));
     let native_bin_str = native_bin.to_string_lossy();
 
-    let launch_dir = paths::hcom_path(&[paths::LAUNCH_DIR]);
+    let launch_dir = paths::nomadterm_path(&[paths::LAUNCH_DIR]);
     fs::create_dir_all(&launch_dir).ok();
 
     let script_file = launch_dir.join(format!(
@@ -350,7 +350,7 @@ pub fn create_runner_script(
     let mut path_dirs: Vec<String> = Vec::new();
 
     // Dev mode: prepend worktree binary dir
-    if let Ok(dev_root) = std::env::var("HCOM_DEV_ROOT") {
+    if let Ok(dev_root) = std::env::var("NOMADTERM_DEV_ROOT") {
         let dev_bin = format!("{}/target/release", dev_root);
         if Path::new(&dev_bin).join("nomadterm").exists() {
             path_dirs.push(dev_bin);
@@ -398,7 +398,7 @@ pub fn create_runner_script(
         native_bin_str,
         crate::tools::args_common::shell_quote(cwd),
         TOOL_MARKER_VARS.join(" "),
-        HCOM_IDENTITY_VARS.join(" "),
+        NOMADTERM_IDENTITY_VARS.join(" "),
         env_block,
         path_export,
         use_exec,
@@ -440,17 +440,17 @@ pub fn launch_pty(
     terminal: Option<&str>,
     inside_ai_tool: bool,
 ) -> Result<bool> {
-    if env.get("HCOM_PROCESS_ID").is_none_or(|v| v.is_empty()) {
+    if env.get("NOMADTERM_PROCESS_ID").is_none_or(|v| v.is_empty()) {
         crate::log::log_error(
             "pty",
             "pty.exit",
-            &format!("HCOM_PROCESS_ID not set in env for {}", instance_name),
+            &format!("NOMADTERM_PROCESS_ID not set in env for {}", instance_name),
         );
         return Ok(false);
     }
 
     let mut runner_env = env.clone();
-    runner_env.insert("HCOM_INSTANCE_NAME".to_string(), instance_name.to_string());
+    runner_env.insert("NOMADTERM_INSTANCE_NAME".to_string(), instance_name.to_string());
     runner_env.extend(tool_extra_env(tool));
 
     let script_file =
@@ -481,7 +481,7 @@ pub fn launch_pty(
 /// This is the unified entry point for launching Claude, Gemini, Codex,
 /// and OpenCode instances with batch tracking, environment setup, and
 /// error handling.
-pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
+pub fn launch(db: &NomadtermDb, mut params: LaunchParams) -> Result<LaunchResult> {
     let normalized = LaunchTool::from_str(&params.tool, params.pty)?;
     let base_tool = normalized.base_tool();
 
@@ -503,30 +503,30 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
     ensure_hooks_installed(&normalized)?;
 
     // Load config
-    let hcom_config = HcomConfig::load(None).unwrap_or_else(|e| {
+    let nomadterm_config = NomadtermConfig::load(None).unwrap_or_else(|e| {
         eprintln!("[nomadterm] warn: config load failed, using defaults: {e}");
-        let mut c = HcomConfig::default();
+        let mut c = NomadtermConfig::default();
         c.normalize();
         c
     });
 
     // Build base environment
-    let mut base_env = build_launch_env(&hcom_config);
+    let mut base_env = build_launch_env(&nomadterm_config);
     if let Some(ref caller_env) = params.env {
         base_env.extend(caller_env.clone());
     }
-    base_env.remove("HCOM_TERMINAL");
+    base_env.remove("NOMADTERM_TERMINAL");
 
     // Tag resolution
     let effective_tag = if let Some(ref tag) = params.tag {
-        base_env.insert("HCOM_TAG".to_string(), tag.clone());
+        base_env.insert("NOMADTERM_TAG".to_string(), tag.clone());
         tag.clone()
-    } else if let Some(tag) = base_env.get("HCOM_TAG").cloned() {
+    } else if let Some(tag) = base_env.get("NOMADTERM_TAG").cloned() {
         tag
     } else {
-        let default = hcom_config.tag.clone();
+        let default = nomadterm_config.tag.clone();
         if !default.is_empty() {
-            base_env.insert("HCOM_TAG".to_string(), default.clone());
+            base_env.insert("NOMADTERM_TAG".to_string(), default.clone());
         }
         default
     };
@@ -591,7 +591,7 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
     let working_dir = params.cwd.as_deref().unwrap_or(".");
     let launcher_name: String = params.launcher.unwrap_or_else(|| {
         // Try to resolve caller identity from the live process binding.
-        let process_id = std::env::var("HCOM_PROCESS_ID").ok();
+        let process_id = std::env::var("NOMADTERM_PROCESS_ID").ok();
         match crate::identity::resolve_identity(
             db,
             None,
@@ -609,11 +609,11 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
         .batch_id
         .unwrap_or_else(|| format!("{:08x}", rand::rng().random::<u32>()));
 
-    let inside_ai_tool = crate::shared::context::HcomContext::from_os().is_inside_ai_tool();
+    let inside_ai_tool = crate::shared::context::NomadtermContext::from_os().is_inside_ai_tool();
     let terminal_mode = params
         .terminal
         .as_deref()
-        .or(Some(hcom_config.terminal.as_str()).filter(|t| !t.is_empty()));
+        .or(Some(nomadterm_config.terminal.as_str()).filter(|t| !t.is_empty()));
 
     let mut launched = 0usize;
     let mut log_files: Vec<String> = Vec::new();
@@ -622,35 +622,35 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
 
     for _ in 0..params.count {
         let mut instance_env = base_env.clone();
-        instance_env.insert("HCOM_LAUNCHED".to_string(), "1".to_string());
+        instance_env.insert("NOMADTERM_LAUNCHED".to_string(), "1".to_string());
         instance_env.insert(
-            "HCOM_LAUNCH_EVENT_ID".to_string(),
+            "NOMADTERM_LAUNCH_EVENT_ID".to_string(),
             db.get_last_event_id().to_string(),
         );
-        instance_env.insert("HCOM_LAUNCHED_BY".to_string(), launcher_name.to_string());
-        instance_env.insert("HCOM_LAUNCH_BATCH_ID".to_string(), batch_id.clone());
+        instance_env.insert("NOMADTERM_LAUNCHED_BY".to_string(), launcher_name.to_string());
+        instance_env.insert("NOMADTERM_LAUNCH_BATCH_ID".to_string(), batch_id.clone());
         instance_env.insert(
-            "HCOM_DIR".to_string(),
-            paths::hcom_dir().to_string_lossy().to_string(),
+            "NOMADTERM_DIR".to_string(),
+            paths::nomadterm_dir().to_string_lossy().to_string(),
         );
 
         // Propagate dev root
-        if let Ok(val) = std::env::var("HCOM_DEV_ROOT") {
-            instance_env.insert("HCOM_DEV_ROOT".to_string(), val);
+        if let Ok(val) = std::env::var("NOMADTERM_DEV_ROOT") {
+            instance_env.insert("NOMADTERM_DEV_ROOT".to_string(), val);
         }
-        // Propagate HCOM_NOTES
-        if let Ok(val) = std::env::var("HCOM_NOTES") {
-            instance_env.insert("HCOM_NOTES".to_string(), val);
+        // Propagate NOMADTERM_NOTES
+        if let Ok(val) = std::env::var("NOMADTERM_NOTES") {
+            instance_env.insert("NOMADTERM_NOTES".to_string(), val);
         }
 
         let process_id = generate_process_id();
-        instance_env.insert("HCOM_PROCESS_ID".to_string(), process_id.clone());
+        instance_env.insert("NOMADTERM_PROCESS_ID".to_string(), process_id.clone());
 
         // Fork mode detection
         if matches!(normalized, LaunchTool::Claude | LaunchTool::ClaudePty)
             && params.args.iter().any(|a| a == "--fork-session")
         {
-            instance_env.insert("HCOM_IS_FORK".to_string(), "1".to_string());
+            instance_env.insert("NOMADTERM_IS_FORK".to_string(), "1".to_string());
         }
 
         let instance_name = if let Some(ref name) = params.name {
@@ -660,19 +660,19 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
         };
 
         // Process ID export: allow custom env var name
-        if let Ok(export_var) = std::env::var("HCOM_PROCESS_ID_EXPORT") {
+        if let Ok(export_var) = std::env::var("NOMADTERM_PROCESS_ID_EXPORT") {
             if !export_var.is_empty() {
                 instance_env.insert(export_var, process_id.clone());
             }
         }
 
         // Name/process export vars
-        if let Ok(export_var) = std::env::var("HCOM_NAME_EXPORT") {
+        if let Ok(export_var) = std::env::var("NOMADTERM_NAME_EXPORT") {
             if !export_var.is_empty() {
                 instance_env.insert(export_var, instance_name.clone());
             }
-        } else if !hcom_config.name_export.is_empty() {
-            instance_env.insert(hcom_config.name_export.clone(), instance_name.clone());
+        } else if !nomadterm_config.name_export.is_empty() {
+            instance_env.insert(nomadterm_config.name_export.clone(), instance_name.clone());
         }
 
         let tool_type = base_tool;
@@ -746,7 +746,7 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
                                 .unwrap_or(0),
                             rand::random::<u16>() % 9000 + 1000
                         );
-                        instance_env.insert("HCOM_BACKGROUND".to_string(), log_filename.clone());
+                        instance_env.insert("NOMADTERM_BACKGROUND".to_string(), log_filename.clone());
 
                         match terminal::launch_terminal(
                             &claude_cmd,
@@ -768,7 +768,7 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
                                     process_id: &process_id,
                                     tag: params.tag.as_deref().unwrap_or(""),
                                     ..crate::pidtrack::PidRecord::new(
-                                        &crate::paths::hcom_dir(),
+                                        &crate::paths::nomadterm_dir(),
                                         pid,
                                         "claude",
                                         &instance_name,
@@ -898,19 +898,19 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
                     // Generate bootstrap text for preprocessing
                     let bootstrap = crate::bootstrap::get_bootstrap(
                         db,
-                        &paths::hcom_dir(),
+                        &paths::nomadterm_dir(),
                         &instance_name,
                         "codex",
                         false,
                         true, // is_launched
                         "",
                         &effective_tag,
-                        hcom_config.relay_enabled,
+                        nomadterm_config.relay_enabled,
                         None,
                     );
 
                     let sandbox_mode = instance_env
-                        .get("HCOM_CODEX_SANDBOX_MODE")
+                        .get("NOMADTERM_CODEX_SANDBOX_MODE")
                         .cloned()
                         .unwrap_or_else(|| "workspace".to_string());
 
@@ -929,7 +929,7 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
                         )]),
                     );
 
-                    instance_env.insert("HCOM_CODEX_SANDBOX_MODE".to_string(), sandbox_mode);
+                    instance_env.insert("NOMADTERM_CODEX_SANDBOX_MODE".to_string(), sandbox_mode);
 
                     let effective_run_here = will_run_in_current_terminal(
                         params.count,
@@ -1049,7 +1049,7 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
     .ok();
 
     // Push launch event to relay (best-effort)
-    let prefix = crate::runtime_env::get_hcom_prefix();
+    let prefix = crate::runtime_env::get_nomadterm_prefix();
     if let Some((cmd, prefix_args)) = prefix.split_first() {
         let _ = std::process::Command::new(cmd)
             .args(prefix_args)
@@ -1095,7 +1095,7 @@ fn validate_tool_args(tool: &LaunchTool, args: &[String]) -> Vec<String> {
 }
 
 /// Clean up instance and process binding on failure.
-fn cleanup_instance(db: &HcomDb, name: &str, process_id: &str) {
+fn cleanup_instance(db: &NomadtermDb, name: &str, process_id: &str) {
     db.delete_instance(name).ok();
     db.delete_process_binding(process_id).ok();
 }

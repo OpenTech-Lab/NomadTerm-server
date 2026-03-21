@@ -32,7 +32,7 @@ use screen::ScreenTracker;
 use terminal::TerminalGuard;
 
 use crate::config::Config;
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::delivery::{DeliveryState, ScreenState, ToolConfig, run_delivery_loop};
 use crate::log::{log_error, log_info, log_warn};
 use crate::notify::NotifyServer;
@@ -405,12 +405,12 @@ fn build_early_launch_context() -> String {
 
     let mut ctx = Map::new();
 
-    if let Ok(preset) = std::env::var("HCOM_LAUNCHED_PRESET") {
+    if let Ok(preset) = std::env::var("NOMADTERM_LAUNCHED_PRESET") {
         if !preset.is_empty() {
             ctx.insert("terminal_preset".into(), Value::String(preset));
         }
     }
-    if let Ok(pid) = std::env::var("HCOM_PROCESS_ID") {
+    if let Ok(pid) = std::env::var("NOMADTERM_PROCESS_ID") {
         if !pid.is_empty() {
             ctx.insert("process_id".into(), Value::String(pid));
         }
@@ -424,7 +424,7 @@ fn build_early_launch_context() -> String {
     }
 
     // Capture pane_id from terminal env vars, and derive terminal_preset
-    // for same-window (run_here) launches where HCOM_LAUNCHED_PRESET isn't set.
+    // for same-window (run_here) launches where NOMADTERM_LAUNCHED_PRESET isn't set.
     let pane_id_vars: &[(&str, &str)] = &[
         ("WEZTERM_PANE", "wezterm-split"),
         ("TMUX_PANE", "tmux-split"),
@@ -451,7 +451,7 @@ fn build_early_launch_context() -> String {
     // Retry with backoff only when pane_id not already captured from env vars
     // (tmux/wezterm set env vars directly, no file needed).
     if let Some(process_id) = ctx.get("process_id").and_then(|v| v.as_str()) {
-        let id_file = crate::paths::hcom_dir()
+        let id_file = crate::paths::nomadterm_dir()
             .join(".tmp")
             .join("terminal_ids")
             .join(process_id);
@@ -588,7 +588,7 @@ impl Proxy {
 
         // Write PID and launch context to database for nomadterm kill
         if let Some(ref instance_name) = config.instance_name {
-            if let Ok(db) = crate::db::HcomDb::open() {
+            if let Ok(db) = crate::db::NomadtermDb::open() {
                 let _ = db.update_instance_pid(instance_name, child.id());
 
                 // Capture minimal launch context early so kill can close the terminal pane.
@@ -622,7 +622,7 @@ impl Proxy {
             let base = config.instance_name.clone().unwrap_or_default();
             if base.is_empty() {
                 base
-            } else if let Ok(db) = crate::db::HcomDb::open() {
+            } else if let Ok(db) = crate::db::NomadtermDb::open() {
                 match db.get_instance_tag(&base) {
                     Some(tag) => format!("{}-{}", tag, base),
                     None => base,
@@ -1050,7 +1050,7 @@ impl Proxy {
             _ => return,
         };
 
-        let Ok(db) = HcomDb::open() else {
+        let Ok(db) = NomadtermDb::open() else {
             return;
         };
         let Ok(Some(instance)) = db.get_instance_full(instance_name) else {
@@ -1072,15 +1072,15 @@ impl Proxy {
             return;
         };
 
-        let launcher = std::env::var("HCOM_LAUNCHED_BY").ok();
-        let batch_id = std::env::var("HCOM_LAUNCH_BATCH_ID").ok();
+        let launcher = std::env::var("NOMADTERM_LAUNCHED_BY").ok();
+        let batch_id = std::env::var("NOMADTERM_LAUNCH_BATCH_ID").ok();
         if let (Some(launcher), Some(batch_id)) = (launcher, batch_id) {
             if !launcher.is_empty() && launcher != "unknown" && !batch_id.is_empty() {
                 let _ = db.notify_batch_failure(&launcher, &batch_id, instance_name, &detail);
             }
         }
 
-        if let Ok(process_id) = std::env::var("HCOM_PROCESS_ID") {
+        if let Ok(process_id) = std::env::var("NOMADTERM_PROCESS_ID") {
             if !process_id.is_empty() {
                 let _ = db.delete_process_binding(&process_id);
             }
@@ -1215,7 +1215,7 @@ impl Proxy {
             crate::log::log_warn(
                 "native",
                 "delivery.skip.no_instance_name",
-                "No instance name - delivery disabled. Set config.instance_name or HCOM_INSTANCE_NAME env var.",
+                "No instance name - delivery disabled. Set config.instance_name or NOMADTERM_INSTANCE_NAME env var.",
             );
             return Ok(());
         }
@@ -1258,7 +1258,7 @@ impl Proxy {
             // Initialize delivery components with dependency injection
             let (mut db, notify) = match initialize_delivery_components(
                 &instance_name,
-                HcomDb::open,
+                NomadtermDb::open,
                 NotifyServer::new,
             ) {
                 Ok((db, notify)) => {
@@ -1468,9 +1468,9 @@ fn initialize_delivery_components<DbF, NotifyF>(
     instance_name: &str,
     db_factory: DbF,
     notify_factory: NotifyF,
-) -> Result<(crate::db::HcomDb, crate::notify::NotifyServer)>
+) -> Result<(crate::db::NomadtermDb, crate::notify::NotifyServer)>
 where
-    DbF: FnOnce() -> Result<crate::db::HcomDb>,
+    DbF: FnOnce() -> Result<crate::db::NomadtermDb>,
     NotifyF: FnOnce() -> Result<crate::notify::NotifyServer>,
 {
     // Open database
@@ -1500,7 +1500,7 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let test_id = COUNTER.fetch_add(1, Ordering::Relaxed);
         let db_path = temp_dir.join(format!(
-            "test_hcom_pty_{}_{}.db",
+            "test_nomadterm_pty_{}_{}.db",
             std::process::id(),
             test_id
         ));
@@ -1559,7 +1559,7 @@ mod tests {
 
         let result = initialize_delivery_components(
             "test",
-            || crate::db::HcomDb::open_at(&db_path),
+            || crate::db::NomadtermDb::open_at(&db_path),
             || Err(anyhow!("Port already in use")),
         );
 
@@ -1581,7 +1581,7 @@ mod tests {
 
         let result = initialize_delivery_components(
             "test",
-            || crate::db::HcomDb::open_at(&db_path),
+            || crate::db::NomadtermDb::open_at(&db_path),
             crate::notify::NotifyServer::new,
         );
 
@@ -1603,7 +1603,7 @@ mod tests {
 
         let (db, notify) = initialize_delivery_components(
             "test",
-            || crate::db::HcomDb::open_at(&db_path),
+            || crate::db::NomadtermDb::open_at(&db_path),
             crate::notify::NotifyServer::new,
         )
         .expect("component init should succeed");

@@ -6,7 +6,7 @@ use std::process::Command;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use crate::db::{HcomDb, InstanceRow};
+use crate::db::{NomadtermDb, InstanceRow};
 use crate::shared::time::{now_epoch_f64, now_epoch_i64};
 
 /// Parameters for `set_status` — fields beyond name/status/context default to empty.
@@ -95,7 +95,7 @@ pub fn is_in_wake_grace() -> bool {
 /// When `db` is Some, persists wall-clock readings to KV so successive short-lived
 /// hook invocations can detect sleep/wake across process boundaries. When None,
 /// uses only in-process state (sufficient for long-lived TUI/PTY processes).
-pub fn is_in_wake_grace_with_persistence(db: Option<&crate::db::HcomDb>) -> bool {
+pub fn is_in_wake_grace_with_persistence(db: Option<&crate::db::NomadtermDb>) -> bool {
     let now_mono = Instant::now();
     let now_wall = now_epoch_f64();
 
@@ -176,7 +176,7 @@ pub fn is_in_wake_grace_with_persistence(db: Option<&crate::db::HcomDb>) -> bool
 }
 
 /// Compute current status from stored fields and heartbeat.
-pub fn get_instance_status(data: &InstanceRow, db: &HcomDb) -> ComputedStatus {
+pub fn get_instance_status(data: &InstanceRow, db: &NomadtermDb) -> ComputedStatus {
     let status = &data.status;
     let status_time = data.status_time;
     let status_context = &data.status_context;
@@ -333,14 +333,14 @@ pub fn get_instance_status(data: &InstanceRow, db: &HcomDb) -> ComputedStatus {
 }
 
 pub(crate) fn get_or_finalize_launch_failure_detail(
-    db: &HcomDb,
+    db: &NomadtermDb,
     data: &InstanceRow,
 ) -> Option<String> {
     finalize_launch_failure_detail(db, data, None)
 }
 
 pub(crate) fn finalize_launch_failure_detail(
-    db: &HcomDb,
+    db: &NomadtermDb,
     data: &InstanceRow,
     fallback_detail: Option<&str>,
 ) -> Option<String> {
@@ -512,7 +512,7 @@ pub fn is_subagent_instance(data: &InstanceRow) -> bool {
 ///
 /// Accepts either a session_id or instance name. Returns true if the instance
 /// has active running tasks (i.e. a Task subagent is executing).
-pub fn in_subagent_context(db: &HcomDb, session_id: &str) -> bool {
+pub fn in_subagent_context(db: &NomadtermDb, session_id: &str) -> bool {
     let instance_name = match db.get_session_binding(session_id) {
         Ok(Some(name)) => name,
         _ => session_id.to_string(),
@@ -551,7 +551,7 @@ pub fn get_full_name(data: &InstanceRow) -> String {
 }
 
 /// Get display name for a base name by loading instance data.
-pub fn get_display_name(db: &HcomDb, base_name: &str) -> String {
+pub fn get_display_name(db: &NomadtermDb, base_name: &str) -> String {
     match db.get_instance_full(base_name) {
         Ok(Some(data)) => get_full_name(&data),
         _ => base_name.to_string(),
@@ -560,7 +560,7 @@ pub fn get_display_name(db: &HcomDb, base_name: &str) -> String {
 
 /// Resolve base name or tag-name (e.g., "team-luna") to base name.
 /// Handles multi-hyphen tags like "vc-p0-p1-parallel-vani" → tag="vc-p0-p1-parallel", name="vani".
-pub fn resolve_display_name(db: &HcomDb, input_name: &str) -> Option<String> {
+pub fn resolve_display_name(db: &NomadtermDb, input_name: &str) -> Option<String> {
     // Direct match
     if let Ok(Some(_)) = db.get_instance_full(input_name) {
         return Some(input_name.to_string());
@@ -582,7 +582,7 @@ pub fn resolve_display_name(db: &HcomDb, input_name: &str) -> Option<String> {
 }
 
 /// Resolve base name or tag-name using live instances first, then stopped snapshots.
-pub fn resolve_display_name_or_stopped(db: &HcomDb, input_name: &str) -> Option<String> {
+pub fn resolve_display_name_or_stopped(db: &NomadtermDb, input_name: &str) -> Option<String> {
     if let Some(name) = resolve_display_name(db, input_name) {
         return Some(name);
     }
@@ -898,10 +898,10 @@ pub fn hash_to_name(input: &str, collision_attempt: u32) -> String {
 
 /// Generate a unique instance name with flock-based reservation.
 /// Creates a placeholder row in DB to prevent TOCTOU races.
-pub fn generate_unique_name(db: &HcomDb) -> Result<String> {
+pub fn generate_unique_name(db: &NomadtermDb) -> Result<String> {
     use std::fs::{File, create_dir_all};
 
-    let lock_path = crate::paths::hcom_dir().join(".tmp").join("name_gen.lock");
+    let lock_path = crate::paths::nomadterm_dir().join(".tmp").join("name_gen.lock");
     if let Some(parent) = lock_path.parent() {
         create_dir_all(parent)?;
     }
@@ -975,7 +975,7 @@ pub fn generate_unique_name(db: &HcomDb) -> Result<String> {
 /// Update instance position atomically.
 /// If instance doesn't exist, UPDATE silently affects 0 rows.
 pub fn update_instance_position(
-    db: &HcomDb,
+    db: &NomadtermDb,
     name: &str,
     updates: &serde_json::Map<String, serde_json::Value>,
 ) {
@@ -1003,7 +1003,7 @@ pub fn update_instance_position(
 
 /// Capture environment context and store it for the instance.
 /// Captures git branch, terminal program, tty, and relevant env vars.
-pub fn capture_and_store_launch_context(db: &HcomDb, instance_name: &str) {
+pub fn capture_and_store_launch_context(db: &NomadtermDb, instance_name: &str) {
     let new_ctx = capture_context();
 
     // Preserve fields from prior context that can't be recaptured in hook env
@@ -1134,12 +1134,12 @@ fn capture_context() -> serde_json::Map<String, serde_json::Value> {
     }
 
     // Process ID for kitty close-by-env matching
-    if let Ok(pid) = std::env::var("HCOM_PROCESS_ID") {
+    if let Ok(pid) = std::env::var("NOMADTERM_PROCESS_ID") {
         if !pid.is_empty() {
             ctx.insert("process_id".into(), serde_json::json!(pid));
 
             // Terminal ID from parent's stdout capture
-            let id_file = crate::paths::hcom_dir()
+            let id_file = crate::paths::nomadterm_dir()
                 .join(".tmp")
                 .join("terminal_ids")
                 .join(&pid);
@@ -1160,7 +1160,7 @@ fn capture_context() -> serde_json::Map<String, serde_json::Value> {
 
 /// Set instance status with timestamp and log status change event.
 pub fn set_status(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     status: &str,
     context: &str,
@@ -1217,11 +1217,11 @@ pub fn set_status(
     if is_new {
         let launcher = launcher_override
             .map(|s| s.to_string())
-            .or_else(|| std::env::var("HCOM_LAUNCHED_BY").ok())
+            .or_else(|| std::env::var("NOMADTERM_LAUNCHED_BY").ok())
             .unwrap_or_else(|| "unknown".to_string());
         let batch_id = batch_id_override
             .map(|s| s.to_string())
-            .or_else(|| std::env::var("HCOM_LAUNCH_BATCH_ID").ok());
+            .or_else(|| std::env::var("NOMADTERM_LAUNCH_BATCH_ID").ok());
 
         let mut event_data = serde_json::json!({
             "action": "ready",
@@ -1271,7 +1271,7 @@ pub fn set_status(
 ///
 /// `kinds` filters which endpoint types to notify (e.g. `&["pty", "listen"]`).
 /// Pass an empty slice to notify all endpoint kinds for the instance.
-pub fn notify_instance_endpoints(db: &HcomDb, instance_name: &str, kinds: &[&str]) {
+pub fn notify_instance_endpoints(db: &NomadtermDb, instance_name: &str, kinds: &[&str]) {
     use std::net::TcpStream;
 
     let ports: Vec<i64> = if kinds.is_empty() {
@@ -1315,14 +1315,14 @@ pub fn notify_instance_endpoints(db: &HcomDb, instance_name: &str, kinds: &[&str
     }
 }
 
-pub fn notify_instance_with_db(db: &HcomDb, instance_name: &str) -> Result<()> {
+pub fn notify_instance_with_db(db: &NomadtermDb, instance_name: &str) -> Result<()> {
     notify_instance_endpoints(db, instance_name, &["pty", "listen", "listen_filter"]);
     Ok(())
 }
 
 /// Notify all instances via their TCP notify ports (wake delivery loops).
 /// Used after sending messages or receiving relay events.
-pub fn notify_all_instances(db: &HcomDb) {
+pub fn notify_all_instances(db: &NomadtermDb) {
     use std::net::TcpStream;
 
     let Ok(mut stmt) = db
@@ -1355,7 +1355,7 @@ pub fn notify_all_instances(db: &HcomDb) {
 /// Handles 4 paths: canonical exists (with placeholder merge/switch), placeholder bind,
 /// and two no-op paths.
 pub fn bind_session_to_process(
-    db: &HcomDb,
+    db: &NomadtermDb,
     session_id: &str,
     process_id: Option<&str>,
 ) -> Option<String> {
@@ -1444,7 +1444,7 @@ pub fn bind_session_to_process(
                             resume_updates.insert("launch_args".into(), serde_json::json!(args));
                         }
                         // Reset status_context for ready event
-                        if std::env::var("HCOM_LAUNCHED").as_deref() == Ok("1") {
+                        if std::env::var("NOMADTERM_LAUNCHED").as_deref() == Ok("1") {
                             resume_updates
                                 .insert("status_context".into(), serde_json::json!("new"));
                         }
@@ -1559,7 +1559,7 @@ pub fn bind_session_to_process(
 /// Initialize instance in DB with required fields (idempotent).
 #[allow(clippy::too_many_arguments)]
 pub fn initialize_instance_in_position_file(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     session_id: Option<&str>,
     parent_session_id: Option<&str>,
@@ -1579,7 +1579,7 @@ pub fn initialize_instance_in_position_file(
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default()
     });
-    let is_launched = std::env::var("HCOM_LAUNCHED").as_deref() == Ok("1");
+    let is_launched = std::env::var("NOMADTERM_LAUNCHED").as_deref() == Ok("1");
 
     // Check if already exists
     match db.get_instance_full(instance_name) {
@@ -1616,7 +1616,7 @@ pub fn initialize_instance_in_position_file(
             let is_true_placeholder = existing.session_id.is_none();
             if existing.last_event_id == 0 && is_true_placeholder {
                 let current_max = db.get_last_event_id();
-                let launch_event_id = std::env::var("HCOM_LAUNCH_EVENT_ID")
+                let launch_event_id = std::env::var("NOMADTERM_LAUNCH_EVENT_ID")
                     .ok()
                     .and_then(|s| s.parse::<i64>().ok());
 
@@ -1641,7 +1641,7 @@ pub fn initialize_instance_in_position_file(
             // New instance
             let now = now_epoch_f64();
             let current_max = db.get_last_event_id();
-            let launch_event_id = std::env::var("HCOM_LAUNCH_EVENT_ID")
+            let launch_event_id = std::env::var("NOMADTERM_LAUNCH_EVENT_ID")
                 .ok()
                 .and_then(|s| s.parse::<i64>().ok());
 
@@ -1679,9 +1679,9 @@ pub fn initialize_instance_in_position_file(
             if let Some(t) = tag {
                 data.insert("tag".into(), serde_json::json!(t));
             } else if session_id.is_some() || parent_session_id.is_some() || is_launched {
-                if let Ok(hcom_config) = crate::config::HcomConfig::load(None) {
-                    if !hcom_config.tag.is_empty() {
-                        data.insert("tag".into(), serde_json::json!(hcom_config.tag));
+                if let Ok(nomadterm_config) = crate::config::NomadtermConfig::load(None) {
+                    if !nomadterm_config.tag.is_empty() {
+                        data.insert("tag".into(), serde_json::json!(nomadterm_config.tag));
                     }
                 }
             }
@@ -1712,11 +1712,11 @@ pub fn initialize_instance_in_position_file(
                 Ok(true) => {
                     // Log creation event
                     let launcher =
-                        std::env::var("HCOM_LAUNCHED_BY").unwrap_or_else(|_| "unknown".to_string());
+                        std::env::var("NOMADTERM_LAUNCHED_BY").unwrap_or_else(|_| "unknown".to_string());
                     let event_data = serde_json::json!({
                         "action": "created",
                         "by": launcher,
-                        "is_hcom_launched": is_launched,
+                        "is_nomadterm_launched": is_launched,
                         "is_subagent": parent_session_id.is_some(),
                         "parent_name": parent_name.unwrap_or(""),
                     });
@@ -1735,7 +1735,7 @@ pub fn initialize_instance_in_position_file(
 /// Create orphaned PTY identity — called when process binding exists but session_id
 /// is fresh (e.g., after /clear). Generates new name, creates instance, binds it.
 pub fn create_orphaned_pty_identity(
-    db: &HcomDb,
+    db: &NomadtermDb,
     session_id: &str,
     process_id: Option<&str>,
     tool: &str,
@@ -1787,7 +1787,7 @@ pub fn create_orphaned_pty_identity(
 }
 
 /// Delete placeholder instances that have been launching too long.
-pub fn cleanup_stale_placeholders(db: &HcomDb) -> i32 {
+pub fn cleanup_stale_placeholders(db: &NomadtermDb) -> i32 {
     let mut deleted = 0;
     let now = now_epoch_f64();
 
@@ -1809,7 +1809,7 @@ pub fn cleanup_stale_placeholders(db: &HcomDb) -> i32 {
 /// Delete instances that have been inactive too long.
 /// Three tiers: exit contexts (1 min), stale (1 hr), other inactive (12 hr).
 pub fn cleanup_stale_instances(
-    db: &HcomDb,
+    db: &NomadtermDb,
     max_stale_seconds: i64,
     max_inactive_seconds: i64,
 ) -> i32 {
@@ -1865,7 +1865,7 @@ pub fn cleanup_stale_instances(
 }
 
 /// Delete remote instance rows whose device hasn't pushed in >90s.
-fn cleanup_stale_remote_instances(db: &HcomDb) {
+fn cleanup_stale_remote_instances(db: &NomadtermDb) {
     let now = now_epoch_f64();
     let sync_map: std::collections::HashMap<String, String> = db
         .kv_prefix("relay_sync_time_")
@@ -1903,14 +1903,14 @@ fn cleanup_stale_remote_instances(db: &HcomDb) {
 }
 
 /// Resolve instance name for a process_id via process_bindings.
-pub fn resolve_process_binding(db: &HcomDb, process_id: Option<&str>) -> Option<String> {
+pub fn resolve_process_binding(db: &NomadtermDb, process_id: Option<&str>) -> Option<String> {
     let pid = process_id?;
     db.get_process_binding(pid).ok()?
 }
 
 /// Resolve instance via process binding, session binding, or transcript marker.
 pub fn resolve_instance_from_binding(
-    db: &HcomDb,
+    db: &NomadtermDb,
     session_id: Option<&str>,
     process_id: Option<&str>,
 ) -> Option<InstanceRow> {
@@ -1937,7 +1937,7 @@ pub fn resolve_instance_from_binding(
 
 /// Auto-subscribe instance to default event subscriptions from config.
 /// Called during instance creation.
-fn auto_subscribe_defaults(db: &HcomDb, instance_name: &str, tool: &str) {
+fn auto_subscribe_defaults(db: &NomadtermDb, instance_name: &str, tool: &str) {
     if !matches!(tool, "claude" | "gemini" | "codex" | "opencode") {
         return;
     }
@@ -1945,7 +1945,7 @@ fn auto_subscribe_defaults(db: &HcomDb, instance_name: &str, tool: &str) {
     // Clean up stale subscriptions from previously stopped instances with reused names
     let _ = db.cleanup_subscriptions(instance_name);
 
-    let config = match crate::config::HcomConfig::load(None) {
+    let config = match crate::config::NomadtermConfig::load(None) {
         Ok(c) => c,
         Err(_) => return,
     };
@@ -1995,7 +1995,7 @@ mod tests {
     use rusqlite::Connection;
     use std::path::PathBuf;
 
-    fn setup_test_db() -> (HcomDb, PathBuf) {
+    fn setup_test_db() -> (NomadtermDb, PathBuf) {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -2080,7 +2080,7 @@ mod tests {
         .unwrap();
         drop(conn);
 
-        let db = HcomDb::open_at(&db_path).unwrap();
+        let db = NomadtermDb::open_at(&db_path).unwrap();
         (db, db_path)
     }
 

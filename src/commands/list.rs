@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::db::{HcomDb, InstanceRow};
+use crate::db::{NomadtermDb, InstanceRow};
 use crate::identity;
 use crate::instances::{
     cleanup_stale_instances, cleanup_stale_placeholders, format_age, get_full_name,
@@ -49,7 +49,7 @@ pub struct ListArgs {
 }
 
 /// Get unread message count for a single instance.
-fn get_unread_count(db: &HcomDb, name: &str, last_event_id: i64) -> i64 {
+fn get_unread_count(db: &NomadtermDb, name: &str, last_event_id: i64) -> i64 {
     db.conn()
         .query_row(
             "SELECT COUNT(*) FROM events WHERE id > ? AND type = 'message'
@@ -61,7 +61,7 @@ fn get_unread_count(db: &HcomDb, name: &str, last_event_id: i64) -> i64 {
 }
 
 /// Get unread counts for all instances in batch.
-fn get_unread_counts_batch(db: &HcomDb, instances: &[InstanceRow]) -> HashMap<String, i64> {
+fn get_unread_counts_batch(db: &NomadtermDb, instances: &[InstanceRow]) -> HashMap<String, i64> {
     let mut counts = HashMap::new();
     for inst in instances {
         if is_remote_instance(inst) {
@@ -78,7 +78,7 @@ fn get_unread_counts_batch(db: &HcomDb, instances: &[InstanceRow]) -> HashMap<St
 /// Main entry point for `nomadterm list` command.
 ///
 /// Returns exit code (0 = success, 1 = error).
-pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_list(db: &NomadtermDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i32 {
     // Clean up stale placeholders and instances
     cleanup_stale_placeholders(db);
     let _ = cleanup_stale_instances(db, 3600, 3600);
@@ -568,7 +568,7 @@ pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i
 
     // Hint about archives if no instances
     if sorted_instances.is_empty() {
-        let archive_dir = crate::paths::hcom_dir().join("archive");
+        let archive_dir = crate::paths::nomadterm_dir().join("archive");
         if archive_dir.exists() {
             if let Ok(entries) = std::fs::read_dir(&archive_dir) {
                 let archive_count = entries
@@ -618,10 +618,10 @@ fn print_sh_exports(payload: &serde_json::Value) {
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
-    println!("export HCOM_INSTANCE_NAME={}", shell_quote(name));
-    println!("export HCOM_SID={}", shell_quote(session_id));
-    println!("export HCOM_STATUS={}", shell_quote(status));
-    println!("export HCOM_DIRECTORY={}", shell_quote(directory));
+    println!("export NOMADTERM_INSTANCE_NAME={}", shell_quote(name));
+    println!("export NOMADTERM_SID={}", shell_quote(session_id));
+    println!("export NOMADTERM_STATUS={}", shell_quote(status));
+    println!("export NOMADTERM_DIRECTORY={}", shell_quote(directory));
 }
 
 use crate::tools::args_common::shell_quote;
@@ -630,7 +630,7 @@ use crate::tools::args_common::shell_quote;
 /// Without a name: shows recent stopped (default last 20, use --all for unlimited).
 /// With a name: shows details for that specific stopped instance.
 /// Uses human-friendly formatting rather than raw JSON for readability.
-fn cmd_list_stopped(db: &HcomDb, args: &ListArgs) -> i32 {
+fn cmd_list_stopped(db: &NomadtermDb, args: &ListArgs) -> i32 {
     use rusqlite::params;
 
     let show_all = args.all;
@@ -810,7 +810,7 @@ fn cmd_list_stopped(db: &HcomDb, args: &ListArgs) -> i32 {
 
 /// Get names of recently stopped instances (within 10 minutes).
 fn get_recently_stopped(
-    db: &HcomDb,
+    db: &NomadtermDb,
     exclude_active: &std::collections::HashSet<String>,
 ) -> Vec<String> {
     let now = crate::shared::time::now_epoch_f64();

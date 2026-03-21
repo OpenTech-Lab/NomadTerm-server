@@ -358,7 +358,7 @@ const START_HELP: &[HelpEntry] = &[
     ("", ""),
     (
         "",
-        "Inside a sandbox? Prefix all nomadterm commands with: HCOM_DIR=$PWD/.nomadterm",
+        "Inside a sandbox? Prefix all nomadterm commands with: NOMADTERM_DIR=$PWD/.nomadterm",
     ),
 ];
 
@@ -405,17 +405,17 @@ const RESET_HELP: &[HelpEntry] = &[
     ("", ""),
     ("Sandbox / local mode:", ""),
     ("", "If you can't write to ~/.nomadterm, set:"),
-    ("", "  export HCOM_DIR=\"$PWD/.nomadterm\""),
+    ("", "  export NOMADTERM_DIR=\"$PWD/.nomadterm\""),
     (
         "",
-        "Hooks install under $PWD (.claude/.gemini/.codex) or ~/.config/opencode/, state in $HCOM_DIR",
+        "Hooks install under $PWD (.claude/.gemini/.codex) or ~/.config/opencode/, state in $NOMADTERM_DIR",
     ),
     ("", ""),
     ("", "To remove local setup:"),
-    ("", "  nomadterm hooks remove && rm -rf \"$HCOM_DIR\""),
+    ("", "  nomadterm hooks remove && rm -rf \"$NOMADTERM_DIR\""),
     ("", ""),
     ("", "Explicit location:"),
-    ("", "  export HCOM_DIR=/your/path/.nomadterm"),
+    ("", "  export NOMADTERM_DIR=/your/path/.nomadterm"),
     ("", ""),
 ];
 
@@ -456,7 +456,7 @@ const CONFIG_HELP: &[HelpEntry] = &[
 // config help continued with dynamic config files hint
 const CONFIG_HELP_2: &[HelpEntry] = &[(
     "",
-    "HCOM_DIR: isolate per project (see 'nomadterm reset --help')",
+    "NOMADTERM_DIR: isolate per project (see 'nomadterm reset --help')",
 )];
 
 const RELAY_HELP: &[HelpEntry] = &[
@@ -575,7 +575,7 @@ const HOOKS_HELP: &[HelpEntry] = &[
     ("", "Restart the tool after adding hooks to activate."),
     (
         "",
-        "Remove cleans both global (~/) and HCOM_DIR-local if set.",
+        "Remove cleans both global (~/) and NOMADTERM_DIR-local if set.",
     ),
 ];
 
@@ -622,7 +622,7 @@ const CLAUDE_SPEC: ToolHelpSpec = ToolHelpSpec {
         ("nomadterm 1 claude --agent <name>", ".claude/agents/<name>.md"),
     ],
     extra_env: &[(
-        "HCOM_SUBAGENT_TIMEOUT",
+        "NOMADTERM_SUBAGENT_TIMEOUT",
         "Seconds subagents keep-alive after task",
     )],
     has_fork: true,
@@ -632,7 +632,7 @@ const GEMINI_SPEC: ToolHelpSpec = ToolHelpSpec {
     name: "gemini",
     label: "Gemini",
     unique_examples: &[("nomadterm N gemini --yolo", "Flags forwarded to gemini")],
-    extra_env: &[("HCOM_GEMINI_SYSTEM_PROMPT", "System prompt (env var)")],
+    extra_env: &[("NOMADTERM_GEMINI_SYSTEM_PROMPT", "System prompt (env var)")],
     has_fork: false,
 };
 
@@ -644,7 +644,7 @@ const CODEX_SPEC: ToolHelpSpec = ToolHelpSpec {
         "Flags forwarded to codex",
     )],
     extra_env: &[(
-        "HCOM_CODEX_SYSTEM_PROMPT",
+        "NOMADTERM_CODEX_SYSTEM_PROMPT",
         "System prompt (env var or config)",
     )],
     has_fork: true,
@@ -677,7 +677,7 @@ fn generate_tool_help(spec: &ToolHelpSpec) -> String {
     } else {
         "Runs in current terminal"
     };
-    let args_env = format!("HCOM_{}_ARGS", t.to_uppercase());
+    let args_env = format!("NOMADTERM_{}_ARGS", t.to_uppercase());
 
     let mut lines: Vec<String> = Vec::new();
 
@@ -713,17 +713,17 @@ fn generate_tool_help(spec: &ToolHelpSpec) -> String {
     ));
     lines.push(format!(
         "    {:<28} Group tag (agents become tag-*)",
-        "HCOM_TAG"
+        "NOMADTERM_TAG"
     ));
     lines.push(format!(
         "    {:<28} default | <preset> | \"cmd {{script}}\"",
-        "HCOM_TERMINAL"
+        "NOMADTERM_TERMINAL"
     ));
     lines.push(format!(
         "    {:<28} Appended to messages received",
-        "HCOM_HINTS"
+        "NOMADTERM_HINTS"
     ));
-    lines.push(format!("    {:<28} One-time bootstrap notes", "HCOM_NOTES"));
+    lines.push(format!("    {:<28} One-time bootstrap notes", "NOMADTERM_NOTES"));
     for (u, d) in spec.extra_env {
         lines.push(format!("    {:<28} {}", u.trim(), d));
     }
@@ -891,11 +891,11 @@ pub fn get_command_help(name: &str) -> String {
     if name == "config" {
         lines.extend(format_entries(CONFIG_HELP));
         // Dynamic: resolved config file paths
-        let hcom_dir = env::var("HCOM_DIR")
+        let nomadterm_dir = env::var("NOMADTERM_DIR")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().join(".nomadterm"));
-        let config_toml = hcom_dir.join("config.toml");
-        let env_file = hcom_dir.join("config.env");
+        let config_toml = nomadterm_dir.join("config.toml");
+        let env_file = nomadterm_dir.join("config.env");
         lines.push(format!(
             "  Files: {}, {}",
             config_toml.display(),

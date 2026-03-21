@@ -9,7 +9,7 @@ use std::process::Command;
 
 use crate::commands::config::{CONFIG_KEYS, config_help};
 use crate::commands::help;
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::paths::scripts_dir;
 use crate::scripts;
 use crate::shared::CommandContext;
@@ -253,7 +253,7 @@ fn write_embedded_to_temp(name: &str, content: &str) -> std::io::Result<tempfile
     Ok(tmp)
 }
 
-pub fn cmd_run(db: &HcomDb, args: &RunArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_run(db: &NomadtermDb, args: &RunArgs, ctx: Option<&CommandContext>) -> i32 {
     // Re-inject --name for scripts that parse it themselves
     let mut argv = args.args.clone();
     if let Some(ctx) = ctx {
@@ -505,7 +505,7 @@ fn print_docs(show_cli: bool, show_config: bool, show_api: bool) -> i32 {
         println!("  nomadterm config <key> --info    Detailed help for a setting");
         println!("  nomadterm config --edit          Open in $EDITOR\n");
         for (key, desc, typ) in CONFIG_KEYS {
-            if *key == "HCOM_TERMINAL" {
+            if *key == "NOMADTERM_TERMINAL" {
                 print_terminal_help();
                 println!();
             } else if let Some(help_text) = config_help(key) {

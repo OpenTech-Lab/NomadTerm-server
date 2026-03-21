@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 
 use regex::Regex;
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::log::log_warn;
 use crate::shared::CommandContext;
 
@@ -391,7 +391,7 @@ fn search_opencode_sessions(
 }
 
 /// Get transcript path for an instance from DB.
-fn get_transcript_path(db: &HcomDb, name: &str) -> Option<String> {
+fn get_transcript_path(db: &NomadtermDb, name: &str) -> Option<String> {
     db.conn()
         .query_row(
             "SELECT transcript_path FROM instances WHERE name = ?",
@@ -1690,8 +1690,8 @@ fn summarize_action(text: &str) -> String {
 
 /// Correlate transcript file paths to nomadterm agent names via DB queries.
 /// Checks instances table first, then stopped life events.
-fn correlate_paths_to_hcom(
-    db: &HcomDb,
+fn correlate_paths_to_nomadterm(
+    db: &NomadtermDb,
     targets: &[(String, Option<String>)],
 ) -> std::collections::HashMap<String, String> {
     let mut result = std::collections::HashMap::new();
@@ -1754,7 +1754,7 @@ fn correlate_paths_to_hcom(
 
 /// Search across transcripts: `nomadterm transcript search "pattern" [--live] [--all] [--limit N] [--exclude-self]`
 fn cmd_transcript_search(
-    db: &HcomDb,
+    db: &NomadtermDb,
     args: &TranscriptSearchArgs,
     ctx: Option<&CommandContext>,
 ) -> i32 {
@@ -1864,7 +1864,7 @@ fn cmd_transcript_search(
                 .iter()
                 .filter_map(|m| m.session_id.clone().map(|sid| (m.path.clone(), Some(sid)))),
         );
-        let path_to_hcom = correlate_paths_to_hcom(db, &targets);
+        let path_to_nomadterm = correlate_paths_to_nomadterm(db, &targets);
 
         // Extract line-level matches from each file
         let mut results = Vec::new();
@@ -1878,7 +1878,7 @@ fn cmd_transcript_search(
                     continue;
                 }
             }
-            let hcom_name = path_to_hcom
+            let nomadterm_name = path_to_nomadterm
                 .get(&transcript_search_key(file_path, None))
                 .cloned()
                 .unwrap_or_default();
@@ -1912,7 +1912,7 @@ fn cmd_transcript_search(
                         };
 
                         results.push(json!({
-                            "hcom_name": if hcom_name.is_empty() { serde_json::Value::Null } else { json!(hcom_name) },
+                            "nomadterm_name": if nomadterm_name.is_empty() { serde_json::Value::Null } else { json!(nomadterm_name) },
                             "agent": agent,
                             "path": file_path,
                             "line": line_num,
@@ -1928,7 +1928,7 @@ fn cmd_transcript_search(
             if results.len() >= limit {
                 break;
             }
-            let hcom_name = path_to_hcom
+            let nomadterm_name = path_to_nomadterm
                 .get(&transcript_search_key(
                     &opencode_match.path,
                     opencode_match.session_id.as_deref(),
@@ -1936,7 +1936,7 @@ fn cmd_transcript_search(
                 .cloned()
                 .unwrap_or_default();
             results.push(json!({
-                "hcom_name": if hcom_name.is_empty() { serde_json::Value::Null } else { json!(hcom_name) },
+                "nomadterm_name": if nomadterm_name.is_empty() { serde_json::Value::Null } else { json!(nomadterm_name) },
                 "agent": opencode_match.agent,
                 "path": opencode_match.path,
                 "line": opencode_match.line,
@@ -1979,7 +1979,7 @@ fn cmd_transcript_search(
                         .rev()
                         .collect::<Vec<_>>()
                         .join("/");
-                    let name_part = r["hcom_name"]
+                    let name_part = r["nomadterm_name"]
                         .as_str()
                         .map(|n| format!(" ({n})"))
                         .unwrap_or_default();
@@ -2094,7 +2094,7 @@ fn cmd_transcript_search(
                     };
 
                     results.push(json!({
-                        "hcom_name": name,
+                        "nomadterm_name": name,
                         "agent": agent,
                         "path": path,
                         "line": line_num,
@@ -2139,8 +2139,8 @@ fn cmd_transcript_search(
             println!("Found {} matches{scope_label}:\n", results.len());
         }
         for result in &results {
-            let hcom_name = result
-                .get("hcom_name")
+            let nomadterm_name = result
+                .get("nomadterm_name")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             let agent = result.get("agent").and_then(|v| v.as_str()).unwrap_or("");
@@ -2158,7 +2158,7 @@ fn cmd_transcript_search(
                 path.to_string()
             };
 
-            println!("[{agent}:{hcom_name}] {path_display}:{line}");
+            println!("[{agent}:{nomadterm_name}] {path_display}:{line}");
             let snippet_clean = snippet.replace('\n', " ");
             let snippet_short = if snippet_clean.len() > 100 {
                 format!("{}...", truncate_str(&snippet_clean, 100))
@@ -2173,7 +2173,7 @@ fn cmd_transcript_search(
 }
 
 /// Timeline: `nomadterm transcript timeline [--last N] [--full] [--json]`
-fn cmd_transcript_timeline(db: &HcomDb, args: &TranscriptTimelineArgs) -> i32 {
+fn cmd_transcript_timeline(db: &NomadtermDb, args: &TranscriptTimelineArgs) -> i32 {
     let json_mode = args.json;
     let full_mode = args.full;
     let detailed = args.detailed;
@@ -2336,7 +2336,7 @@ fn cmd_transcript_timeline(db: &HcomDb, args: &TranscriptTimelineArgs) -> i32 {
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
 /// Main entry point for `nomadterm transcript` command.
-pub fn cmd_transcript(db: &HcomDb, args: &TranscriptArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_transcript(db: &NomadtermDb, args: &TranscriptArgs, ctx: Option<&CommandContext>) -> i32 {
     // Handle subcommands
     match &args.subcmd {
         Some(TranscriptSubcmd::Search(search_args)) => {
@@ -2510,7 +2510,7 @@ pub fn cmd_transcript(db: &HcomDb, args: &TranscriptArgs, ctx: Option<&CommandCo
 
 /// Resolve instance name to (name, transcript_path, agent_type, session_id).
 fn resolve_instance_transcript(
-    db: &HcomDb,
+    db: &NomadtermDb,
     name: &str,
 ) -> Option<(String, String, String, Option<String>)> {
     let name = crate::instances::resolve_display_name_or_stopped(db, name)
@@ -2758,9 +2758,9 @@ mod tests {
     }
 
     #[test]
-    fn test_correlate_paths_to_hcom_uses_session_id_for_opencode() {
+    fn test_correlate_paths_to_nomadterm_uses_session_id_for_opencode() {
         let dir = tempfile::tempdir().unwrap();
-        let db = HcomDb::open_at(&dir.path().join("nomadterm.db")).unwrap();
+        let db = NomadtermDb::open_at(&dir.path().join("nomadterm.db")).unwrap();
         db.conn()
             .execute_batch(
                 "CREATE TABLE instances (
@@ -2789,7 +2789,7 @@ mod tests {
             )
             .unwrap();
 
-        let correlated = correlate_paths_to_hcom(
+        let correlated = correlate_paths_to_nomadterm(
             &db,
             &[
                 ("/tmp/opencode.db".to_string(), Some("ses_a".to_string())),

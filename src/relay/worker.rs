@@ -13,15 +13,15 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use crate::config::HcomConfig;
-use crate::db::HcomDb;
+use crate::config::NomadtermConfig;
+use crate::db::NomadtermDb;
 use crate::log;
 use crate::relay::client::RelayCommand;
 
 // ── PID file helpers ────────────────────────────────────────────────
 
 fn pid_file_path() -> PathBuf {
-    crate::paths::hcom_dir().join(".tmp").join("relay.pid")
+    crate::paths::nomadterm_dir().join(".tmp").join("relay.pid")
 }
 
 fn write_pid_file() {
@@ -83,7 +83,7 @@ pub fn run() -> i32 {
     );
 
     // Load config
-    let config = match HcomConfig::load(None) {
+    let config = match NomadtermConfig::load(None) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Error: Failed to load config: {e}");
@@ -140,7 +140,7 @@ pub fn run() -> i32 {
 
     // Clear notify port so CLI callers stop trying to connect
     if notify_port.is_some() {
-        if let Ok(db) = HcomDb::open() {
+        if let Ok(db) = NomadtermDb::open() {
             super::safe_kv_set(&db, "relay_daemon_port", None);
         }
     }
@@ -156,7 +156,7 @@ fn setup_notify_listener(cmd_tx: &std::sync::mpsc::Sender<RelayCommand>) -> Opti
     let port = listener.local_addr().ok()?.port();
 
     // Store port in DB so CLI callers can find us
-    if let Ok(db) = HcomDb::open() {
+    if let Ok(db) = NomadtermDb::open() {
         super::safe_kv_set(&db, "relay_daemon_port", Some(&port.to_string()));
     }
 
@@ -190,7 +190,7 @@ fn setup_notify_listener(cmd_tx: &std::sync::mpsc::Sender<RelayCommand>) -> Opti
 /// If none for 2 consecutive checks, or shutdown signal received, send Shutdown.
 fn auto_exit_watchdog(cmd_tx: std::sync::mpsc::Sender<RelayCommand>, shutdown: Arc<AtomicBool>) {
     let mut consecutive_empty = 0u32;
-    let mut db = HcomDb::open().ok();
+    let mut db = NomadtermDb::open().ok();
 
     loop {
         std::thread::sleep(Duration::from_secs(30));
@@ -202,7 +202,7 @@ fn auto_exit_watchdog(cmd_tx: std::sync::mpsc::Sender<RelayCommand>, shutdown: A
 
         // Re-open DB if previous connection failed
         if db.is_none() {
-            db = HcomDb::open().ok();
+            db = NomadtermDb::open().ok();
         }
 
         let count = match &db {
@@ -233,7 +233,7 @@ fn auto_exit_watchdog(cmd_tx: std::sync::mpsc::Sender<RelayCommand>, shutdown: A
 /// Count active local (non-remote) instances.
 /// Mirrors the filter in ensure_worker(true) so the watchdog exits when no syncable
 /// instances remain, not merely when all instances are stopped/dead.
-fn local_instance_count(db: &HcomDb) -> i64 {
+fn local_instance_count(db: &NomadtermDb) -> i64 {
     db.conn()
         .query_row(
             "SELECT COUNT(*) FROM instances \
@@ -307,7 +307,7 @@ fn do_spawn() -> bool {
 ///
 /// Returns true if the worker is running (and port-ready when require_instances=false).
 pub fn ensure_worker(require_instances: bool) -> bool {
-    let config = match HcomConfig::load(None) {
+    let config = match NomadtermConfig::load(None) {
         Ok(c) => c,
         Err(_) => return false,
     };
@@ -321,7 +321,7 @@ pub fn ensure_worker(require_instances: bool) -> bool {
         if is_relay_worker_running() {
             return true;
         }
-        let db = match HcomDb::open() {
+        let db = match NomadtermDb::open() {
             Ok(db) => db,
             Err(_) => return false,
         };
@@ -361,7 +361,7 @@ pub fn ensure_worker(require_instances: bool) -> bool {
 /// Used by trigger_push() when no daemon is running, so events push on the
 /// worker's first cycle instead of sitting in the DB indefinitely.
 pub fn try_spawn_worker() {
-    let config = match HcomConfig::load(None) {
+    let config = match NomadtermConfig::load(None) {
         Ok(c) => c,
         Err(_) => return,
     };
@@ -376,7 +376,7 @@ pub fn try_spawn_worker() {
 fn poll_until_ready(timeout_ms: u64) -> bool {
     let start = std::time::Instant::now();
     let deadline = std::time::Duration::from_millis(timeout_ms);
-    let db = HcomDb::open().ok();
+    let db = NomadtermDb::open().ok();
 
     while start.elapsed() < deadline {
         if let Some(ref db) = db {

@@ -1,6 +1,6 @@
 //! Relay MQTT roundtrip integration test.
 //!
-//! Two real nomadterm instances (separate HCOM_DIR), each with their own
+//! Two real nomadterm instances (separate NOMADTERM_DIR), each with their own
 //! daemon, talking through a real public MQTT broker.
 //! Zero mocking, zero fake payloads.
 //!
@@ -27,16 +27,16 @@ use std::time::{Duration, Instant};
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-fn hcom_with_dir(cmd: &str, hcom_dir: &str) -> Output {
+fn nomadterm_with_dir(cmd: &str, nomadterm_dir: &str) -> Output {
     Command::new("nomadterm")
         .args(shell_words::split(cmd).unwrap())
-        .env("HCOM_DIR", hcom_dir)
+        .env("NOMADTERM_DIR", nomadterm_dir)
         .output()
         .expect("failed to execute nomadterm")
 }
 
-fn check(label: &str, cmd: &str, hcom_dir: &str) -> String {
-    let out = hcom_with_dir(cmd, hcom_dir);
+fn check(label: &str, cmd: &str, nomadterm_dir: &str) -> String {
+    let out = nomadterm_with_dir(cmd, nomadterm_dir);
     assert!(
         out.status.success(),
         "Device {label}: nomadterm {cmd}\nstdout: {}\nstderr: {}",
@@ -84,8 +84,8 @@ fn parse_device_id(status_output: &str) -> Option<String> {
     None
 }
 
-fn read_device_uuid(hcom_dir: &str) -> Option<String> {
-    let path = Path::new(hcom_dir).join(".tmp/device_id");
+fn read_device_uuid(nomadterm_dir: &str) -> Option<String> {
+    let path = Path::new(nomadterm_dir).join(".tmp/device_id");
     fs::read_to_string(path).ok().and_then(|s| {
         let trimmed = s.trim().to_string();
         if trimmed.is_empty() {
@@ -96,8 +96,8 @@ fn read_device_uuid(hcom_dir: &str) -> Option<String> {
     })
 }
 
-fn kill_daemon(hcom_dir: &str) {
-    let pid_path = Path::new(hcom_dir).join(".tmp").join("relay.pid");
+fn kill_daemon(nomadterm_dir: &str) {
+    let pid_path = Path::new(nomadterm_dir).join(".tmp").join("relay.pid");
     if let Ok(content) = fs::read_to_string(&pid_path) {
         if let Ok(pid) = content.trim().parse::<i32>() {
             unsafe {
@@ -130,8 +130,8 @@ impl Drop for RelayGuard {
         for dir in [&self.dir_a, &self.dir_b] {
             if let Some(d) = dir {
                 let d_str = d.to_string_lossy();
-                let _ = hcom_with_dir("relay off", &d_str);
-                let _ = hcom_with_dir("relay daemon stop", &d_str);
+                let _ = nomadterm_with_dir("relay off", &d_str);
+                let _ = nomadterm_with_dir("relay daemon stop", &d_str);
                 kill_daemon(&d_str);
                 let _ = fs::remove_dir_all(d);
             }
@@ -179,7 +179,7 @@ fn test_relay_roundtrip() {
     // Wait for connected
     poll_until(
         || {
-            let out = hcom_with_dir("relay status", &path_a);
+            let out = nomadterm_with_dir("relay status", &path_a);
             if out.status.success() {
                 let stdout = String::from_utf8_lossy(&out.stdout).to_lowercase();
                 if stdout.contains("connected") {
@@ -195,7 +195,7 @@ fn test_relay_roundtrip() {
     eprintln!("  OK: Device A connected to broker");
 
     let status_a =
-        String::from_utf8_lossy(&hcom_with_dir("relay status", &path_a).stdout).to_string();
+        String::from_utf8_lossy(&nomadterm_with_dir("relay status", &path_a).stdout).to_string();
     let short_a = parse_device_id(&status_a).expect("Could not parse Device A short ID");
     eprintln!("  OK: Device A short ID: {short_a}");
 
@@ -212,7 +212,7 @@ fn test_relay_roundtrip() {
 
     poll_until(
         || {
-            let out = hcom_with_dir("relay status", &path_a);
+            let out = nomadterm_with_dir("relay status", &path_a);
             if out.status.success() {
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 let lower = stdout.to_lowercase();
@@ -245,7 +245,7 @@ fn test_relay_roundtrip() {
     // relay connect auto-starts the daemon via ensure_worker; wait for it to connect
     poll_until(
         || {
-            let out = hcom_with_dir("relay status", &path_b);
+            let out = nomadterm_with_dir("relay status", &path_b);
             if out.status.success() {
                 let stdout = String::from_utf8_lossy(&out.stdout).to_lowercase();
                 if stdout.contains("connected") {
@@ -265,7 +265,7 @@ fn test_relay_roundtrip() {
 
     let (ev, data) = poll_until(
         || {
-            let out = hcom_with_dir("events --last 50", &path_b);
+            let out = nomadterm_with_dir("events --last 50", &path_b);
             if !out.status.success() {
                 eprintln!(
                     "    events cmd failed: {}",
@@ -338,13 +338,13 @@ fn test_relay_roundtrip() {
     eprintln!("\n[Phase 5] Device A: checking for Device B as remote...");
 
     let status_b =
-        String::from_utf8_lossy(&hcom_with_dir("relay status", &path_b).stdout).to_string();
+        String::from_utf8_lossy(&nomadterm_with_dir("relay status", &path_b).stdout).to_string();
     let short_b = parse_device_id(&status_b).expect("Could not parse Device B short ID");
     eprintln!("  OK: Device B short ID: {short_b}");
 
     let remote_line: String = poll_until(
         || {
-            let out = hcom_with_dir("relay status", &path_a);
+            let out = nomadterm_with_dir("relay status", &path_a);
             if !out.status.success() {
                 return None;
             }
@@ -383,7 +383,7 @@ fn test_relay_roundtrip() {
 
     poll_until(
         || {
-            let out = hcom_with_dir("relay status", &path_b);
+            let out = nomadterm_with_dir("relay status", &path_b);
             if out.status.success() {
                 let lower = String::from_utf8_lossy(&out.stdout).to_lowercase();
                 if lower.contains("up to date") {
@@ -403,7 +403,7 @@ fn test_relay_roundtrip() {
 
     let (_, data_b) = poll_until(
         || {
-            let out = hcom_with_dir("events --last 50", &path_a);
+            let out = nomadterm_with_dir("events --last 50", &path_a);
             if !out.status.success() {
                 return None;
             }

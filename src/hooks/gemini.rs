@@ -8,13 +8,13 @@ use std::time::Instant;
 
 use serde_json::Value;
 
-use crate::db::{HcomDb, InstanceRow};
+use crate::db::{NomadtermDb, InstanceRow};
 use crate::hooks::common;
 use crate::hooks::{HookPayload, HookResult};
 use crate::instances;
 use crate::log;
 use crate::shared::constants::BIND_MARKER_RE;
-use crate::shared::context::HcomContext;
+use crate::shared::context::NomadtermContext;
 use crate::shared::{ST_ACTIVE, ST_BLOCKED, ST_LISTENING};
 
 /// Derive Gemini CLI transcript path from session_id.
@@ -119,7 +119,7 @@ fn matches_session_pattern(filename: &str, pattern: &str) -> bool {
 ///
 /// Gemini's ChatRecordingService isn't initialized at SessionStart,
 /// so transcript_path is empty. It becomes available at BeforeAgent/AfterAgent.
-fn try_capture_transcript_path(db: &HcomDb, instance_name: &str, payload: &HookPayload) {
+fn try_capture_transcript_path(db: &NomadtermDb, instance_name: &str, payload: &HookPayload) {
     let instance = match db.get_instance_full(instance_name) {
         Ok(Some(data)) => data,
         _ => return,
@@ -155,12 +155,12 @@ fn try_capture_transcript_path(db: &HcomDb, instance_name: &str, payload: &HookP
 }
 
 /// Resolve instance using process binding or session binding.
-fn resolve_instance_gemini(db: &HcomDb, payload: &HookPayload) -> Option<InstanceRow> {
+fn resolve_instance_gemini(db: &NomadtermDb, payload: &HookPayload) -> Option<InstanceRow> {
     instances::resolve_instance_from_binding(db, payload.session_id.as_deref(), None)
 }
 
 /// Bind vanilla Gemini instance by parsing tool_result for [nomadterm:X] marker.
-fn bind_vanilla_instance(db: &HcomDb, payload: &HookPayload) -> Option<String> {
+fn bind_vanilla_instance(db: &NomadtermDb, payload: &HookPayload) -> Option<String> {
     // Skip if no pending instances (optimization)
     let pending = common::get_pending_instances(db);
     if pending.is_empty() {
@@ -194,13 +194,13 @@ fn bind_vanilla_instance(db: &HcomDb, payload: &HookPayload) -> Option<String> {
 ///
 /// NOMADTERM-launched: bind session_id, inject bootstrap if not announced.
 /// Vanilla: show nomadterm hint.
-fn handle_sessionstart(db: &HcomDb, ctx: &HcomContext, payload: &HookPayload) -> HookResult {
+fn handle_sessionstart(db: &NomadtermDb, ctx: &NomadtermContext, payload: &HookPayload) -> HookResult {
     if ctx.process_id.is_none() {
         // Vanilla instance - show hint
         return HookResult::Allow {
             additional_context: Some(format!(
                 "[nomadterm available - run '{} start' to participate]",
-                crate::runtime_env::build_hcom_command()
+                crate::runtime_env::build_nomadterm_command()
             )),
             system_message: None,
         };
@@ -286,7 +286,7 @@ fn handle_sessionstart(db: &HcomDb, ctx: &HcomContext, payload: &HookPayload) ->
 ///
 /// Fallback bootstrap if SessionStart injection failed.
 /// Also delivers pending messages and binds session_id for fresh instances.
-fn handle_beforeagent(db: &HcomDb, ctx: &HcomContext, payload: &HookPayload) -> HookResult {
+fn handle_beforeagent(db: &NomadtermDb, ctx: &NomadtermContext, payload: &HookPayload) -> HookResult {
     let instance = match resolve_instance_gemini(db, payload) {
         Some(inst) => inst,
         None => return hook_noop(),
@@ -364,7 +364,7 @@ fn handle_beforeagent(db: &HcomDb, ctx: &HcomContext, payload: &HookPayload) -> 
 }
 
 /// Handle AfterAgent hook - fires when agent turn completes.
-fn handle_afteragent(db: &HcomDb, _ctx: &HcomContext, payload: &HookPayload) -> HookResult {
+fn handle_afteragent(db: &NomadtermDb, _ctx: &NomadtermContext, payload: &HookPayload) -> HookResult {
     let instance = match resolve_instance_gemini(db, payload) {
         Some(inst) => inst,
         None => return hook_noop(),
@@ -377,7 +377,7 @@ fn handle_afteragent(db: &HcomDb, _ctx: &HcomContext, payload: &HookPayload) -> 
 }
 
 /// Handle BeforeTool hook - fires before tool execution.
-fn handle_beforetool(db: &HcomDb, _ctx: &HcomContext, payload: &HookPayload) -> HookResult {
+fn handle_beforetool(db: &NomadtermDb, _ctx: &NomadtermContext, payload: &HookPayload) -> HookResult {
     let instance = match resolve_instance_gemini(db, payload) {
         Some(inst) => inst,
         None => return hook_noop(),
@@ -397,7 +397,7 @@ fn handle_beforetool(db: &HcomDb, _ctx: &HcomContext, payload: &HookPayload) -> 
 ///
 /// Vanilla binding: detects [nomadterm:X] marker from nomadterm start output.
 /// Bootstrap injection and message delivery via additionalContext.
-fn handle_aftertool(db: &HcomDb, ctx: &HcomContext, payload: &HookPayload) -> HookResult {
+fn handle_aftertool(db: &NomadtermDb, ctx: &NomadtermContext, payload: &HookPayload) -> HookResult {
     let mut instance: Option<InstanceRow> = None;
 
     // Vanilla binding: try tool_response first (immediate)
@@ -445,7 +445,7 @@ fn handle_aftertool(db: &HcomDb, ctx: &HcomContext, payload: &HookPayload) -> Ho
 }
 
 /// Handle Notification hook - fires on approval prompts, etc.
-fn handle_notification(db: &HcomDb, _ctx: &HcomContext, payload: &HookPayload) -> HookResult {
+fn handle_notification(db: &NomadtermDb, _ctx: &NomadtermContext, payload: &HookPayload) -> HookResult {
     let instance = match resolve_instance_gemini(db, payload) {
         Some(inst) => inst,
         None => return hook_noop(),
@@ -465,7 +465,7 @@ fn handle_notification(db: &HcomDb, _ctx: &HcomContext, payload: &HookPayload) -
 }
 
 /// Handle SessionEnd hook - fires when a session ends.
-fn handle_sessionend(db: &HcomDb, _ctx: &HcomContext, payload: &HookPayload) -> HookResult {
+fn handle_sessionend(db: &NomadtermDb, _ctx: &NomadtermContext, payload: &HookPayload) -> HookResult {
     let instance = match resolve_instance_gemini(db, payload) {
         Some(inst) => inst,
         None => return hook_noop(),
@@ -490,7 +490,7 @@ fn hook_noop() -> HookResult {
 }
 
 /// Gemini hook handler name → function dispatch.
-fn get_handler(hook_name: &str) -> Option<fn(&HcomDb, &HcomContext, &HookPayload) -> HookResult> {
+fn get_handler(hook_name: &str) -> Option<fn(&NomadtermDb, &NomadtermContext, &HookPayload) -> HookResult> {
     match hook_name {
         "gemini-sessionstart" => Some(handle_sessionstart),
         "gemini-beforeagent" => Some(handle_beforeagent),
@@ -505,14 +505,14 @@ fn get_handler(hook_name: &str) -> Option<fn(&HcomDb, &HcomContext, &HookPayload
 
 /// Main entry point for Gemini hooks — called by router.
 ///
-/// Reads stdin JSON, builds HookPayload + HcomContext, dispatches to handler.
+/// Reads stdin JSON, builds HookPayload + NomadtermContext, dispatches to handler.
 /// Prints JSON to stdout (additionalContext for Gemini to inject).
 ///
 pub fn dispatch_gemini_hook(hook_name: &str) -> i32 {
     let start = Instant::now();
 
     // Build context from environment
-    let ctx = HcomContext::from_os();
+    let ctx = NomadtermContext::from_os();
 
     // Read stdin JSON
     let stdin_json: Value = match serde_json::from_reader(std::io::stdin().lock()) {
@@ -530,7 +530,7 @@ pub fn dispatch_gemini_hook(hook_name: &str) -> i32 {
             None => return 0,
         };
         // Quick DB check for session binding
-        if let Ok(db) = HcomDb::open() {
+        if let Ok(db) = NomadtermDb::open() {
             if db.get_session_binding(sid).ok().flatten().is_none() {
                 return 0;
             }
@@ -541,13 +541,13 @@ pub fn dispatch_gemini_hook(hook_name: &str) -> i32 {
 
     // Ensure nomadterm directories exist
     let init_start = Instant::now();
-    if !crate::paths::ensure_hcom_directories() {
+    if !crate::paths::ensure_nomadterm_directories() {
         return 0;
     }
     let init_ms = init_start.elapsed().as_secs_f64() * 1000.0;
 
     // Open DB
-    let db = match HcomDb::open() {
+    let db = match NomadtermDb::open() {
         Ok(db) => db,
         Err(e) => {
             log::log_error("hooks", "gemini.db.error", &format!("{}", e));
@@ -701,7 +701,7 @@ pub fn is_gemini_version_supported() -> bool {
 }
 
 /// Safe nomadterm commands for Gemini auto-approval permission patterns.
-use super::common::SAFE_HCOM_COMMANDS;
+use super::common::SAFE_NOMADTERM_COMMANDS;
 
 /// Hook configuration: (hook_type, matcher, command_suffix, timeout, description).
 const GEMINI_HOOK_CONFIGS: &[(&str, &str, &str, u32, &str)] = &[
@@ -760,7 +760,7 @@ const GEMINI_HOOK_CONFIGS: &[(&str, &str, &str, u32, &str)] = &[
 fn build_all_permission_patterns() -> Vec<String> {
     let mut patterns = Vec::new();
     for prefix in &["nomadterm", "uvx nomadterm"] {
-        for cmd in SAFE_HCOM_COMMANDS {
+        for cmd in SAFE_NOMADTERM_COMMANDS {
             patterns.push(format!("run_shell_command({} {})", prefix, cmd));
         }
     }
@@ -769,7 +769,7 @@ fn build_all_permission_patterns() -> Vec<String> {
 
 /// Get path to Gemini policies directory.
 ///
-/// If HCOM_DIR is set (sandbox), uses HCOM_DIR parent.
+/// If NOMADTERM_DIR is set (sandbox), uses NOMADTERM_DIR parent.
 /// Otherwise uses global (~/.gemini/policies/).
 fn get_gemini_policies_path() -> PathBuf {
     crate::runtime_env::tool_config_root()
@@ -782,8 +782,8 @@ fn get_gemini_policies_path() -> PathBuf {
 /// Uses commandPrefix array to allow all safe nomadterm commands in a single rule.
 /// Matches the Codex pattern of a separate, self-contained permission file.
 fn build_gemini_policy() -> String {
-    let prefix = crate::runtime_env::build_hcom_command();
-    let command_prefixes: Vec<String> = SAFE_HCOM_COMMANDS
+    let prefix = crate::runtime_env::build_nomadterm_command();
+    let command_prefixes: Vec<String> = SAFE_NOMADTERM_COMMANDS
         .iter()
         .map(|cmd| format!("  \"{} {}\"", prefix, cmd))
         .collect();
@@ -842,7 +842,7 @@ fn remove_policy_from_path(policies_dir: &Path) -> bool {
 
 /// Get path to Gemini settings file.
 ///
-/// If HCOM_DIR is set (sandbox), uses HCOM_DIR parent.
+/// If NOMADTERM_DIR is set (sandbox), uses NOMADTERM_DIR parent.
 /// Otherwise uses global (~/.gemini/settings.json).
 pub fn get_gemini_settings_path() -> PathBuf {
     crate::runtime_env::tool_config_root()
@@ -858,7 +858,7 @@ fn load_gemini_settings(path: &Path) -> Option<serde_json::Map<String, Value>> {
 }
 
 /// Check if a hook dict is an nomadterm hook.
-fn is_hcom_hook(hook: &Value) -> bool {
+fn is_nomadterm_hook(hook: &Value) -> bool {
     let command = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
     let name = hook.get("name").and_then(|v| v.as_str()).unwrap_or("");
     // Check for nomadterm-related patterns
@@ -904,7 +904,7 @@ fn is_hooks_enabled(settings: &serde_json::Map<String, Value>) -> bool {
 /// Remove nomadterm hooks from Gemini settings dict (in-place).
 ///
 /// Only removes nomadterm-specific hooks, preserving user hooks.
-fn remove_hcom_hooks_from_settings(settings: &mut serde_json::Map<String, Value>) {
+fn remove_nomadterm_hooks_from_settings(settings: &mut serde_json::Map<String, Value>) {
     if let Some(hooks_val) = settings.get_mut("hooks") {
         if let Some(hooks) = hooks_val.as_object_mut() {
             let hook_types: Vec<String> = hooks.keys().cloned().collect();
@@ -916,14 +916,14 @@ fn remove_hcom_hooks_from_settings(settings: &mut serde_json::Map<String, Value>
                             if let Some(hook_list) =
                                 matcher_obj.get("hooks").and_then(|v| v.as_array())
                             {
-                                let non_hcom: Vec<Value> = hook_list
+                                let non_nomadterm: Vec<Value> = hook_list
                                     .iter()
-                                    .filter(|h| !is_hcom_hook(h))
+                                    .filter(|h| !is_nomadterm_hook(h))
                                     .cloned()
                                     .collect();
-                                if !non_hcom.is_empty() {
+                                if !non_nomadterm.is_empty() {
                                     let mut new_matcher = matcher_obj.clone();
-                                    new_matcher.insert("hooks".into(), Value::Array(non_hcom));
+                                    new_matcher.insert("hooks".into(), Value::Array(non_nomadterm));
                                     updated.push(Value::Object(new_matcher));
                                 } else if !matcher_obj.contains_key("hooks") {
                                     updated.push(matcher.clone());
@@ -1032,7 +1032,7 @@ pub fn setup_gemini_hooks(include_permissions: bool) -> bool {
     let mut settings = load_gemini_settings(&settings_path).unwrap_or_default();
 
     // Remove existing nomadterm hooks (clean slate)
-    remove_hcom_hooks_from_settings(&mut settings);
+    remove_nomadterm_hooks_from_settings(&mut settings);
 
     // Ensure tools.enableHooks = true
     if !settings.contains_key("tools") {
@@ -1062,7 +1062,7 @@ pub fn setup_gemini_hooks(include_permissions: bool) -> bool {
         remove_gemini_policy();
     }
 
-    let hcom_cmd = crate::runtime_env::build_hcom_command();
+    let nomadterm_cmd = crate::runtime_env::build_nomadterm_command();
 
     // Set hooksConfig.enabled
     set_hooks_enabled(&mut settings);
@@ -1081,7 +1081,7 @@ pub fn setup_gemini_hooks(include_permissions: bool) -> bool {
                 "hooks": [{
                     "name": hook_name,
                     "type": "command",
-                    "command": format!("{} {}", hcom_cmd, cmd_suffix),
+                    "command": format!("{} {}", nomadterm_cmd, cmd_suffix),
                     "timeout": timeout,
                     "description": description,
                 }]
@@ -1139,7 +1139,7 @@ fn verify_hooks_at(settings_path: &Path, check_permissions: bool) -> bool {
         None => return false,
     };
 
-    let expected_hcom_cmd = crate::runtime_env::build_hcom_command();
+    let expected_nomadterm_cmd = crate::runtime_env::build_nomadterm_command();
 
     for &(hook_type, expected_matcher, cmd_suffix, expected_timeout, _) in GEMINI_HOOK_CONFIGS {
         let hook_matchers = match hooks.get(hook_type).and_then(|v| v.as_array()) {
@@ -1147,7 +1147,7 @@ fn verify_hooks_at(settings_path: &Path, check_permissions: bool) -> bool {
             _ => return false,
         };
 
-        let expected_command = format!("{} {}", expected_hcom_cmd, cmd_suffix);
+        let expected_command = format!("{} {}", expected_nomadterm_cmd, cmd_suffix);
         let expected_name = format!("nomadterm-{}", hook_type.to_lowercase());
         let mut found = false;
 
@@ -1167,7 +1167,7 @@ fn verify_hooks_at(settings_path: &Path, check_permissions: bool) -> bool {
             };
 
             for hook in matcher_hooks {
-                if is_hcom_hook(hook) {
+                if is_nomadterm_hook(hook) {
                     if found {
                         return false; // Duplicate
                     }
@@ -1249,7 +1249,7 @@ fn remove_hooks_from_path(path: &Path) -> bool {
         None => return true,
     };
 
-    remove_hcom_hooks_from_settings(&mut settings);
+    remove_nomadterm_hooks_from_settings(&mut settings);
 
     let json_str = serde_json::to_string_pretty(&Value::Object(settings)).unwrap_or_default();
     crate::paths::atomic_write(path, &json_str)
@@ -1657,20 +1657,20 @@ mod tests {
     }
 
     #[test]
-    fn test_is_hcom_hook() {
-        let hcom_hook = serde_json::json!({
+    fn test_is_nomadterm_hook() {
+        let nomadterm_hook = serde_json::json!({
             "name": "nomadterm-sessionstart",
             "type": "command",
             "command": "nomadterm gemini-sessionstart"
         });
-        assert!(is_hcom_hook(&hcom_hook));
+        assert!(is_nomadterm_hook(&nomadterm_hook));
 
         let user_hook = serde_json::json!({
             "name": "my-hook",
             "type": "command",
             "command": "/usr/local/bin/my-script"
         });
-        assert!(!is_hcom_hook(&user_hook));
+        assert!(!is_nomadterm_hook(&user_hook));
     }
 
     #[test]
@@ -1698,7 +1698,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_hcom_hooks_preserves_user_hooks() {
+    fn test_remove_nomadterm_hooks_preserves_user_hooks() {
         let mut settings: serde_json::Map<String, Value> = serde_json::from_value(serde_json::json!({
             "hooks": {
                 "SessionStart": [{
@@ -1711,7 +1711,7 @@ mod tests {
             }
         })).unwrap();
 
-        remove_hcom_hooks_from_settings(&mut settings);
+        remove_nomadterm_hooks_from_settings(&mut settings);
 
         // User hook should be preserved
         let hooks = settings.get("hooks").unwrap();
@@ -1726,7 +1726,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_hcom_hooks_drops_empty() {
+    fn test_remove_nomadterm_hooks_drops_empty() {
         let mut settings: serde_json::Map<String, Value> = serde_json::from_value(serde_json::json!({
             "hooks": {
                 "SessionStart": [{
@@ -1738,7 +1738,7 @@ mod tests {
             }
         })).unwrap();
 
-        remove_hcom_hooks_from_settings(&mut settings);
+        remove_nomadterm_hooks_from_settings(&mut settings);
 
         // hooks dict should be removed (all empty)
         assert!(settings.get("hooks").is_none());
@@ -1760,14 +1760,14 @@ mod tests {
     #[serial]
     fn test_setup_and_verify_gemini_hooks() {
         let dir = tempfile::tempdir().unwrap();
-        let hcom_dir = dir.path().join(".nomadterm");
-        std::fs::create_dir_all(&hcom_dir).unwrap();
+        let nomadterm_dir = dir.path().join(".nomadterm");
+        std::fs::create_dir_all(&nomadterm_dir).unwrap();
         let settings_dir = dir.path().join(".gemini");
         std::fs::create_dir_all(&settings_dir).unwrap();
 
-        // Redirect paths via HCOM_DIR
-        let saved = std::env::var("HCOM_DIR").ok();
-        unsafe { std::env::set_var("HCOM_DIR", &hcom_dir) };
+        // Redirect paths via NOMADTERM_DIR
+        let saved = std::env::var("NOMADTERM_DIR").ok();
+        unsafe { std::env::set_var("NOMADTERM_DIR", &nomadterm_dir) };
 
         let success = setup_gemini_hooks(true);
         assert!(success, "setup should succeed");
@@ -1799,9 +1799,9 @@ mod tests {
 
         // Restore
         if let Some(v) = saved {
-            unsafe { std::env::set_var("HCOM_DIR", v) };
+            unsafe { std::env::set_var("NOMADTERM_DIR", v) };
         } else {
-            unsafe { std::env::remove_var("HCOM_DIR") };
+            unsafe { std::env::remove_var("NOMADTERM_DIR") };
         }
     }
 
@@ -1885,13 +1885,13 @@ mod tests {
     use serial_test::serial;
 
     fn gemini_test_env() -> (tempfile::TempDir, PathBuf, PathBuf, EnvGuard) {
-        let (dir, _hcom_dir, test_home, guard) = isolated_test_env();
+        let (dir, _nomadterm_dir, test_home, guard) = isolated_test_env();
         let settings_path = test_home.join(".gemini").join("settings.json");
         (dir, test_home, settings_path, guard)
     }
 
     /// Independent verification: check no nomadterm hooks present in settings JSON.
-    fn independently_verify_no_hcom_hooks(settings: &Value) -> Vec<String> {
+    fn independently_verify_no_nomadterm_hooks(settings: &Value) -> Vec<String> {
         let mut violations = Vec::new();
         let hooks = match settings.get("hooks").and_then(|v| v.as_object()) {
             Some(h) => h,
@@ -1925,11 +1925,11 @@ mod tests {
     }
 
     /// Independent verification: check expected nomadterm hooks are present.
-    fn independently_verify_hcom_hooks_present(
+    fn independently_verify_nomadterm_hooks_present(
         settings: &Value,
         expected: &[(&str, &str)], // (hook_type, cmd_suffix)
     ) -> Vec<String> {
-        let hcom_cmd = crate::runtime_env::build_hcom_command();
+        let nomadterm_cmd = crate::runtime_env::build_nomadterm_command();
         let mut missing = Vec::new();
         let hooks = match settings.get("hooks").and_then(|v| v.as_object()) {
             Some(h) => h,
@@ -1941,7 +1941,7 @@ mod tests {
             }
         };
         for &(hook_type, cmd_suffix) in expected {
-            let expected_full = format!("{} {}", hcom_cmd, cmd_suffix);
+            let expected_full = format!("{} {}", nomadterm_cmd, cmd_suffix);
             let matchers = match hooks.get(hook_type).and_then(|v| v.as_array()) {
                 Some(a) => a,
                 None => {
@@ -2043,7 +2043,7 @@ mod tests {
             assert_eq!(hook["timeout"].as_u64().unwrap(), expected_timeout as u64);
             let expected_command = format!(
                 "{} {}",
-                crate::runtime_env::build_hcom_command(),
+                crate::runtime_env::build_nomadterm_command(),
                 cmd_suffix
             );
             assert_eq!(
@@ -2218,7 +2218,7 @@ mod tests {
         assert_eq!(remaining[0]["name"], "keep-other");
 
         // Independent check: no nomadterm hooks remain
-        let violations = independently_verify_no_hcom_hooks(&updated);
+        let violations = independently_verify_no_nomadterm_hooks(&updated);
         assert!(violations.is_empty(), "nomadterm hooks remain: {violations:?}");
 
         drop(_guard);
@@ -2345,7 +2345,7 @@ mod tests {
             .iter()
             .map(|&(ht, _, cmd, _, _)| (ht, cmd))
             .collect();
-        let missing = independently_verify_hcom_hooks_present(&after_setup, &expected);
+        let missing = independently_verify_nomadterm_hooks_present(&after_setup, &expected);
         assert!(
             missing.is_empty(),
             "after setup, missing hooks: {missing:?}"
@@ -2354,7 +2354,7 @@ mod tests {
         // Remove
         assert!(remove_hooks_from_path(&settings_path));
         let after_remove = read_json(&settings_path);
-        let violations = independently_verify_no_hcom_hooks(&after_remove);
+        let violations = independently_verify_no_nomadterm_hooks(&after_remove);
         assert!(
             violations.is_empty(),
             "after remove, nomadterm hooks still present: {violations:?}"
@@ -2382,7 +2382,7 @@ mod tests {
             .iter()
             .map(|&(ht, _, cmd, _, _)| (ht, cmd))
             .collect();
-        let missing = independently_verify_hcom_hooks_present(&settings, &expected);
+        let missing = independently_verify_nomadterm_hooks_present(&settings, &expected);
         assert!(missing.is_empty(), "missing hooks: {missing:?}");
 
         drop(_guard);
@@ -2402,7 +2402,7 @@ mod tests {
             .iter()
             .map(|&(ht, _, cmd, _, _)| (ht, cmd))
             .collect();
-        let missing = independently_verify_hcom_hooks_present(&settings, &expected);
+        let missing = independently_verify_nomadterm_hooks_present(&settings, &expected);
         assert!(missing.is_empty(), "missing hooks: {missing:?}");
 
         drop(_guard);
@@ -2410,7 +2410,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_gemini_mixed_hcom_and_user_hooks() {
+    fn test_gemini_mixed_nomadterm_and_user_hooks() {
         let (_dir, _test_home, settings_path, _guard) = gemini_test_env();
 
         std::fs::create_dir_all(settings_path.parent().unwrap()).unwrap();
@@ -2445,7 +2445,7 @@ mod tests {
         assert_eq!(hooks_list[0]["name"], "my-logger");
 
         // No nomadterm hooks
-        let violations = independently_verify_no_hcom_hooks(&updated);
+        let violations = independently_verify_no_nomadterm_hooks(&updated);
         assert!(violations.is_empty());
 
         drop(_guard);

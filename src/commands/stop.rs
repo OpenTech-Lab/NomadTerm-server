@@ -4,7 +4,7 @@
 //! Supports: self-stop, named stop, multi-stop, `all`, `tag:<name>`.
 //! Inside AI tools, destructive ops require `--go` flag.
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::hooks::common::stop_instance;
 use crate::identity;
 use crate::instances::{
@@ -24,7 +24,7 @@ pub struct StopArgs {
 
 /// Resolve the initiator name for event logging.
 fn resolve_initiator(
-    db: &HcomDb,
+    db: &NomadtermDb,
     ctx: Option<&CommandContext>,
     explicit_name: Option<&str>,
 ) -> String {
@@ -47,7 +47,7 @@ fn resolve_initiator(
 /// Main entry point for `nomadterm stop` command.
 ///
 /// Returns exit code (0 = success, 1 = error).
-pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_stop(db: &NomadtermDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i32 {
     let explicit_name = ctx.and_then(|c| c.explicit_name.as_deref());
 
     let targets: Vec<&str> = args.targets.iter().map(|s| s.as_str()).collect();
@@ -132,7 +132,7 @@ pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i
 
         if tag_matches.is_empty() {
             // Check orphans for this tag (already stopped but process may still be running)
-            let orphans = crate::pidtrack::get_orphan_processes(&crate::paths::hcom_dir(), None);
+            let orphans = crate::pidtrack::get_orphan_processes(&crate::paths::nomadterm_dir(), None);
             let tagged_orphans: Vec<_> = orphans.iter().filter(|o| o.tag == tag).collect();
             if !tagged_orphans.is_empty() {
                 let names: Vec<_> = tagged_orphans
@@ -309,7 +309,7 @@ pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i
     if is_remote_instance(&position) {
         if instance_name.contains(':') {
             let (name, device_short_id) = instance_name.rsplit_once(':').unwrap();
-            let config = crate::config::HcomConfig::load(None).unwrap_or_default();
+            let config = crate::config::NomadtermConfig::load(None).unwrap_or_default();
             if crate::relay::control::send_control_ephemeral(&config, "stop", name, device_short_id)
             {
                 println!("Stop sent to {instance_name}");

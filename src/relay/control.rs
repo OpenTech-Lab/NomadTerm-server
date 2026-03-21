@@ -8,8 +8,8 @@ use rumqttc::v5::mqttbytes::QoS;
 use serde_json::{Value, json};
 use std::time::Duration;
 
-use crate::config::HcomConfig;
-use crate::db::HcomDb;
+use crate::config::NomadtermConfig;
+use crate::db::NomadtermDb;
 use crate::log;
 
 use super::{
@@ -18,7 +18,7 @@ use super::{
 
 /// Build control payload JSON bytes. Returns (topic, payload_bytes) or None.
 fn build_control_payload(
-    config: &HcomConfig,
+    config: &NomadtermConfig,
     action: &str,
     target: &str,
     target_device_short_id: &str,
@@ -60,7 +60,7 @@ fn build_control_payload(
 
 /// Send a control command to a remote device via MQTT using the daemon's long-lived client.
 pub fn send_control(
-    config: &HcomConfig,
+    config: &NomadtermConfig,
     client: &Client,
     action: &str,
     target: &str,
@@ -95,7 +95,7 @@ pub fn send_control(
 
 /// Send a control command via an ephemeral client, waiting for PUBACK (5s timeout).
 fn send_control_via_ephemeral(
-    config: &HcomConfig,
+    config: &NomadtermConfig,
     client: &super::client::EphemeralClient,
     action: &str,
     target: &str,
@@ -136,7 +136,7 @@ fn send_control_via_ephemeral(
 /// Send a control command using an ephemeral client (for CLI callers without
 /// a long-lived relay connection). Waits for PUBACK (up to 5s) before disconnecting.
 pub fn send_control_ephemeral(
-    config: &HcomConfig,
+    config: &NomadtermConfig,
     action: &str,
     target: &str,
     target_device_short_id: &str,
@@ -156,7 +156,7 @@ pub fn send_control_ephemeral(
 /// Process incoming control events targeting this device.
 /// Deduplicates by timestamp to avoid re-processing.
 pub fn handle_control_events(
-    db: &HcomDb,
+    db: &NomadtermDb,
     events: &[Value],
     own_short_id: &str,
     source_device: &str,
@@ -265,7 +265,7 @@ mod tests {
 
         // own_short_id is "WXYZ" — event targets "ABCD", so nothing should happen
         let db =
-            HcomDb::open_at(&tempfile::NamedTempFile::new().unwrap().into_temp_path()).unwrap();
+            NomadtermDb::open_at(&tempfile::NamedTempFile::new().unwrap().into_temp_path()).unwrap();
         handle_control_events(&db, &events, "WXYZ", "device-123");
 
         // No crash, no panic — event was filtered

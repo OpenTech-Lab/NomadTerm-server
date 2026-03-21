@@ -371,14 +371,14 @@ pub fn resolve_action(argv: &[String]) -> Action {
     }
 }
 
-// ── HCOM_DEV_ROOT re-exec ───────────────────────────────────────────────
+// ── NOMADTERM_DEV_ROOT re-exec ───────────────────────────────────────────────
 
-/// If HCOM_DEV_ROOT is set and points to a different worktree, re-exec using
+/// If NOMADTERM_DEV_ROOT is set and points to a different worktree, re-exec using
 /// that worktree's binary.
-/// so worktree development works: `HCOM_DEV_ROOT=/path/to/worktree nomadterm list`
+/// so worktree development works: `NOMADTERM_DEV_ROOT=/path/to/worktree nomadterm list`
 /// will run the worktree's nomadterm binary instead of the installed one.
 pub fn maybe_reexec_dev_root() {
-    let dev_root = match env::var("HCOM_DEV_ROOT") {
+    let dev_root = match env::var("NOMADTERM_DEV_ROOT") {
         Ok(r) if !r.is_empty() => PathBuf::from(r),
         _ => return,
     };
@@ -406,7 +406,7 @@ pub fn maybe_reexec_dev_root() {
             "router",
             "dev_root_no_binary",
             &format!(
-                "HCOM_DEV_ROOT={} set but no dev binary found (checked {} and {}). Run build.sh in the worktree.",
+                "NOMADTERM_DEV_ROOT={} set but no dev binary found (checked {} and {}). Run build.sh in the worktree.",
                 dev_root.display(),
                 dev_binary.display(),
                 dev_binary_cargo.display()
@@ -479,7 +479,7 @@ fn is_same_file(a: &Path, b: &Path) -> bool {
 
 /// Main entry point: resolve action and dispatch.
 pub fn dispatch() -> anyhow::Result<()> {
-    // HCOM_DEV_ROOT re-exec (must happen before anything else)
+    // NOMADTERM_DEV_ROOT re-exec (must happen before anything else)
     maybe_reexec_dev_root();
 
     let args: Vec<String> = env::args().collect();
@@ -704,7 +704,7 @@ fn launch_new_terminal() -> i32 {
     // Pass through NOMADTERM env vars
     let mut env_vars = HashMap::new();
     for (k, v) in env::vars() {
-        if k.starts_with("HCOM_") {
+        if k.starts_with("NOMADTERM_") {
             env_vars.insert(k, v);
         }
     }
@@ -741,7 +741,7 @@ fn launch_new_terminal() -> i32 {
 /// Args are the full argv[1..] (includes the command name and global flags).
 fn dispatch_native_command(cmd: &str, args: &[String]) -> i32 {
     use crate::cli_context::build_ctx_for_command;
-    use crate::db::HcomDb;
+    use crate::db::NomadtermDb;
 
     // Extract global flags (--name, --go, --help) from anywhere in args,
     // respecting -- separator. Uses full scan (not clap) so --name works
@@ -764,7 +764,7 @@ fn dispatch_native_command(cmd: &str, args: &[String]) -> i32 {
     }
 
     // Open DB and ensure schema exists
-    let db = match HcomDb::open() {
+    let db = match NomadtermDb::open() {
         Ok(db) => {
             if let Err(e) = db.init_db() {
                 eprintln!("Error: Failed to initialize database schema: {e}");
@@ -779,7 +779,7 @@ fn dispatch_native_command(cmd: &str, args: &[String]) -> i32 {
     };
 
     // Build context (identity resolution, --go flag)
-    let process_id = std::env::var("HCOM_PROCESS_ID")
+    let process_id = std::env::var("NOMADTERM_PROCESS_ID")
         .ok()
         .filter(|s| !s.is_empty());
     let codex_thread_id = std::env::var("CODEX_THREAD_ID")
@@ -1310,7 +1310,7 @@ mod tests {
 
     #[test]
     fn is_same_file_works() {
-        let tmp = std::env::temp_dir().join("hcom_test_same_file");
+        let tmp = std::env::temp_dir().join("nomadterm_test_same_file");
         let _ = std::fs::write(&tmp, "test");
         assert!(is_same_file(&tmp, &tmp));
         let _ = std::fs::remove_file(&tmp);

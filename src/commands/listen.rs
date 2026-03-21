@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use crate::core::filters::{EventFilterArgs, build_sql_from_flags, resolve_filter_names};
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::identity;
 use crate::instances::{self, StatusUpdate, get_display_name, set_status};
 use crate::notify::NotifyServer;
@@ -39,7 +39,7 @@ pub struct ListenArgs {
 
 /// Initialize heartbeat for the listening instance.
 /// Writes last_stop + wait_timeout to instances table
-fn init_heartbeat(db: &HcomDb, instance_name: &str, timeout: f64) {
+fn init_heartbeat(db: &NomadtermDb, instance_name: &str, timeout: f64) {
     let now = crate::shared::time::now_epoch_i64();
 
     let mut updates = serde_json::Map::new();
@@ -50,7 +50,7 @@ fn init_heartbeat(db: &HcomDb, instance_name: &str, timeout: f64) {
 
 /// Update heartbeat timestamp.
 /// Writes last_stop to instances table so stale-cleanup sees the agent as alive.
-fn update_heartbeat(db: &HcomDb, instance_name: &str) {
+fn update_heartbeat(db: &NomadtermDb, instance_name: &str) {
     let now = crate::shared::time::now_epoch_i64();
 
     let mut updates = serde_json::Map::new();
@@ -60,7 +60,7 @@ fn update_heartbeat(db: &HcomDb, instance_name: &str) {
 
 /// Format messages as JSON for model consumption.
 fn format_messages_json(
-    db: &HcomDb,
+    db: &NomadtermDb,
     messages: &[crate::db::Message],
     instance_name: &str,
 ) -> String {
@@ -109,7 +109,7 @@ fn build_prefix(intent: Option<&str>, thread: Option<&str>, event_id: Option<i64
 /// Main entry point for `nomadterm listen` command.
 ///
 /// Returns exit code (0 = success, 1 = error, 130 = interrupted).
-pub fn cmd_listen(db: &HcomDb, args: &ListenArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_listen(db: &NomadtermDb, args: &ListenArgs, ctx: Option<&CommandContext>) -> i32 {
     let explicit_name = ctx.and_then(|c| c.explicit_name.as_deref());
 
     // Resolve identity
@@ -302,7 +302,7 @@ pub fn cmd_listen(db: &HcomDb, args: &ListenArgs, ctx: Option<&CommandContext>) 
 
 #[allow(clippy::too_many_arguments)]
 fn listen_loop(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     timeout: f64,
     json_output: bool,
@@ -452,7 +452,7 @@ fn listen_loop(
 
 /// Listen with SQL filter — uses temp subscription.
 fn listen_with_filter(
-    db: &HcomDb,
+    db: &NomadtermDb,
     sql_filter: &str,
     instance_name: &str,
     timeout: f64,
@@ -565,7 +565,7 @@ fn listen_with_filter(
 
 #[allow(clippy::too_many_arguments)]
 fn filter_listen_loop(
-    db: &HcomDb,
+    db: &NomadtermDb,
     instance_name: &str,
     sub_id: &str,
     timeout: f64,

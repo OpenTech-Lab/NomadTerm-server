@@ -3,7 +3,7 @@
 //!
 //! Manages hook installation across Claude, Gemini, Codex, and OpenCode.
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::shared::CommandContext;
 
 /// Parsed arguments for `nomadterm hooks`.
@@ -274,7 +274,7 @@ fn detect_current_tool() -> &'static str {
     crate::shared::detect_current_tool_from_env()
 }
 
-pub fn cmd_hooks(_db: &HcomDb, args: &HooksArgs, _ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_hooks(_db: &NomadtermDb, args: &HooksArgs, _ctx: Option<&CommandContext>) -> i32 {
     let argv = &args.args;
     if argv.is_empty() {
         // No args = show status

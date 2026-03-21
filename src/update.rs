@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::paths::{FLAGS_DIR, atomic_write, hcom_path};
+use crate::paths::{FLAGS_DIR, atomic_write, nomadterm_path};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 const CHECK_INTERVAL: Duration = Duration::from_secs(86400); // 24 hours
 
 fn flag_path() -> PathBuf {
-    hcom_path(&[FLAGS_DIR, "update_check"])
+    nomadterm_path(&[FLAGS_DIR, "update_check"])
 }
 
 /// Parse version string "x.y.z" into comparable tuple.

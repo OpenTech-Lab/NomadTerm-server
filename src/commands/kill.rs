@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 use anyhow::{Result, bail};
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::hooks::common::stop_instance;
 use crate::identity;
 use crate::instances;
@@ -26,7 +26,7 @@ pub struct KillArgs {
 }
 
 /// Resolve who initiated the kill
-fn resolve_initiator(db: &HcomDb, explicit_name: Option<&str>) -> String {
+fn resolve_initiator(db: &NomadtermDb, explicit_name: Option<&str>) -> String {
     if let Some(name) = explicit_name {
         return name.to_string();
     }
@@ -74,21 +74,21 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
     }
     let explicit_name = flags.name.clone();
 
-    let db = HcomDb::open()?;
-    let hcom_dir = paths::hcom_dir();
+    let db = NomadtermDb::open()?;
+    let nomadterm_dir = paths::nomadterm_dir();
     let initiator = resolve_initiator(&db, explicit_name.as_deref());
 
     // If any target is "all", just kill all
     if targets.iter().any(|t| t == "all") {
-        return kill_all(&db, &hcom_dir, &initiator);
+        return kill_all(&db, &nomadterm_dir, &initiator);
     }
 
     let mut worst_exit = 0;
     for target in &targets {
         let exit = if let Some(tag) = target.strip_prefix("tag:") {
-            kill_by_tag(&db, &hcom_dir, tag, &initiator)?
+            kill_by_tag(&db, &nomadterm_dir, tag, &initiator)?
         } else {
-            kill_single(&db, &hcom_dir, target, &initiator)?
+            kill_single(&db, &nomadterm_dir, target, &initiator)?
         };
         if exit > worst_exit {
             worst_exit = exit;
@@ -115,7 +115,7 @@ fn pane_info_str(pane_closed: bool, preset_name: &str, pane_id: &str) -> String 
 }
 
 /// Kill all instances.
-fn kill_all(db: &HcomDb, hcom_dir: &std::path::Path, initiator: &str) -> Result<i32> {
+fn kill_all(db: &NomadtermDb, nomadterm_dir: &std::path::Path, initiator: &str) -> Result<i32> {
     let instances = db.iter_instances_full()?;
     let mut killed = 0;
     let mut failed = 0;
@@ -173,7 +173,7 @@ fn kill_all(db: &HcomDb, hcom_dir: &std::path::Path, initiator: &str) -> Result<
     }
 
     // Kill orphans too
-    let orphans = pidtrack::get_orphan_processes(hcom_dir, Some(&active_pids));
+    let orphans = pidtrack::get_orphan_processes(nomadterm_dir, Some(&active_pids));
     for orphan in &orphans {
         let (result, pane_closed) = terminal::kill_process(
             orphan.pid,
@@ -208,7 +208,7 @@ fn kill_all(db: &HcomDb, hcom_dir: &std::path::Path, initiator: &str) -> Result<
                 failed += 1;
             }
         }
-        pidtrack::remove_pid(hcom_dir, orphan.pid);
+        pidtrack::remove_pid(nomadterm_dir, orphan.pid);
     }
 
     if killed == 0 && failed == 0 {
@@ -225,7 +225,7 @@ fn kill_all(db: &HcomDb, hcom_dir: &std::path::Path, initiator: &str) -> Result<
 }
 
 /// Kill instances by tag.
-fn kill_by_tag(db: &HcomDb, hcom_dir: &std::path::Path, tag: &str, initiator: &str) -> Result<i32> {
+fn kill_by_tag(db: &NomadtermDb, nomadterm_dir: &std::path::Path, tag: &str, initiator: &str) -> Result<i32> {
     let instances = db.iter_instances_full()?;
     let tagged: Vec<_> = instances
         .iter()
@@ -282,7 +282,7 @@ fn kill_by_tag(db: &HcomDb, hcom_dir: &std::path::Path, tag: &str, initiator: &s
         .iter()
         .filter_map(|i| i.pid.map(|p| p as u32))
         .collect();
-    let orphans = pidtrack::get_orphan_processes(hcom_dir, Some(&active_pids));
+    let orphans = pidtrack::get_orphan_processes(nomadterm_dir, Some(&active_pids));
     let tagged_orphans: Vec<_> = orphans.iter().filter(|o| o.tag == tag).collect();
     for orphan in &tagged_orphans {
         let names = orphan.names.join(", ");
@@ -314,7 +314,7 @@ fn kill_by_tag(db: &HcomDb, hcom_dir: &std::path::Path, tag: &str, initiator: &s
                 failed += 1;
             }
         }
-        pidtrack::remove_pid(hcom_dir, orphan.pid);
+        pidtrack::remove_pid(nomadterm_dir, orphan.pid);
     }
 
     if tagged.is_empty() && tagged_orphans.is_empty() {
@@ -328,8 +328,8 @@ fn kill_by_tag(db: &HcomDb, hcom_dir: &std::path::Path, tag: &str, initiator: &s
 
 /// Kill a single instance by name.
 fn kill_single(
-    db: &HcomDb,
-    hcom_dir: &std::path::Path,
+    db: &NomadtermDb,
+    nomadterm_dir: &std::path::Path,
     target: &str,
     initiator: &str,
 ) -> Result<i32> {
@@ -340,7 +340,7 @@ fn kill_single(
         Some(inst) => inst,
         None => {
             // Check orphans
-            let orphans = pidtrack::get_orphan_processes(hcom_dir, None);
+            let orphans = pidtrack::get_orphan_processes(nomadterm_dir, None);
             // Also match by PID number (TUI sends kill by PID for orphans)
             let target_pid = target.parse::<u32>().ok();
             if let Some(orphan) = orphans.iter().find(|o| {
@@ -376,7 +376,7 @@ fn kill_single(
                         return Ok(1);
                     }
                 }
-                pidtrack::remove_pid(hcom_dir, orphan.pid);
+                pidtrack::remove_pid(nomadterm_dir, orphan.pid);
                 return Ok(0);
             }
             bail!("Agent '{}' not found", target);
@@ -428,7 +428,7 @@ fn kill_single(
 /// Kill a process and close its terminal pane.
 /// Returns (KillResult, pane_closed, preset_name, pane_id).
 fn kill_instance(
-    _db: &HcomDb,
+    _db: &NomadtermDb,
     name: &str,
     pid: u32,
     launch_context: &Option<String>,

@@ -1,8 +1,8 @@
 //! Configuration management — central config system used by all modules.
 //!
 //! Two config layers:
-//! - `Config`: Runtime env vars (HCOM_DIR, HCOM_INSTANCE_NAME, etc.) — startup-only, used by router/client
-//! - `HcomConfig`: User config from TOML + env vars — all 20 user-facing settings with validation
+//! - `Config`: Runtime env vars (NOMADTERM_DIR, NOMADTERM_INSTANCE_NAME, etc.) — startup-only, used by router/client
+//! - `NomadtermConfig`: User config from TOML + env vars — all 20 user-facing settings with validation
 
 use regex::Regex;
 use std::collections::HashMap;
@@ -17,17 +17,17 @@ use crate::paths;
 /// Global configuration instance, lazily initialized and resettable for tests.
 static CONFIG: Mutex<Option<Config>> = Mutex::new(None);
 
-/// Configuration loaded from HCOM_* environment variables.
+/// Configuration loaded from NOMADTERM_* environment variables.
 ///
 /// All environment variable access should go through this struct
 /// rather than calling env::var directly.
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// NOMADTERM directory (HCOM_DIR or ~/.nomadterm)
-    pub hcom_dir: PathBuf,
-    /// Instance name (HCOM_INSTANCE_NAME)
+    /// NOMADTERM directory (NOMADTERM_DIR or ~/.nomadterm)
+    pub nomadterm_dir: PathBuf,
+    /// Instance name (NOMADTERM_INSTANCE_NAME)
     pub instance_name: Option<String>,
-    /// Process ID for daemon binding (HCOM_PROCESS_ID)
+    /// Process ID for daemon binding (NOMADTERM_PROCESS_ID)
     pub process_id: Option<String>,
 }
 
@@ -62,23 +62,23 @@ impl Config {
 
         let env_map: HashMap<String, String> = env::vars().collect();
         let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let (hcom_dir, _) = paths::resolve_hcom_dir_from_env(&env_map, &cwd);
+        let (nomadterm_dir, _) = paths::resolve_nomadterm_dir_from_env(&env_map, &cwd);
 
-        let instance_name = env::var("HCOM_INSTANCE_NAME")
+        let instance_name = env::var("NOMADTERM_INSTANCE_NAME")
             .ok()
             .filter(|s| !s.is_empty());
 
-        let process_id = env::var("HCOM_PROCESS_ID").ok().filter(|s| !s.is_empty());
+        let process_id = env::var("NOMADTERM_PROCESS_ID").ok().filter(|s| !s.is_empty());
 
         Self {
-            hcom_dir,
+            nomadterm_dir,
             instance_name,
             process_id,
         }
     }
 }
 
-/// Bidirectional mapping: HcomConfig field name <-> TOML dotted path.
+/// Bidirectional mapping: NomadtermConfig field name <-> TOML dotted path.
 const TOML_KEY_MAP: &[(&str, &str)] = &[
     ("terminal", "terminal.active"),
     ("tag", "launch.tag"),
@@ -102,28 +102,28 @@ const TOML_KEY_MAP: &[(&str, &str)] = &[
     ("name_export", "preferences.name_export"),
 ];
 
-/// Mapping: HcomConfig field name -> HCOM_* env var key.
+/// Mapping: NomadtermConfig field name -> NOMADTERM_* env var key.
 const FIELD_TO_ENV: &[(&str, &str)] = &[
-    ("timeout", "HCOM_TIMEOUT"),
-    ("subagent_timeout", "HCOM_SUBAGENT_TIMEOUT"),
-    ("terminal", "HCOM_TERMINAL"),
-    ("hints", "HCOM_HINTS"),
-    ("notes", "HCOM_NOTES"),
-    ("tag", "HCOM_TAG"),
-    ("claude_args", "HCOM_CLAUDE_ARGS"),
-    ("gemini_args", "HCOM_GEMINI_ARGS"),
-    ("codex_args", "HCOM_CODEX_ARGS"),
-    ("codex_sandbox_mode", "HCOM_CODEX_SANDBOX_MODE"),
-    ("gemini_system_prompt", "HCOM_GEMINI_SYSTEM_PROMPT"),
-    ("codex_system_prompt", "HCOM_CODEX_SYSTEM_PROMPT"),
-    ("opencode_args", "HCOM_OPENCODE_ARGS"),
-    ("relay", "HCOM_RELAY"),
-    ("relay_id", "HCOM_RELAY_ID"),
-    ("relay_token", "HCOM_RELAY_TOKEN"),
-    ("relay_enabled", "HCOM_RELAY_ENABLED"),
-    ("auto_approve", "HCOM_AUTO_APPROVE"),
-    ("auto_subscribe", "HCOM_AUTO_SUBSCRIBE"),
-    ("name_export", "HCOM_NAME_EXPORT"),
+    ("timeout", "NOMADTERM_TIMEOUT"),
+    ("subagent_timeout", "NOMADTERM_SUBAGENT_TIMEOUT"),
+    ("terminal", "NOMADTERM_TERMINAL"),
+    ("hints", "NOMADTERM_HINTS"),
+    ("notes", "NOMADTERM_NOTES"),
+    ("tag", "NOMADTERM_TAG"),
+    ("claude_args", "NOMADTERM_CLAUDE_ARGS"),
+    ("gemini_args", "NOMADTERM_GEMINI_ARGS"),
+    ("codex_args", "NOMADTERM_CODEX_ARGS"),
+    ("codex_sandbox_mode", "NOMADTERM_CODEX_SANDBOX_MODE"),
+    ("gemini_system_prompt", "NOMADTERM_GEMINI_SYSTEM_PROMPT"),
+    ("codex_system_prompt", "NOMADTERM_CODEX_SYSTEM_PROMPT"),
+    ("opencode_args", "NOMADTERM_OPENCODE_ARGS"),
+    ("relay", "NOMADTERM_RELAY"),
+    ("relay_id", "NOMADTERM_RELAY_ID"),
+    ("relay_token", "NOMADTERM_RELAY_TOKEN"),
+    ("relay_enabled", "NOMADTERM_RELAY_ENABLED"),
+    ("auto_approve", "NOMADTERM_AUTO_APPROVE"),
+    ("auto_subscribe", "NOMADTERM_AUTO_SUBSCRIBE"),
+    ("name_export", "NOMADTERM_NAME_EXPORT"),
 ];
 
 /// Relay fields — file-only, no env var override.
@@ -174,13 +174,13 @@ fn set_nested(table: &mut toml::Value, dotted_path: &str, value: toml::Value) {
     }
 }
 
-/// Validation errors from HcomConfig construction.
+/// Validation errors from NomadtermConfig construction.
 #[derive(Debug, Clone)]
-pub struct HcomConfigError {
+pub struct NomadtermConfigError {
     pub errors: HashMap<String, String>,
 }
 
-impl std::fmt::Display for HcomConfigError {
+impl std::fmt::Display for NomadtermConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.errors.is_empty() {
             write!(f, "Invalid config")
@@ -194,12 +194,12 @@ impl std::fmt::Display for HcomConfigError {
     }
 }
 
-impl std::error::Error for HcomConfigError {}
+impl std::error::Error for NomadtermConfigError {}
 
 /// NOMADTERM user configuration with validation.
 /// Load priority: env var → config.toml → defaults.
 #[derive(Clone, Debug, PartialEq)]
-pub struct HcomConfig {
+pub struct NomadtermConfig {
     pub timeout: i64,
     pub subagent_timeout: i64,
     pub terminal: String,
@@ -222,7 +222,7 @@ pub struct HcomConfig {
     pub name_export: String,
 }
 
-impl Default for HcomConfig {
+impl Default for NomadtermConfig {
     fn default() -> Self {
         Self {
             timeout: 86400,
@@ -249,7 +249,7 @@ impl Default for HcomConfig {
     }
 }
 
-impl HcomConfig {
+impl NomadtermConfig {
     /// Normalize fields before validation (case normalization, legacy values).
     pub fn normalize(&mut self) {
         // Resolve old terminal casing (WezTerm→wezterm, Alacritty→alacritty)
@@ -440,12 +440,12 @@ impl HcomConfig {
     ///
     /// `env_override`: If Some, use this map for env var lookups instead of std::env.
     /// Used in daemon mode where os.environ is stale.
-    pub fn load(env_override: Option<&HashMap<String, String>>) -> Result<Self, HcomConfigError> {
+    pub fn load(env_override: Option<&HashMap<String, String>>) -> Result<Self, NomadtermConfigError> {
         let toml_path = paths::config_toml_path();
 
         if !toml_path.exists() {
-            let hcom_dir = &Config::get().hcom_dir;
-            let config_env_path = hcom_dir.join("config.env");
+            let nomadterm_dir = &Config::get().nomadterm_dir;
+            let config_env_path = nomadterm_dir.join("config.env");
             if config_env_path.exists() {
                 // Legacy config.env exists — migration to config.toml not yet done.
                 // Don't write default config.toml here or we'd silently lose the
@@ -470,8 +470,8 @@ impl HcomConfig {
     fn load_from_sources(
         file_config: &HashMap<String, TomlFieldValue>,
         env_override: Option<&HashMap<String, String>>,
-    ) -> Result<Self, HcomConfigError> {
-        let mut config = HcomConfig::default();
+    ) -> Result<Self, NomadtermConfigError> {
+        let mut config = NomadtermConfig::default();
 
         let is_relay_field = |field: &str| -> bool { RELAY_FIELDS.contains(&field) };
 
@@ -570,13 +570,13 @@ impl HcomConfig {
         // Validate
         let errors = config.collect_errors();
         if !errors.is_empty() {
-            return Err(HcomConfigError { errors });
+            return Err(NomadtermConfigError { errors });
         }
 
         Ok(config)
     }
 
-    /// Convert to HCOM_* env var dict (for persistence/display).
+    /// Convert to NOMADTERM_* env var dict (for persistence/display).
     pub fn to_env_dict(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
         for &(field, env_key) in FIELD_TO_ENV {
@@ -587,12 +587,12 @@ impl HcomConfig {
         map
     }
 
-    /// Build from HCOM_* env var dict. Returns validated config.
-    pub fn from_env_dict(data: &HashMap<String, String>) -> Result<Self, HcomConfigError> {
-        let mut config = HcomConfig::default();
+    /// Build from NOMADTERM_* env var dict. Returns validated config.
+    pub fn from_env_dict(data: &HashMap<String, String>) -> Result<Self, NomadtermConfigError> {
+        let mut config = NomadtermConfig::default();
         let mut errors: HashMap<String, String> = HashMap::new();
 
-        // Build reverse map: HCOM_* key -> field name
+        // Build reverse map: NOMADTERM_* key -> field name
         let env_to_field: HashMap<&str, &str> = FIELD_TO_ENV.iter().map(|&(f, e)| (e, f)).collect();
 
         for (env_key, value) in data {
@@ -604,13 +604,13 @@ impl HcomConfig {
         }
 
         if !errors.is_empty() {
-            return Err(HcomConfigError { errors });
+            return Err(NomadtermConfigError { errors });
         }
 
         // Run validation
         let validation_errors = config.collect_errors();
         if !validation_errors.is_empty() {
-            return Err(HcomConfigError {
+            return Err(NomadtermConfigError {
                 errors: validation_errors,
             });
         }
@@ -717,10 +717,10 @@ pub fn load_toml_config(path: &std::path::Path) -> HashMap<String, TomlFieldValu
     result
 }
 
-/// Write config.toml from HcomConfig using toml_edit to preserve comments and formatting.
+/// Write config.toml from NomadtermConfig using toml_edit to preserve comments and formatting.
 /// If the file already exists, parses it and surgically updates only changed keys.
 /// If the file doesn't exist, writes a fresh default with the header comment.
-pub fn save_toml_config(config: &HcomConfig, presets: Option<&toml::Value>) -> std::io::Result<()> {
+pub fn save_toml_config(config: &NomadtermConfig, presets: Option<&toml::Value>) -> std::io::Result<()> {
     use toml_edit::DocumentMut;
 
     let toml_path = paths::config_toml_path();
@@ -1017,7 +1017,7 @@ fn is_falsy(s: &str) -> bool {
 /// Structured snapshot of config state for load/save operations.
 #[derive(Clone, Debug)]
 pub struct ConfigSnapshot {
-    pub core: HcomConfig,
+    pub core: NomadtermConfig,
 }
 
 /// Load config snapshot from files (no env overrides — file contents only).
@@ -1027,7 +1027,7 @@ pub fn load_config_snapshot() -> ConfigSnapshot {
     if !toml_path.exists() {
         // Check for legacy config.env before writing defaults — don't overwrite
         // user settings that haven't been migrated yet.
-        let config_env_path = Config::get().hcom_dir.join("config.env");
+        let config_env_path = Config::get().nomadterm_dir.join("config.env");
         if !config_env_path.exists() {
             let _ = write_default_config();
         }
@@ -1039,12 +1039,12 @@ pub fn load_config_snapshot() -> ConfigSnapshot {
         HashMap::new()
     };
 
-    // Build HcomConfig from file values only (no env)
-    let core = match HcomConfig::load_from_sources(&file_config, Some(&HashMap::new())) {
+    // Build NomadtermConfig from file values only (no env)
+    let core = match NomadtermConfig::load_from_sources(&file_config, Some(&HashMap::new())) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("{e}");
-            HcomConfig::default()
+            NomadtermConfig::default()
         }
     };
 
@@ -1053,7 +1053,7 @@ pub fn load_config_snapshot() -> ConfigSnapshot {
 
 /// Write default config.toml + env file.
 pub fn write_default_config() -> std::io::Result<()> {
-    let config = HcomConfig::default();
+    let config = NomadtermConfig::default();
     save_toml_config(&config, None)?;
     save_env_file(&HashMap::new())
 }
@@ -1080,7 +1080,7 @@ pub fn load_env_extras(path: &std::path::Path) -> HashMap<String, String> {
         }
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim();
-            if !key.is_empty() && !key.starts_with("HCOM_") {
+            if !key.is_empty() && !key.starts_with("NOMADTERM_") {
                 result.insert(key.to_string(), parse_env_value(value));
             }
         }
@@ -1090,7 +1090,7 @@ pub fn load_env_extras(path: &std::path::Path) -> HashMap<String, String> {
 
 /// Write env passthrough file (non-NOMADTERM vars only).
 pub fn save_env_file(extras: &HashMap<String, String>) -> std::io::Result<()> {
-    let env_path = Config::get().hcom_dir.join("env");
+    let env_path = Config::get().nomadterm_dir.join("env");
 
     if let Some(parent) = env_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -1101,13 +1101,13 @@ pub fn save_env_file(extras: &HashMap<String, String>) -> std::io::Result<()> {
     // Always include default placeholders
     let mut all_keys: Vec<String> = DEFAULT_ENV_VARS.iter().map(|s| s.to_string()).collect();
     for key in extras.keys() {
-        if !all_keys.contains(key) && !key.starts_with("HCOM_") {
+        if !all_keys.contains(key) && !key.starts_with("NOMADTERM_") {
             all_keys.push(key.clone());
         }
     }
 
     for key in &all_keys {
-        if key.starts_with("HCOM_") {
+        if key.starts_with("NOMADTERM_") {
             continue;
         }
         let value = extras.get(key.as_str()).map(|s| s.as_str()).unwrap_or("");
@@ -1219,26 +1219,26 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_default_config_uses_home_hcom() {
+    fn test_default_config_uses_home_nomadterm() {
         Config::reset();
-        without_env(&["HCOM_DIR"], || {
+        without_env(&["NOMADTERM_DIR"], || {
             Config::init();
             let config = Config::get();
             let expected = env::var("HOME")
                 .map(|h| PathBuf::from(h).join(".nomadterm"))
                 .unwrap();
-            assert_eq!(config.hcom_dir, expected);
+            assert_eq!(config.nomadterm_dir, expected);
         });
     }
 
     #[test]
     #[serial]
-    fn test_hcom_dir_overrides_home() {
+    fn test_nomadterm_dir_overrides_home() {
         Config::reset();
-        with_env("HCOM_DIR", "/custom/nomadterm", || {
+        with_env("NOMADTERM_DIR", "/custom/nomadterm", || {
             Config::init();
             let config = Config::get();
-            assert_eq!(config.hcom_dir, PathBuf::from("/custom/nomadterm"));
+            assert_eq!(config.nomadterm_dir, PathBuf::from("/custom/nomadterm"));
         });
     }
 
@@ -1246,7 +1246,7 @@ mod tests {
     #[serial]
     fn test_instance_name_some_when_set() {
         Config::reset();
-        with_env("HCOM_INSTANCE_NAME", "test-instance", || {
+        with_env("NOMADTERM_INSTANCE_NAME", "test-instance", || {
             Config::init();
             let config = Config::get();
             assert_eq!(config.instance_name, Some("test-instance".to_string()));
@@ -1257,7 +1257,7 @@ mod tests {
     #[serial]
     fn test_instance_name_none_when_unset() {
         Config::reset();
-        without_env(&["HCOM_INSTANCE_NAME"], || {
+        without_env(&["NOMADTERM_INSTANCE_NAME"], || {
             Config::init();
             let config = Config::get();
             assert_eq!(config.instance_name, None);
@@ -1268,7 +1268,7 @@ mod tests {
     #[serial]
     fn test_process_id_some_when_set() {
         Config::reset();
-        with_env("HCOM_PROCESS_ID", "pid-123", || {
+        with_env("NOMADTERM_PROCESS_ID", "pid-123", || {
             Config::init();
             let config = Config::get();
             assert_eq!(config.process_id, Some("pid-123".to_string()));
@@ -1279,7 +1279,7 @@ mod tests {
     #[serial]
     fn test_process_id_none_when_unset() {
         Config::reset();
-        without_env(&["HCOM_PROCESS_ID"], || {
+        without_env(&["NOMADTERM_PROCESS_ID"], || {
             Config::init();
             let config = Config::get();
             assert_eq!(config.process_id, None);
@@ -1290,13 +1290,13 @@ mod tests {
     #[serial]
     fn test_reset_allows_reinit() {
         Config::reset();
-        with_env("HCOM_INSTANCE_NAME", "first", || {
+        with_env("NOMADTERM_INSTANCE_NAME", "first", || {
             Config::init();
             assert_eq!(Config::get().instance_name, Some("first".to_string()));
         });
 
         Config::reset();
-        with_env("HCOM_INSTANCE_NAME", "second", || {
+        with_env("NOMADTERM_INSTANCE_NAME", "second", || {
             Config::init();
             assert_eq!(Config::get().instance_name, Some("second".to_string()));
         });
@@ -1304,43 +1304,43 @@ mod tests {
 
     #[test]
     #[serial]
-    fn test_hcom_dir_tilde_expansion() {
+    fn test_nomadterm_dir_tilde_expansion() {
         Config::reset();
-        with_env("HCOM_DIR", "~/.nomadterm", || {
+        with_env("NOMADTERM_DIR", "~/.nomadterm", || {
             Config::init();
             let config = Config::get();
             let home = env::var("HOME").unwrap();
-            assert_eq!(config.hcom_dir, PathBuf::from(home).join(".nomadterm"));
+            assert_eq!(config.nomadterm_dir, PathBuf::from(home).join(".nomadterm"));
         });
     }
 
     #[test]
     #[serial]
-    fn test_hcom_dir_relative_resolved_to_absolute() {
+    fn test_nomadterm_dir_relative_resolved_to_absolute() {
         Config::reset();
-        with_env("HCOM_DIR", "relative/path", || {
+        with_env("NOMADTERM_DIR", "relative/path", || {
             Config::init();
             let config = Config::get();
             // Should be resolved relative to CWD
-            assert!(config.hcom_dir.is_absolute());
-            assert!(config.hcom_dir.ends_with("relative/path"));
+            assert!(config.nomadterm_dir.is_absolute());
+            assert!(config.nomadterm_dir.ends_with("relative/path"));
         });
     }
 
     #[test]
     #[serial]
-    fn test_hcom_dir_absolute_stays_absolute() {
+    fn test_nomadterm_dir_absolute_stays_absolute() {
         Config::reset();
-        with_env("HCOM_DIR", "/absolute/nomadterm", || {
+        with_env("NOMADTERM_DIR", "/absolute/nomadterm", || {
             Config::init();
             let config = Config::get();
-            assert_eq!(config.hcom_dir, PathBuf::from("/absolute/nomadterm"));
+            assert_eq!(config.nomadterm_dir, PathBuf::from("/absolute/nomadterm"));
         });
     }
 
     #[test]
-    fn test_hcom_config_defaults() {
-        let mut config = HcomConfig::default();
+    fn test_nomadterm_config_defaults() {
+        let mut config = NomadtermConfig::default();
         assert_eq!(config.timeout, 86400);
         assert_eq!(config.subagent_timeout, 30);
         assert_eq!(config.terminal, "default");
@@ -1353,8 +1353,8 @@ mod tests {
     }
 
     #[test]
-    fn test_hcom_config_validation_timeout() {
-        let mut config = HcomConfig::default();
+    fn test_nomadterm_config_validation_timeout() {
+        let mut config = NomadtermConfig::default();
         config.timeout = 0;
         let errors = config.collect_errors();
         assert!(errors.contains_key("timeout"));
@@ -1369,8 +1369,8 @@ mod tests {
     }
 
     #[test]
-    fn test_hcom_config_validation_tag() {
-        let mut config = HcomConfig::default();
+    fn test_nomadterm_config_validation_tag() {
+        let mut config = NomadtermConfig::default();
 
         config.tag = "valid-tag".to_string();
         assert!(!config.collect_errors().contains_key("tag"));
@@ -1383,8 +1383,8 @@ mod tests {
     }
 
     #[test]
-    fn test_hcom_config_validation_sandbox_mode() {
-        let mut config = HcomConfig::default();
+    fn test_nomadterm_config_validation_sandbox_mode() {
+        let mut config = NomadtermConfig::default();
 
         for mode in VALID_SANDBOX_MODES {
             config.codex_sandbox_mode = mode.to_string();
@@ -1399,8 +1399,8 @@ mod tests {
     }
 
     #[test]
-    fn test_hcom_config_validation_shell_args() {
-        let mut config = HcomConfig::default();
+    fn test_nomadterm_config_validation_shell_args() {
+        let mut config = NomadtermConfig::default();
 
         config.claude_args = "--model opus".to_string();
         assert!(!config.collect_errors().contains_key("claude_args"));
@@ -1410,8 +1410,8 @@ mod tests {
     }
 
     #[test]
-    fn test_hcom_config_validation_auto_subscribe() {
-        let mut config = HcomConfig::default();
+    fn test_nomadterm_config_validation_auto_subscribe() {
+        let mut config = NomadtermConfig::default();
 
         config.auto_subscribe = "collision,created".to_string();
         assert!(!config.collect_errors().contains_key("auto_subscribe"));
@@ -1422,7 +1422,7 @@ mod tests {
 
     #[test]
     fn test_terminal_case_normalization() {
-        let mut config = HcomConfig::default();
+        let mut config = NomadtermConfig::default();
         config.terminal = "WezTerm".to_string();
         let errors = config.collect_errors();
         assert!(!errors.contains_key("terminal"));
@@ -1441,7 +1441,7 @@ mod tests {
 
     #[test]
     fn test_terminal_custom_command_requires_script() {
-        let mut config = HcomConfig::default();
+        let mut config = NomadtermConfig::default();
 
         // Custom command with {script} is valid
         config.terminal = "my-terminal -e bash {script}".to_string();
@@ -1454,7 +1454,7 @@ mod tests {
 
     #[test]
     fn test_terminal_known_presets_accepted() {
-        let mut config = HcomConfig::default();
+        let mut config = NomadtermConfig::default();
         for preset in &[
             "kitty",
             "wezterm",
@@ -1473,14 +1473,14 @@ mod tests {
 
     #[test]
     fn test_set_field_full_auto_normalization() {
-        let mut config = HcomConfig::default();
+        let mut config = NomadtermConfig::default();
         config.set_field("codex_sandbox_mode", "full-auto").unwrap();
         assert_eq!(config.codex_sandbox_mode, "danger-full-access");
     }
 
     #[test]
     fn test_set_field_bool_coercion() {
-        let mut config = HcomConfig::default();
+        let mut config = NomadtermConfig::default();
 
         config.set_field("auto_approve", "0").unwrap();
         assert_eq!(config.auto_approve, false);
@@ -1517,15 +1517,15 @@ mod tests {
 
     #[test]
     fn test_to_env_dict_roundtrip() {
-        let config = HcomConfig::default();
+        let config = NomadtermConfig::default();
         let dict = config.to_env_dict();
 
-        assert_eq!(dict.get("HCOM_TIMEOUT"), Some(&"86400".to_string()));
-        assert_eq!(dict.get("HCOM_TERMINAL"), Some(&"default".to_string()));
-        assert_eq!(dict.get("HCOM_AUTO_APPROVE"), Some(&"1".to_string()));
-        assert_eq!(dict.get("HCOM_RELAY_ENABLED"), Some(&"1".to_string()));
+        assert_eq!(dict.get("NOMADTERM_TIMEOUT"), Some(&"86400".to_string()));
+        assert_eq!(dict.get("NOMADTERM_TERMINAL"), Some(&"default".to_string()));
+        assert_eq!(dict.get("NOMADTERM_AUTO_APPROVE"), Some(&"1".to_string()));
+        assert_eq!(dict.get("NOMADTERM_RELAY_ENABLED"), Some(&"1".to_string()));
 
-        let roundtrip = HcomConfig::from_env_dict(&dict).unwrap();
+        let roundtrip = NomadtermConfig::from_env_dict(&dict).unwrap();
         assert_eq!(config, roundtrip);
     }
 
@@ -1533,8 +1533,8 @@ mod tests {
     fn test_load_from_sources_empty() {
         let file_config = HashMap::new();
         let env = HashMap::new();
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
-        assert_eq!(config, HcomConfig::default());
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        assert_eq!(config, NomadtermConfig::default());
     }
 
     #[test]
@@ -1545,7 +1545,7 @@ mod tests {
         file_config.insert("relay_enabled".to_string(), TomlFieldValue::Bool(false));
 
         let env = HashMap::new();
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
 
         assert_eq!(config.timeout, 3600);
         assert_eq!(config.tag, "test");
@@ -1562,9 +1562,9 @@ mod tests {
         );
 
         let mut env = HashMap::new();
-        env.insert("HCOM_TAG".to_string(), "env-tag".to_string());
+        env.insert("NOMADTERM_TAG".to_string(), "env-tag".to_string());
 
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
 
         assert_eq!(config.timeout, 3600); // From file (no env override)
         assert_eq!(config.tag, "env-tag"); // Env wins over file
@@ -1580,11 +1580,11 @@ mod tests {
 
         let mut env = HashMap::new();
         env.insert(
-            "HCOM_RELAY".to_string(),
+            "NOMADTERM_RELAY".to_string(),
             "mqtt://env.example.com".to_string(),
         );
 
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
 
         // Relay fields should come from file, not env
         assert_eq!(config.relay, "mqtt://file.example.com");
@@ -1599,7 +1599,7 @@ mod tests {
         );
 
         let env = HashMap::new();
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
         assert_eq!(config.timeout, 7200);
     }
 
@@ -1612,7 +1612,7 @@ mod tests {
         );
 
         let env = HashMap::new();
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
         assert_eq!(config.auto_approve, false);
     }
 
@@ -1625,7 +1625,7 @@ mod tests {
         );
 
         let env = HashMap::new();
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
         assert_eq!(config.codex_sandbox_mode, "workspace"); // Default, not empty
     }
 
@@ -1635,18 +1635,18 @@ mod tests {
         file_config.insert("terminal".to_string(), TomlFieldValue::Str("".to_string()));
 
         let env = HashMap::new();
-        let config = HcomConfig::load_from_sources(&file_config, Some(&env)).unwrap();
+        let config = NomadtermConfig::load_from_sources(&file_config, Some(&env)).unwrap();
         assert_eq!(config.terminal, "default");
     }
 
     #[test]
     fn test_toml_roundtrip() {
-        let config = HcomConfig {
+        let config = NomadtermConfig {
             timeout: 3600,
             tag: "dev".to_string(),
             auto_approve: false,
             relay: "mqtt://test.com".to_string(),
-            ..HcomConfig::default()
+            ..NomadtermConfig::default()
         };
 
         let toml_table = config.to_toml_table();
@@ -1667,7 +1667,7 @@ mod tests {
             }
         }
 
-        let roundtrip = HcomConfig::load_from_sources(&file_config, Some(&HashMap::new())).unwrap();
+        let roundtrip = NomadtermConfig::load_from_sources(&file_config, Some(&HashMap::new())).unwrap();
         assert_eq!(config, roundtrip);
     }
 
@@ -1786,7 +1786,7 @@ auto_approve = false
 
     #[test]
     fn test_get_field_all_fields() {
-        let config = HcomConfig::default();
+        let config = NomadtermConfig::default();
         // All 20 fields should be gettable
         for &(field, _) in FIELD_TO_ENV {
             assert!(
@@ -1798,23 +1798,23 @@ auto_approve = false
     }
 
     #[test]
-    fn test_hcom_config_from_env_dict_with_full_auto() {
-        let mut data = HcomConfig::default().to_env_dict();
+    fn test_nomadterm_config_from_env_dict_with_full_auto() {
+        let mut data = NomadtermConfig::default().to_env_dict();
         data.insert(
-            "HCOM_CODEX_SANDBOX_MODE".to_string(),
+            "NOMADTERM_CODEX_SANDBOX_MODE".to_string(),
             "full-auto".to_string(),
         );
-        let config = HcomConfig::from_env_dict(&data).unwrap();
+        let config = NomadtermConfig::from_env_dict(&data).unwrap();
         assert_eq!(config.codex_sandbox_mode, "danger-full-access");
     }
 
     #[test]
-    fn test_hcom_config_validation_error_display() {
+    fn test_nomadterm_config_validation_error_display() {
         let errors = HashMap::from([
             ("timeout".to_string(), "timeout must be 1-86400".to_string()),
             ("tag".to_string(), "tag invalid chars".to_string()),
         ]);
-        let err = HcomConfigError { errors };
+        let err = NomadtermConfigError { errors };
         let display = format!("{err}");
         assert!(display.contains("Invalid config"));
         assert!(display.contains("timeout must be 1-86400"));

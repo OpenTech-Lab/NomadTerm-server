@@ -9,7 +9,7 @@ use std::time::SystemTime;
 use serde_json::{Value, json};
 
 use crate::core::bundles;
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::shared::{CommandContext, SenderKind};
 
 // Re-use transcript parsing for bundle prepare/cat (C5 fix)
@@ -113,7 +113,7 @@ pub struct BundleCreateArgs {
 
 /// Find a bundle by ID (event ID or bundle_id prefix).
 /// Returns bundle data with `event_id` and `timestamp` injected.
-fn get_bundle_by_id(db: &HcomDb, id_or_prefix: &str) -> Option<Value> {
+fn get_bundle_by_id(db: &NomadtermDb, id_or_prefix: &str) -> Option<Value> {
     // Try numeric event ID first
     if let Ok(event_id) = id_or_prefix.parse::<i64>() {
         if let Ok(row) = db.conn().query_row(
@@ -170,7 +170,7 @@ fn get_bundle_by_id(db: &HcomDb, id_or_prefix: &str) -> Option<Value> {
 // ── Subcommands ──────────────────────────────────────────────────────────
 
 /// List bundles: `nomadterm bundle [list] [--last N] [--json]`
-fn cmd_bundle_list(db: &HcomDb, args: &BundleListArgs) -> i32 {
+fn cmd_bundle_list(db: &NomadtermDb, args: &BundleListArgs) -> i32 {
     let json_mode = args.json;
     let last_n = args.last.unwrap_or(20);
 
@@ -277,7 +277,7 @@ fn cmd_bundle_list(db: &HcomDb, args: &BundleListArgs) -> i32 {
 }
 
 /// Show bundle: `nomadterm bundle show <id> [--json]`
-fn cmd_bundle_show(db: &HcomDb, args: &BundleShowArgs) -> i32 {
+fn cmd_bundle_show(db: &NomadtermDb, args: &BundleShowArgs) -> i32 {
     let json_mode = args.json;
 
     let bundle = match get_bundle_by_id(db, &args.id) {
@@ -334,7 +334,7 @@ fn cmd_bundle_show(db: &HcomDb, args: &BundleShowArgs) -> i32 {
 }
 
 /// Cat bundle (expand full content): `nomadterm bundle cat <id>`
-fn cmd_bundle_cat(db: &HcomDb, args: &BundleCatArgs) -> i32 {
+fn cmd_bundle_cat(db: &NomadtermDb, args: &BundleCatArgs) -> i32 {
     let bundle = match get_bundle_by_id(db, &args.id) {
         Some(b) => b,
         None => {
@@ -617,7 +617,7 @@ fn cmd_bundle_cat(db: &HcomDb, args: &BundleCatArgs) -> i32 {
 }
 
 /// Chain: `nomadterm bundle chain <id> [--json]`
-fn cmd_bundle_chain(db: &HcomDb, args: &BundleChainArgs) -> i32 {
+fn cmd_bundle_chain(db: &NomadtermDb, args: &BundleChainArgs) -> i32 {
     let json_mode = args.json;
 
     let mut chain = Vec::new();
@@ -700,7 +700,7 @@ fn cmd_bundle_chain(db: &HcomDb, args: &BundleChainArgs) -> i32 {
 
 /// Prepare: `nomadterm bundle prepare [--for AGENT] [--last-transcript N] [--last-events N] [--compact] [--json]`
 #[allow(clippy::type_complexity)]
-fn cmd_bundle_prepare(db: &HcomDb, args: &BundlePrepareArgs, ctx: Option<&CommandContext>) -> i32 {
+fn cmd_bundle_prepare(db: &NomadtermDb, args: &BundlePrepareArgs, ctx: Option<&CommandContext>) -> i32 {
     let json_mode = args.json;
     let compact = args.compact;
     let for_agent = args.for_agent.as_deref().map(|name| {
@@ -1043,7 +1043,7 @@ everything you know about this. what happened, decisions, current state, issues,
 }
 
 /// Create: `nomadterm bundle create [TITLE] --description DESC [--events LIST] [--files LIST] [--transcript RANGES] [--extends ID] [--json]`
-fn cmd_bundle_create(db: &HcomDb, args: &BundleCreateArgs, ctx: Option<&CommandContext>) -> i32 {
+fn cmd_bundle_create(db: &NomadtermDb, args: &BundleCreateArgs, ctx: Option<&CommandContext>) -> i32 {
     let json_mode = args.json;
 
     // Mutual exclusion: --bundle and --bundle-file
@@ -1124,7 +1124,7 @@ fn cmd_bundle_create(db: &HcomDb, args: &BundleCreateArgs, ctx: Option<&CommandC
 
 /// Validate, create, and log a bundle event.
 fn create_and_log_bundle(
-    db: &HcomDb,
+    db: &NomadtermDb,
     bundle: &mut Value,
     ctx: Option<&CommandContext>,
     json_mode: bool,
@@ -1144,7 +1144,7 @@ fn create_and_log_bundle(
     match bundles::create_bundle_event(bundle, &instance, created_by, db) {
         Ok(bundle_id) => {
             // Trigger relay push (best-effort)
-            let prefix = crate::runtime_env::get_hcom_prefix();
+            let prefix = crate::runtime_env::get_nomadterm_prefix();
             if let Some((cmd, prefix_args)) = prefix.split_first() {
                 let _ = std::process::Command::new(cmd)
                     .args(prefix_args)
@@ -1171,7 +1171,7 @@ fn create_and_log_bundle(
 
 /// Query bundle events by category for JSON output (C5 fix).
 #[allow(clippy::type_complexity)]
-fn query_bundle_event_categories(db: &HcomDb, agent: &str, last_events: usize) -> Value {
+fn query_bundle_event_categories(db: &NomadtermDb, agent: &str, last_events: usize) -> Value {
     let delivered_to_pattern = format!("%\"{}\"%", agent);
     let categories: Vec<(&str, &str, Vec<Box<dyn rusqlite::ToSql>>)> = vec![
         (
@@ -1271,7 +1271,7 @@ use crate::instances::format_age;
 
 /// Main entry point for `nomadterm bundle` command.
 /// Manual subcommand routing to support implicit list/show patterns.
-pub fn cmd_bundle(db: &HcomDb, args: &BundleArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_bundle(db: &NomadtermDb, args: &BundleArgs, ctx: Option<&CommandContext>) -> i32 {
     let argv = &args.args;
     let subcmd = argv.first().map(|s| s.as_str()).unwrap_or("list");
     let sub_argv: Vec<String> = if argv.is_empty() {

@@ -8,7 +8,7 @@
 //! - Target tool CLI installed (claude/gemini/codex/opencode)
 //!
 //! Phases (claude/gemini/codex):
-//! 1. Launch tool via `nomadterm 1 <tool>` with HCOM_TERMINAL=tmux
+//! 1. Launch tool via `nomadterm 1 <tool>` with NOMADTERM_TERMINAL=tmux
 //! 2. Wait for ready event, capture and validate full screen state
 //! 3. Send message → verify delivery via events, capture post-delivery screen
 //! 4. Inject uncommitted text → verify gate blocks delivery, capture screen
@@ -120,7 +120,7 @@ fn nomadterm(cmd: &str) -> Output {
         .expect("failed to execute nomadterm")
 }
 
-fn hcom_check(cmd: &str) -> String {
+fn nomadterm_check(cmd: &str) -> String {
     let out = nomadterm(cmd);
     assert!(
         out.status.success(),
@@ -132,7 +132,7 @@ fn hcom_check(cmd: &str) -> String {
 }
 
 fn send_msg(msg: &str) {
-    hcom_check(&format!("send --from {SENDER} --intent inform '{msg}'"));
+    nomadterm_check(&format!("send --from {SENDER} --intent inform '{msg}'"));
 }
 
 fn get_screen(name: &str) -> Option<serde_json::Value> {
@@ -439,8 +439,8 @@ fn run_pty_test(tool: &str) {
 
     // SAFETY: Integration tests run serially (serial_lock above).
     unsafe {
-        std::env::set_var("HCOM_TERMINAL", "tmux");
-        std::env::set_var("HCOM_TAG", "ptytest");
+        std::env::set_var("NOMADTERM_TERMINAL", "tmux");
+        std::env::set_var("NOMADTERM_TAG", "ptytest");
     }
     let log = TestLog::new(tool);
 
@@ -511,7 +511,7 @@ fn run_pty_test(tool: &str) {
     );
 
     guard.base_name = Some(base_name.clone());
-    let tag = std::env::var("HCOM_TAG").unwrap_or_default();
+    let tag = std::env::var("NOMADTERM_TAG").unwrap_or_default();
     let instance_name = if tag.is_empty() {
         base_name.clone()
     } else {
@@ -646,7 +646,7 @@ fn run_pty_test(tool: &str) {
     // Extra settle time
     thread::sleep(Duration::from_secs(2));
 
-    hcom_check(&format!("term inject {base_name} uncommitted text here"));
+    nomadterm_check(&format!("term inject {base_name} uncommitted text here"));
     logln!(log, "  OK: Injected uncommitted text");
 
     // Verify text appears in input box
@@ -735,7 +735,7 @@ fn run_pty_test(tool: &str) {
 
     let baseline_event3 = get_last_event_id(&base_name);
 
-    hcom_check(&format!("term inject {base_name} --enter"));
+    nomadterm_check(&format!("term inject {base_name} --enter"));
     logln!(log, "  OK: Sent --enter to submit uncommitted text");
 
     // Wait for screen to settle
@@ -816,8 +816,8 @@ fn run_pty_test_opencode() {
     let tool = "opencode";
     // SAFETY: Integration tests run serially (serial_lock above).
     unsafe {
-        std::env::set_var("HCOM_TERMINAL", "tmux");
-        std::env::set_var("HCOM_TAG", "ptytest");
+        std::env::set_var("NOMADTERM_TERMINAL", "tmux");
+        std::env::set_var("NOMADTERM_TAG", "ptytest");
     }
     let log = TestLog::new(tool);
 
@@ -881,7 +881,7 @@ fn run_pty_test_opencode() {
     );
 
     guard.base_name = Some(base_name.clone());
-    let tag = std::env::var("HCOM_TAG").unwrap_or_default();
+    let tag = std::env::var("NOMADTERM_TAG").unwrap_or_default();
     let instance_name = if tag.is_empty() {
         base_name.clone()
     } else {

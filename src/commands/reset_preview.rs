@@ -1,4 +1,4 @@
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 
 use super::reset::ResetTarget;
 
@@ -9,7 +9,7 @@ struct ResetPreviewState {
     plural: &'static str,
 }
 
-fn load_preview_state(db: &HcomDb) -> ResetPreviewState {
+fn load_preview_state(db: &NomadtermDb) -> ResetPreviewState {
     let event_count: i64 = db
         .conn()
         .query_row("SELECT COUNT(*) FROM events", [], |r| r.get(0))
@@ -48,7 +48,7 @@ fn load_preview_state(db: &HcomDb) -> ResetPreviewState {
 }
 
 fn render_hooks_preview() -> String {
-    let hcom_cmd = "nomadterm";
+    let nomadterm_cmd = "nomadterm";
     format!(
         "\n== RESET HOOKS PREVIEW ==\n\
          This will remove nomadterm hooks from tool configs.\n\n\
@@ -58,12 +58,12 @@ fn render_hooks_preview() -> String {
          \u{2022} Remove hooks from Codex config (~/.codex/)\n\n\
          To reinstall: nomadterm hooks add\n\n\
          Add --go flag and run again to proceed:\n  \
-         {hcom_cmd} --go reset hooks\n"
+         {nomadterm_cmd} --go reset hooks\n"
     )
 }
 
 fn render_reset_all_preview(state: &ResetPreviewState) -> String {
-    let hcom_cmd = "nomadterm";
+    let nomadterm_cmd = "nomadterm";
     format!(
         "\n== RESET ALL PREVIEW ==\n\
          This will stop all instances, archive the database, remove hooks, and reset config.\n\n\
@@ -78,7 +78,7 @@ fn render_reset_all_preview(state: &ResetPreviewState) -> String {
          5. Archive and delete config.toml + env\n  \
          6. Clear device identity (new UUID on next relay)\n\n\
          Add --go flag and run again to proceed:\n  \
-         {hcom_cmd} --go reset all\n",
+         {nomadterm_cmd} --go reset all\n",
         instance_count = state.instance_count,
         plural = state.plural,
         names_display = state.names_display,
@@ -87,7 +87,7 @@ fn render_reset_all_preview(state: &ResetPreviewState) -> String {
 }
 
 fn render_reset_preview(state: &ResetPreviewState) -> String {
-    let hcom_cmd = "nomadterm";
+    let nomadterm_cmd = "nomadterm";
     format!(
         "\n== RESET PREVIEW ==\n\
          This will archive and clear the current nomadterm session.\n\n\
@@ -100,9 +100,9 @@ fn render_reset_preview(state: &ResetPreviewState) -> String {
          3. Log reset event to fresh database\n  \
          4. Sync with relay (push reset, pull fresh state)\n\n\
          Note: Instance rows are deleted but snapshots preserved in archive.\n      \
-         Query archived sessions with: {hcom_cmd} archive\n\n\
+         Query archived sessions with: {nomadterm_cmd} archive\n\n\
          Add --go flag and run again to proceed:\n  \
-         {hcom_cmd} --go reset\n",
+         {nomadterm_cmd} --go reset\n",
         instance_count = state.instance_count,
         plural = state.plural,
         names_display = state.names_display,
@@ -111,7 +111,7 @@ fn render_reset_preview(state: &ResetPreviewState) -> String {
 }
 
 /// Print reset preview for AI tools (shows what will be destroyed).
-pub(crate) fn print_reset_preview(target: Option<ResetTarget>, db: &HcomDb) {
+pub(crate) fn print_reset_preview(target: Option<ResetTarget>, db: &NomadtermDb) {
     let state = load_preview_state(db);
     let preview = match target {
         Some(ResetTarget::Hooks) => render_hooks_preview(),

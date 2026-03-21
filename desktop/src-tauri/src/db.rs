@@ -32,7 +32,7 @@ pub struct RepoDB {
 impl RepoDB {
     /// Open (or create) the nomadterm database at `~/.nomadterm/nomadterm.db`.
     pub fn open() -> Result<Self> {
-        let path = hcom_db_path();
+        let path = nomadterm_db_path();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("create nomadterm dir {:?}", parent))?;
@@ -125,7 +125,7 @@ impl RepoDB {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn hcom_db_path() -> std::path::PathBuf {
+fn nomadterm_db_path() -> std::path::PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join(".nomadterm")

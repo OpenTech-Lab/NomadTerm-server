@@ -33,8 +33,8 @@ pub use constants::{
     status_fg,
     status_icon,
 };
-pub use context::HcomContext;
-pub use errors::{CLIError, HcomError, HookError};
+pub use context::NomadtermContext;
+pub use errors::{CLIError, NomadtermError, HookError};
 pub use identity::{CommandContext, SenderIdentity, SenderKind};
 pub use platform::{
     detect_current_tool_from_env, is_inside_ai_tool, is_termux, is_wsl, platform_name,

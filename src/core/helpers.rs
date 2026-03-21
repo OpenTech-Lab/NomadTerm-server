@@ -159,7 +159,7 @@ mod tests {
             instance_data: None,
             session_id: None,
         };
-        assert_eq!(get_bundle_instance_name(&id), "sys_hcom");
+        assert_eq!(get_bundle_instance_name(&id), "sys_nomadterm");
     }
 
     // ===== is_mentioned =====

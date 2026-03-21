@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 
 use crate::core::filters::{EventFilterArgs, build_sql_from_flags, resolve_filter_names};
 use crate::core::launch_status::wait_for_launch;
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::shared::CommandContext;
 
 /// Parsed arguments for `nomadterm events`.
@@ -152,7 +152,7 @@ pub fn streamline_event(event: &Value, filters: &HashMap<String, Vec<String>>) -
 
 /// Query events from events_v view. Returns parsed event objects.
 fn query_events(
-    db: &HcomDb,
+    db: &NomadtermDb,
     filter_query: &str,
     last_n: usize,
     params: &[&dyn rusqlite::types::ToSql],
@@ -201,7 +201,7 @@ fn query_events(
 // ── Subscription Management ──────────────────────────────────────────────
 
 /// List all active event subscriptions.
-fn events_sub_list(db: &HcomDb) -> i32 {
+fn events_sub_list(db: &NomadtermDb) -> i32 {
     let rows: Vec<(String, String)> = db
         .conn()
         .prepare("SELECT key, value FROM kv WHERE key LIKE 'events_sub:%'")
@@ -276,13 +276,13 @@ fn events_sub_list(db: &HcomDb) -> i32 {
 
 /// Show one-time tip for a command, tracked per-instance via kv.
 /// Delegates to centralized core::tips module.
-fn maybe_show_tip(db: &HcomDb, instance_name: &str, command: &str) {
+fn maybe_show_tip(db: &NomadtermDb, instance_name: &str, command: &str) {
     crate::core::tips::maybe_show_tip(db, instance_name, command, false);
 }
 
 /// Create a filter-based subscription.
 fn events_sub_filter(
-    db: &HcomDb,
+    db: &NomadtermDb,
     filters: &HashMap<String, Vec<String>>,
     sql_parts: &[String],
     caller: &str,
@@ -294,7 +294,7 @@ fn events_sub_filter(
 /// Core subscription creation logic. When `silent` is true, suppresses all stdout output.
 /// Used by both the CLI `events sub` command and `auto_subscribe_defaults`.
 pub(crate) fn create_filter_subscription(
-    db: &HcomDb,
+    db: &NomadtermDb,
     filters: &HashMap<String, Vec<String>>,
     sql_parts: &[String],
     caller: &str,
@@ -399,7 +399,7 @@ pub(crate) fn create_filter_subscription(
 }
 
 /// Create a raw SQL subscription.
-fn events_sub_sql(db: &HcomDb, sql_parts: &[String], caller: &str, once: bool) -> i32 {
+fn events_sub_sql(db: &NomadtermDb, sql_parts: &[String], caller: &str, once: bool) -> i32 {
     let sql = sql_parts.join(" ").replace("\\!", "!");
 
     // Validate SQL
@@ -476,7 +476,7 @@ fn events_sub_sql(db: &HcomDb, sql_parts: &[String], caller: &str, once: bool) -
 }
 
 /// Handle `nomadterm events sub` subcommand.
-fn cmd_events_sub(db: &HcomDb, args: &EventsSubArgs, caller_name: Option<&str>) -> i32 {
+fn cmd_events_sub(db: &NomadtermDb, args: &EventsSubArgs, caller_name: Option<&str>) -> i32 {
     // Handle 'list' subcommand
     if args.rest.first().map(|s| s.as_str()) == Some("list") {
         return events_sub_list(db);
@@ -578,7 +578,7 @@ fn cmd_events_sub(db: &HcomDb, args: &EventsSubArgs, caller_name: Option<&str>) 
 }
 
 /// Handle `nomadterm events unsub <id>`.
-fn cmd_events_unsub(db: &HcomDb, args: &EventsUnsubArgs) -> i32 {
+fn cmd_events_unsub(db: &NomadtermDb, args: &EventsUnsubArgs) -> i32 {
     let mut sub_id = args.id.clone();
     if !sub_id.starts_with("sub-") {
         sub_id = format!("sub-{sub_id}");
@@ -599,7 +599,7 @@ fn cmd_events_unsub(db: &HcomDb, args: &EventsUnsubArgs) -> i32 {
 }
 
 /// Handle `nomadterm events launch [batch_id] [--timeout N]`.
-fn cmd_events_launch(db: &HcomDb, args: &EventsLaunchArgs, instance_name: Option<&str>) -> i32 {
+fn cmd_events_launch(db: &NomadtermDb, args: &EventsLaunchArgs, instance_name: Option<&str>) -> i32 {
     let timeout = args.timeout;
 
     let batch_id = args.batch_id.as_deref();
@@ -633,7 +633,7 @@ fn cmd_events_launch(db: &HcomDb, args: &EventsLaunchArgs, instance_name: Option
 
 /// Wait mode: block until matching event or timeout.
 fn events_wait(
-    db: &HcomDb,
+    db: &NomadtermDb,
     filter_query: &str,
     wait_timeout: u64,
     full_output: bool,
@@ -806,7 +806,7 @@ fn sha256_hash(input: &str) -> String {
 }
 
 /// Build <nomadterm> XML message preview for unread notification.
-fn build_message_preview(db: &HcomDb, instance_name: &str) -> String {
+fn build_message_preview(db: &NomadtermDb, instance_name: &str) -> String {
     let messages = db.get_unread_messages(instance_name);
     if messages.is_empty() {
         return "<nomadterm></nomadterm>".to_string();
@@ -849,7 +849,7 @@ fn build_message_preview(db: &HcomDb, instance_name: &str) -> String {
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
 /// Main entry point for `nomadterm events` command.
-pub fn cmd_events(db: &HcomDb, args: &EventsArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_events(db: &NomadtermDb, args: &EventsArgs, ctx: Option<&CommandContext>) -> i32 {
     // Resolve identity context
     let instance_name = ctx
         .and_then(|c| c.identity.as_ref())
@@ -937,7 +937,7 @@ pub fn cmd_events(db: &HcomDb, args: &EventsArgs, ctx: Option<&CommandContext>) 
         }
 
         // Search archives
-        let archive_dir = crate::paths::hcom_dir().join("archive");
+        let archive_dir = crate::paths::nomadterm_dir().join("archive");
         if archive_dir.exists() {
             if let Ok(entries) = std::fs::read_dir(&archive_dir) {
                 for entry in entries.flatten() {
@@ -954,7 +954,7 @@ pub fn cmd_events(db: &HcomDb, args: &EventsArgs, ctx: Option<&CommandContext>) 
                         .and_then(|n| n.to_str())
                         .unwrap_or("archive");
 
-                    if let Ok(archive_db) = HcomDb::open_at(&db_path) {
+                    if let Ok(archive_db) = NomadtermDb::open_at(&db_path) {
                         // Build archive query with same filters
                         let archive_filter = filter_query.clone();
                         let query = format!(

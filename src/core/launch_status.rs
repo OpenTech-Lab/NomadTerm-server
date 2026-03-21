@@ -6,7 +6,7 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use rusqlite::params;
 
 /// Result of a launch wait operation.
@@ -55,7 +55,7 @@ struct LaunchData {
 }
 
 /// Count ready instances for a batch via 'ready' life events.
-fn get_ready_for_batch(db: &HcomDb, batch_id: &str) -> (i64, Vec<String>) {
+fn get_ready_for_batch(db: &NomadtermDb, batch_id: &str) -> (i64, Vec<String>) {
     let conn = db.conn();
     let mut stmt = match conn.prepare(
         "SELECT instance FROM events \
@@ -75,7 +75,7 @@ fn get_ready_for_batch(db: &HcomDb, batch_id: &str) -> (i64, Vec<String>) {
     (count, instances)
 }
 
-fn get_batch_instance_names(db: &HcomDb, batch_id: &str) -> Vec<String> {
+fn get_batch_instance_names(db: &NomadtermDb, batch_id: &str) -> Vec<String> {
     let conn = db.conn();
     let data_str: String = match conn.query_row(
         "SELECT data FROM events
@@ -106,7 +106,7 @@ fn get_batch_instance_names(db: &HcomDb, batch_id: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn get_batch_failure_details_for_ids(db: &HcomDb, batch_ids: &[String]) -> Vec<String> {
+fn get_batch_failure_details_for_ids(db: &NomadtermDb, batch_ids: &[String]) -> Vec<String> {
     let mut details = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
@@ -168,7 +168,7 @@ const LAUNCH_TIMEOUT_SECONDS: i64 = 60;
 ///
 /// Queries batch_launched events, gets ready counts from 'ready' life events,
 /// and aggregates.
-fn get_launch_status(db: &HcomDb, launcher: Option<&str>) -> Option<LaunchData> {
+fn get_launch_status(db: &NomadtermDb, launcher: Option<&str>) -> Option<LaunchData> {
     let conn = db.conn();
 
     let (sql, params): (String, Vec<String>) = if let Some(name) = launcher {
@@ -316,7 +316,7 @@ fn get_launch_status(db: &HcomDb, launcher: Option<&str>) -> Option<LaunchData> 
 ///
 /// Sums expected across matching
 /// batch_launched events, counts ready from 'ready' life events.
-fn get_launch_batch(db: &HcomDb, batch_id: &str) -> Option<LaunchData> {
+fn get_launch_batch(db: &NomadtermDb, batch_id: &str) -> Option<LaunchData> {
     let conn = db.conn();
 
     // Get aggregated launch info for this batch_id prefix
@@ -371,7 +371,7 @@ fn get_launch_batch(db: &HcomDb, batch_id: &str) -> Option<LaunchData> {
 ///
 /// Returns LaunchResult with status and batch details.
 pub fn wait_for_launch(
-    db: &HcomDb,
+    db: &NomadtermDb,
     launcher: Option<&str>,
     batch_id: Option<&str>,
     timeout_secs: u64,
@@ -380,7 +380,7 @@ pub fn wait_for_launch(
     // Stale placeholders can block launch detection.
     crate::instances::cleanup_stale_placeholders(db);
 
-    let fetch = |db: &HcomDb| -> Option<LaunchData> {
+    let fetch = |db: &NomadtermDb| -> Option<LaunchData> {
         if let Some(bid) = batch_id {
             get_launch_batch(db, bid)
         } else {
@@ -528,9 +528,9 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    fn make_test_db() -> (HcomDb, tempfile::TempDir) {
+    fn make_test_db() -> (NomadtermDb, tempfile::TempDir) {
         let dir = tempdir().unwrap();
-        let db = HcomDb::open_at(&dir.path().join("test.db")).unwrap();
+        let db = NomadtermDb::open_at(&dir.path().join("test.db")).unwrap();
         db.init_db().unwrap();
         (db, dir)
     }

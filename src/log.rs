@@ -11,9 +11,9 @@ const MAX_BYTES: u64 = 8_000_000;
 /// Default number of backup files to keep (.log.1, .log.2, .log.3).
 const DEFAULT_BACKUPS: u32 = 3;
 
-/// Read backup count from HCOM_LOG_BACKUPS env, falling back to default.
+/// Read backup count from NOMADTERM_LOG_BACKUPS env, falling back to default.
 fn log_backups() -> u32 {
-    std::env::var("HCOM_LOG_BACKUPS")
+    std::env::var("NOMADTERM_LOG_BACKUPS")
         .ok()
         .and_then(|v| v.parse::<u32>().ok())
         .unwrap_or(DEFAULT_BACKUPS)

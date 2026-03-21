@@ -2,7 +2,7 @@
 
 use std::io::{IsTerminal, Read as IoRead};
 
-use crate::db::HcomDb;
+use crate::db::NomadtermDb;
 use crate::identity;
 use crate::instances;
 use crate::messages::{
@@ -212,7 +212,7 @@ impl SendArgs {
 }
 
 /// Get formatted recipient feedback showing who received the message.
-fn get_recipient_feedback(db: &HcomDb, delivered_to: &[String]) -> String {
+fn get_recipient_feedback(db: &NomadtermDb, delivered_to: &[String]) -> String {
     if delivered_to.is_empty() {
         return format!("Sent to: {SENDER}");
     }
@@ -237,7 +237,7 @@ fn get_recipient_feedback(db: &HcomDb, delivered_to: &[String]) -> String {
 /// Validates message, computes scope, logs event, notifies all instances.
 /// Returns delivered_to list (base names).
 pub fn send_message(
-    db: &HcomDb,
+    db: &NomadtermDb,
     identity: &SenderIdentity,
     message: &str,
     envelope: Option<&MessageEnvelope>,
@@ -370,7 +370,7 @@ pub fn send_message(
 }
 
 /// Resolve reply_to to local event ID. Returns None if not found.
-fn resolve_reply_to_local(db: &HcomDb, reply_to: &str) -> Option<i64> {
+fn resolve_reply_to_local(db: &NomadtermDb, reply_to: &str) -> Option<i64> {
     // reply_to can be "42" or "42:BOXE" (remote)
     let local_part = reply_to.split(':').next()?;
     let id: i64 = local_part.parse().ok()?;
@@ -389,7 +389,7 @@ fn resolve_reply_to_local(db: &HcomDb, reply_to: &str) -> Option<i64> {
 }
 
 /// Get thread from an event (for --reply-to thread inheritance).
-fn get_thread_from_event(db: &HcomDb, event_id: i64) -> Option<String> {
+fn get_thread_from_event(db: &NomadtermDb, event_id: i64) -> Option<String> {
     db.conn()
         .query_row(
             "SELECT json_extract(data, '$.thread') FROM events WHERE id = ?",
@@ -401,7 +401,7 @@ fn get_thread_from_event(db: &HcomDb, event_id: i64) -> Option<String> {
 }
 
 /// Get intent from an event (for ack-on-ack prevention).
-fn get_intent_from_event(db: &HcomDb, event_id: i64) -> Option<String> {
+fn get_intent_from_event(db: &NomadtermDb, event_id: i64) -> Option<String> {
     db.conn()
         .query_row(
             "SELECT json_extract(data, '$.intent') FROM events WHERE id = ?",
@@ -413,7 +413,7 @@ fn get_intent_from_event(db: &HcomDb, event_id: i64) -> Option<String> {
 }
 
 /// Create request-watch subscriptions for each recipient.
-fn create_request_watches(db: &HcomDb, sender: &str, request_event_id: i64, recipients: &[String]) {
+fn create_request_watches(db: &NomadtermDb, sender: &str, request_event_id: i64, recipients: &[String]) {
     let last_id = db.get_last_event_id();
     let now = crate::shared::time::now_epoch_f64();
 
@@ -588,7 +588,7 @@ fn process_positionals(positionals: &[String]) -> (Vec<String>, Option<String>) 
 /// Main entry point for `nomadterm send` command.
 ///
 /// Returns exit code (0 = success, 1 = error).
-pub fn cmd_send(db: &HcomDb, args: &SendArgs, ctx: Option<&CommandContext>) -> i32 {
+pub fn cmd_send(db: &NomadtermDb, args: &SendArgs, ctx: Option<&CommandContext>) -> i32 {
     // ── Resolve --from name ──
     let from_name = args.sender_name();
 
@@ -994,7 +994,7 @@ pub fn cmd_send(db: &HcomDb, args: &SendArgs, ctx: Option<&CommandContext>) -> i
 
 /// Format messages for hook display (no ANSI).
 fn format_messages_for_hook(
-    db: &HcomDb,
+    db: &NomadtermDb,
     messages: &[&crate::db::Message],
     instance_name: &str,
 ) -> String {

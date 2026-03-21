@@ -16,7 +16,7 @@ use std::process::Command;
 use anyhow::{Context, Result, anyhow, bail};
 
 use crate::paths;
-use crate::shared::constants::{HCOM_IDENTITY_VARS, TOOL_MARKER_VARS};
+use crate::shared::constants::{NOMADTERM_IDENTITY_VARS, TOOL_MARKER_VARS};
 use crate::shared::platform;
 use crate::shared::terminal_presets::TERMINAL_ENV_MAP;
 
@@ -535,7 +535,7 @@ pub fn create_bash_script(
 
     // Unset tool markers and identity vars to prevent inheritance
     writeln!(f, "unset {}", TOOL_MARKER_VARS.join(" "))?;
-    writeln!(f, "unset {}", HCOM_IDENTITY_VARS.join(" "))?;
+    writeln!(f, "unset {}", NOMADTERM_IDENTITY_VARS.join(" "))?;
 
     // Discover paths for minimal environments (kitty splits, etc.)
     let mut paths_to_add: Vec<String> = Vec::new();
@@ -609,14 +609,14 @@ pub fn create_bash_script(
     if opens_new_window {
         writeln!(
             f,
-            "unset HCOM_PROCESS_ID HCOM_LAUNCHED HCOM_PTY_MODE HCOM_TAG HCOM_CODEX_SANDBOX_MODE"
+            "unset NOMADTERM_PROCESS_ID NOMADTERM_LAUNCHED NOMADTERM_PTY_MODE NOMADTERM_TAG NOMADTERM_CODEX_SANDBOX_MODE"
         )?;
         writeln!(f, "rm -f {}", shell_quote(&script_file.to_string_lossy()))?;
         writeln!(f, "exec bash -l")?;
     } else if !background {
-        writeln!(f, "hcom_status=$?")?;
+        writeln!(f, "nomadterm_status=$?")?;
         writeln!(f, "rm -f {}", shell_quote(&script_file.to_string_lossy()))?;
-        writeln!(f, "exit $hcom_status")?;
+        writeln!(f, "exit $nomadterm_status")?;
     }
 
     // Make executable (Unix only — Windows doesn't use Unix mode bits)
@@ -637,13 +637,13 @@ fn get_launcher_env() -> HashMap<String, String> {
     for v in TOOL_MARKER_VARS {
         strip.insert(v);
     }
-    for v in HCOM_IDENTITY_VARS {
+    for v in NOMADTERM_IDENTITY_VARS {
         strip.insert(v);
     }
     for v in TERMINAL_CONTEXT_VARS {
         strip.insert(v);
     }
-    strip.insert("HCOM_LAUNCHED_PRESET");
+    strip.insert("NOMADTERM_LAUNCHED_PRESET");
 
     std::env::vars()
         .filter(|(k, _)| !strip.contains(k.as_str()))
@@ -829,7 +829,7 @@ fn spawn_terminal_process(argv: &[String], inside_ai_tool: bool) -> Result<(bool
 
     if inside_ai_tool {
         // Fully detach: don't let AI tool's PTY capture our output
-        let launch_dir = paths::hcom_path(&[paths::LAUNCH_DIR]);
+        let launch_dir = paths::nomadterm_path(&[paths::LAUNCH_DIR]);
         fs::create_dir_all(&launch_dir).ok();
 
         let child = Command::new(&argv[0])
@@ -909,11 +909,11 @@ fn write_terminal_id(env: &HashMap<String, String>, captured_id: &str) {
     if captured_id.is_empty() {
         return;
     }
-    let process_id = match env.get("HCOM_PROCESS_ID") {
+    let process_id = match env.get("NOMADTERM_PROCESS_ID") {
         Some(pid) if !pid.is_empty() => pid,
         _ => return,
     };
-    let ids_dir = paths::hcom_path(&[".tmp", "terminal_ids"]);
+    let ids_dir = paths::nomadterm_path(&[".tmp", "terminal_ids"]);
     fs::create_dir_all(&ids_dir).ok();
     fs::write(ids_dir.join(process_id), captured_id).ok();
 }
@@ -985,7 +985,7 @@ pub fn launch_terminal(
         }
 
         if terminal_mode != "default" && terminal_mode != "print" {
-            final_env.insert("HCOM_LAUNCHED_PRESET".to_string(), terminal_mode.clone());
+            final_env.insert("NOMADTERM_LAUNCHED_PRESET".to_string(), terminal_mode.clone());
         }
         if !kitty_socket.is_empty() {
             final_env.insert("KITTY_LISTEN_ON".to_string(), kitty_socket.clone());
@@ -999,10 +999,10 @@ pub fn launch_terminal(
     } else {
         ".sh"
     };
-    let script_file = paths::hcom_path(&[
+    let script_file = paths::nomadterm_path(&[
         paths::LAUNCH_DIR,
         &format!(
-            "hcom_{}_{}{}",
+            "nomadterm_{}_{}{}",
             std::process::id(),
             rand::random::<u16>() % 9000 + 1000,
             extension
@@ -1027,9 +1027,9 @@ pub fn launch_terminal(
 
     // Background mode
     if background {
-        let logs_dir = paths::hcom_path(&[paths::LOGS_DIR]);
+        let logs_dir = paths::nomadterm_path(&[paths::LOGS_DIR]);
         fs::create_dir_all(&logs_dir).ok();
-        let log_name = env.get("HCOM_BACKGROUND").cloned().unwrap_or_default();
+        let log_name = env.get("NOMADTERM_BACKGROUND").cloned().unwrap_or_default();
         let log_file = logs_dir.join(&log_name);
 
         let log_handle = fs::File::create(&log_file).context("Failed to create log file")?;
@@ -1169,7 +1169,7 @@ pub fn launch_terminal(
         let final_argv = parse_terminal_command(
             &cmd_template,
             &script_str,
-            env.get("HCOM_PROCESS_ID").map(|s| s.as_str()).unwrap_or(""),
+            env.get("NOMADTERM_PROCESS_ID").map(|s| s.as_str()).unwrap_or(""),
         )?;
         let (success, captured_id) = spawn_terminal_process(&final_argv, inside_ai_tool)?;
         write_terminal_id(env, &captured_id);
@@ -1208,7 +1208,7 @@ pub fn launch_terminal(
             "Darwin" => parse_terminal_command(
                 &get_macos_terminal_command(),
                 &script_str,
-                env.get("HCOM_PROCESS_ID").map(|s| s.as_str()).unwrap_or(""),
+                env.get("NOMADTERM_PROCESS_ID").map(|s| s.as_str()).unwrap_or(""),
             )?,
             "Linux" => get_linux_terminal_argv()
                 .ok_or_else(|| anyhow::anyhow!("No supported terminal emulator found"))?,
@@ -1239,10 +1239,10 @@ fn build_full_env(config_env: &HashMap<String, String>) -> HashMap<String, Strin
         if TOOL_MARKER_VARS.contains(&k.as_str()) {
             continue;
         }
-        if k == "HCOM_TERMINAL" {
+        if k == "NOMADTERM_TERMINAL" {
             continue;
         }
-        // Config env takes precedence for HCOM_ vars
+        // Config env takes precedence for NOMADTERM_ vars
         full.entry(k).or_insert(v);
     }
     full
