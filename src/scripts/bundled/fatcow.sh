@@ -3,30 +3,30 @@
 #
 # Launches a headless Claude that gorges on a codebase module, memorizing files
 # with line references. Sits in background answering questions from other agents
-# via hcom. Subscribes to file changes to stay current.
+# via nomadterm. Subscribes to file changes to stay current.
 #
 # Two modes:
 #   Live (default): Stays running, answers in real-time, tracks file changes.
 #   Dead (--dead):  Ingests then stops. Resumed on demand via --ask.
 #
 # Usage:
-#   hcom run fatcow --path src/tools                          # live fatcow
-#   hcom run fatcow --path src/tools --dead                   # dead fatcow
-#   hcom run fatcow --ask fatcow.tools-luna "what does db.py export?"  # query
-#   hcom run fatcow --path src/ --focus "auth, middleware"           # with focus
-#   hcom stop @fatcow.tools                                         # kill by tag
+#   nomadterm run fatcow --path src/tools                          # live fatcow
+#   nomadterm run fatcow --path src/tools --dead                   # dead fatcow
+#   nomadterm run fatcow --ask fatcow.tools-luna "what does db.py export?"  # query
+#   nomadterm run fatcow --path src/ --focus "auth, middleware"           # with focus
+#   nomadterm stop @fatcow.tools                                         # kill by tag
 
 set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: hcom run fatcow [OPTIONS]
+Usage: nomadterm run fatcow [OPTIONS]
 
 Launch or query a fat cow - a dedicated codebase oracle.
 
 The fatcow agent reads every file in the specified path, memorizes structure
 and line references, then sits in background answering questions from other
-agents via hcom. Subscribes to file changes to stay current.
+agents via nomadterm. Subscribes to file changes to stay current.
 
 MODES:
   Live (default): Stays running, subscribes to file changes, answers in real-time.
@@ -49,11 +49,11 @@ Identity:
   -h, --help              Show this help
 
 Examples:
-  hcom run fatcow --path src/tools
-  hcom run fatcow --path src/ --focus "auth, middleware"
-  hcom run fatcow --path src/tools --dead
-  hcom run fatcow --ask fatcow.tools-luna "what does db.py export?"
-  hcom stop @fatcow.tools
+  nomadterm run fatcow --path src/tools
+  nomadterm run fatcow --path src/ --focus "auth, middleware"
+  nomadterm run fatcow --path src/tools --dead
+  nomadterm run fatcow --ask fatcow.tools-luna "what does db.py export?"
+  nomadterm stop @fatcow.tools
 EOF
   exit 0
 }
@@ -94,13 +94,13 @@ name_arg=""
 # --- Helper: resolve caller name ---
 resolve_caller() {
   local caller
-  caller=$(hcom list self --json $name_arg 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['name'])" 2>/dev/null) || caller="fatcow-q"
+  caller=$(nomadterm list self --json $name_arg 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['name'])" 2>/dev/null) || caller="fatcow-q"
   echo "$caller"
 }
 
 # --- Helper: check if instance is active ---
 is_active() {
-  hcom list "$1" --json $name_arg >/dev/null 2>&1
+  nomadterm list "$1" --json $name_arg >/dev/null 2>&1
 }
 
 # --- ASK MODE ---
@@ -111,14 +111,14 @@ if [[ -n "$ask_name" ]]; then
 
   # Live fatcow — just send the question
   if is_active "$ask_name"; then
-    hcom send "@${ask_name}" $name_arg -- "$ask_question" 2>/dev/null
+    nomadterm send "@${ask_name}" $name_arg -- "$ask_question" 2>/dev/null
     if [[ "$has_identity" == "true" ]]; then
-      echo "Asked ${ask_name} — answer will arrive via hcom"
+      echo "Asked ${ask_name} — answer will arrive via nomadterm"
       exit 0
     fi
     echo "Sent to live fatcow ${ask_name}, waiting for reply..."
     # Wait for reply
-    event=$(hcom events --wait "$timeout" --sql "type='message' AND msg_from='${ask_name}'" --json $name_arg 2>/dev/null) || true
+    event=$(nomadterm events --wait "$timeout" --sql "type='message' AND msg_from='${ask_name}'" --json $name_arg 2>/dev/null) || true
     if [[ -n "$event" ]]; then
       echo "$event" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data.get('data',{}).get('text',''))" 2>/dev/null
       exit 0
@@ -130,7 +130,7 @@ if [[ -n "$ask_name" ]]; then
 
   # Dead fatcow — resume it
   # Get stopped snapshot
-  stopped_json=$(hcom events --sql "type='life' AND instance='${ask_name}' AND json_extract(data, '$.action')='stopped'" --last 1 --json $name_arg 2>/dev/null) || true
+  stopped_json=$(nomadterm events --sql "type='life' AND instance='${ask_name}' AND json_extract(data, '$.action')='stopped'" --last 1 --json $name_arg 2>/dev/null) || true
   if [[ -z "$stopped_json" ]]; then
     echo "Error: '${ask_name}' not found (no stopped snapshot)" >&2
     exit 1
@@ -146,25 +146,25 @@ ${ask_question}
 ## INSTRUCTIONS
 
 1. Answer with file:line precision.
-2. Send your answer: hcom send @${caller_name} -- <your answer>
-3. Stop yourself: run hcom stop"
+2. Send your answer: nomadterm send @${caller_name} -- <your answer>
+3. Stop yourself: run nomadterm stop"
 
   # Resume
-  hcom 1 "$fatcow_tool" --go \
+  nomadterm 1 "$fatcow_tool" --go \
     --resume "$ask_name" \
-    --hcom-prompt "$resume_prompt" \
+    --nomadterm-prompt "$resume_prompt" \
     --headless >/dev/null 2>&1 || {
     echo "Error: Resume failed" >&2
     exit 1
   }
 
   if [[ "$has_identity" == "true" ]]; then
-    echo "Resumed ${ask_name} — answer will arrive via hcom"
+    echo "Resumed ${ask_name} — answer will arrive via nomadterm"
     exit 0
   fi
 
   echo "Resumed ${ask_name}, waiting for answer..."
-  event=$(hcom events --wait "$timeout" --sql "type='message' AND msg_from='${ask_name}'" --json $name_arg 2>/dev/null) || true
+  event=$(nomadterm events --wait "$timeout" --sql "type='message' AND msg_from='${ask_name}'" --json $name_arg 2>/dev/null) || true
   if [[ -n "$event" ]]; then
     echo "$event" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data.get('data',{}).get('text',''))" 2>/dev/null
     exit 0
@@ -266,7 +266,7 @@ ${ingest_section}
 
 4. Summarize what you indexed: file count, key modules, major exports/functions.
 
-5. Stop yourself: run \`hcom stop\`
+5. Stop yourself: run \`nomadterm stop\`
 
 Do NOT subscribe to events. Do NOT wait for questions. Summarize, then stop."
 
@@ -305,18 +305,18 @@ ${ingest_section}
 ## PHASE 2: INDEX & SUBSCRIBE
 
 4. Subscribe to file changes in your scope so you stay current:
-   - \`hcom events sub --file \"${file_glob}\"\`
+   - \`nomadterm events sub --file \"${file_glob}\"\`
    - When you get an [event] notification, re-read the changed file immediately.
 
 5. Announce you're ready:
-   - \`hcom send \"@${notify} [fatcow] Loaded ${display_path} - ready for questions\"\`
+   - \`nomadterm send \"@${notify} [fatcow] Loaded ${display_path} - ready for questions\"\`
 
 ## PHASE 3: ANSWER
 
 6. Wait for questions. When a message arrives:
    - Parse what they're asking about
    - Answer with file:line references
-   - Reply via: \`hcom send \"@<asker> <answer>\"\`
+   - Reply via: \`nomadterm send \"@<asker> <answer>\"\`
 
 7. On file change notifications:
    - Check which file changed, re-read it, update your mental model
@@ -330,9 +330,9 @@ You are a fat, lazy, knowledge-stuffed oracle. Eat all the files. Sit there. Ans
   fi
 fi
 
-hcom 1 "$tool" --tag "$tag" --go \
-  --hcom-system-prompt "$system_prompt" \
-  --hcom-prompt "$launch_prompt" \
+nomadterm 1 "$tool" --tag "$tag" --go \
+  --nomadterm-system-prompt "$system_prompt" \
+  --nomadterm-prompt "$launch_prompt" \
   -C "$cwd" \
   ${bg_flag} >/dev/null 2>&1 || {
   echo "Error: Launch failed" >&2
@@ -350,11 +350,11 @@ echo
 if [[ "$dead" == "true" ]]; then
   echo "Dead fatcow — will stop after ingestion."
   echo "Query it later:"
-  echo "  hcom run fatcow --ask ${tag}-<name> \"what does ${display_path} export?\""
+  echo "  nomadterm run fatcow --ask ${tag}-<name> \"what does ${display_path} export?\""
 else
   echo "Ask it anything:"
-  echo "  hcom send \"@${tag} what functions does ${display_path} export?\""
-  echo "  hcom send \"@${tag} where is error handling done?\""
+  echo "  nomadterm send \"@${tag} what functions does ${display_path} export?\""
+  echo "  nomadterm send \"@${tag} where is error handling done?\""
   echo
-  echo "Stop: hcom stop @${tag}"
+  echo "Stop: nomadterm stop @${tag}"
 fi

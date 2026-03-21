@@ -1,6 +1,6 @@
 //! Relay worker process — manages the MQTT relay as a standalone process.
 //!
-//! Entry point for `hcom relay-worker`. Handles PID file management,
+//! Entry point for `nomadterm relay-worker`. Handles PID file management,
 //! signal handling, auto-exit watchdog, and relay lifecycle.
 //!
 //! Auto-spawn: `maybe_auto_spawn()` checks config, PID, and instance count
@@ -106,7 +106,7 @@ pub fn run() -> i32 {
     };
 
     // Bind TCP notify listener for CLI → daemon push wake.
-    // CLI callers (hcom send, hooks) connect to trigger immediate push.
+    // CLI callers (nomadterm send, hooks) connect to trigger immediate push.
     let notify_port = setup_notify_listener(&cmd_tx);
 
     // Install signal handlers via signal-hook (sets AtomicBool on SIGTERM/SIGINT).

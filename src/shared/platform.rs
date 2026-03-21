@@ -123,7 +123,7 @@ pub fn is_inside_ai_tool() -> bool {
         || is_set("CODEX_THREAD_ID")
         // OpenCode
         || is_eq("OPENCODE", "1")
-        // hcom-launched
+        // nomadterm-launched
         || is_eq("HCOM_LAUNCHED", "1")
 }
 

@@ -1,4 +1,4 @@
-//! Shared CLI infrastructure for hcom commands.
+//! Shared CLI infrastructure for nomadterm commands.
 //!
 //! - `CommandContext` builder (`_build_ctx_for_command`)
 //! - Identity gating (`REQUIRE_IDENTITY`)
@@ -97,11 +97,11 @@ pub fn check_identity_gate(
     if !is_participant {
         let hcom_cmd = crate::runtime_env::build_hcom_command();
         let mut msg = format!(
-            "hcom identity not found, you need to run '{hcom_cmd} start' first, then use '{hcom_cmd} {cmd}'"
+            "nomadterm identity not found, you need to run '{hcom_cmd} start' first, then use '{hcom_cmd} {cmd}'"
         );
         if is_inside_ai_tool {
             msg.push_str(&format!(
-                "\nUsage:\n  {hcom_cmd} start              # New hcom identity (assigns new name)\n  {hcom_cmd} start --as <name>  # Rebind to existing identity\n  Then use the command: {hcom_cmd} {cmd} --name <name>"
+                "\nUsage:\n  {hcom_cmd} start              # New nomadterm identity (assigns new name)\n  {hcom_cmd} start --as <name>  # Rebind to existing identity\n  Then use the command: {hcom_cmd} {cmd} --name <name>"
             ));
         } else {
             msg.push_str(&format!("\nUsage: {hcom_cmd} start"));
@@ -116,7 +116,7 @@ pub fn check_identity_gate(
 ///
 /// Claude/Gemini main instances have PreToolUse hooks that set active:tool:*.
 /// These instance types need explicit status updates here:
-/// - Subagent: has Claude hooks but not for hcom Bash commands
+/// - Subagent: has Claude hooks but not for nomadterm Bash commands
 /// - Codex: has notify hook (turn-end) but no pre-tool hook
 /// - Adhoc: no hooks at all
 ///
@@ -217,7 +217,7 @@ pub fn maybe_deliver_pending_messages(
     // Format with divider
     let formatted = format_hook_messages_simple_from_msgs(db, &messages, &identity.name);
     let output = format!(
-        "\n{}\n[hcom]\n{}\n{}",
+        "\n{}\n[nomadterm]\n{}\n{}",
         "─".repeat(40),
         "─".repeat(40),
         formatted,

@@ -78,7 +78,7 @@ pub fn get_broker_from_config(config: &HcomConfig) -> Option<(String, u16, bool)
 }
 
 /// Get or create persistent device UUID
-/// Reads from ~/.hcom/.tmp/device_id; creates with a new UUID if missing.
+/// Reads from ~/.nomadterm/.tmp/device_id; creates with a new UUID if missing.
 pub fn read_device_uuid() -> String {
     let path = crate::paths::hcom_dir().join(".tmp").join("device_id");
     if let Ok(content) = std::fs::read_to_string(&path) {

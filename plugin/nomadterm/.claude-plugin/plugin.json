@@ -1,0 +1,12 @@
+{
+  "name": "nomadterm",
+  "version": "1.0.0",
+  "description": "Let AI agents message, watch, and spawn each other across terminals. Claude Code, Gemini CLI, Codex, OpenCode.",
+  "author": {
+    "name": "aannoo"
+  },
+  "homepage": "https://github.com/aannoo/nomadterm",
+  "repository": "https://github.com/aannoo/nomadterm",
+  "license": "MIT",
+  "keywords": ["nomadterm", "multi-agent", "communication", "claude", "gemini", "codex", "opencode"]
+}

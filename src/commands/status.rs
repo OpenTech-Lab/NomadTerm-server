@@ -1,4 +1,4 @@
-//! `hcom status` command — system health overview.
+//! `nomadterm status` command — system health overview.
 //!
 //!
 //! Shows: version, directory, config, tools, terminal, agents, relay, logs.
@@ -10,7 +10,7 @@ use serde_json::json;
 use crate::db::HcomDb;
 use crate::shared::CommandContext;
 
-/// Parsed arguments for `hcom status`.
+/// Parsed arguments for `nomadterm status`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "status", about = "System health overview")]
 pub struct StatusArgs {
@@ -38,7 +38,7 @@ fn check_claude_hooks() -> bool {
         .map(|h| h.join(".claude/settings.json"))
         .unwrap_or_default();
     if let Ok(content) = std::fs::read_to_string(&settings_path) {
-        content.contains("hcom") || content.contains("hook-comms")
+        content.contains("nomadterm") || content.contains("hook-comms")
     } else {
         false
     }
@@ -50,7 +50,7 @@ fn check_gemini_hooks() -> bool {
         .map(|h| h.join(".gemini/settings.json"))
         .unwrap_or_default();
     if let Ok(content) = std::fs::read_to_string(&settings_path) {
-        content.contains("hcom") || content.contains("hook-comms")
+        content.contains("nomadterm") || content.contains("hook-comms")
     } else {
         false
     }
@@ -72,15 +72,15 @@ fn check_codex_hooks() -> bool {
         return false;
     }
     // Must have execpolicy rules file
-    let rules_path = home.join(".codex/rules/hcom.rules");
+    let rules_path = home.join(".codex/rules/nomadterm.rules");
     rules_path.exists()
 }
 
 /// Check OpenCode plugin installation.
 fn check_opencode_hooks() -> bool {
     let plugin_paths = [
-        dirs::home_dir().map(|h| h.join(".config/opencode/plugins/hcom.ts")),
-        dirs::config_dir().map(|h| h.join("opencode/plugins/hcom.ts")),
+        dirs::home_dir().map(|h| h.join(".config/opencode/plugins/nomadterm.ts")),
+        dirs::config_dir().map(|h| h.join("opencode/plugins/nomadterm.ts")),
     ];
     plugin_paths
         .iter()
@@ -180,7 +180,7 @@ fn get_agent_counts(db: &HcomDb) -> AgentCounts {
 
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
-/// Main entry point for `hcom status` command.
+/// Main entry point for `nomadterm status` command.
 pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>) -> i32 {
     let json_mode = args.json;
     let show_logs = args.logs;
@@ -311,7 +311,7 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
     }
 
     // Pretty output
-    println!("hcom {}", env!("CARGO_PKG_VERSION"));
+    println!("nomadterm {}", env!("CARGO_PKG_VERSION"));
     println!();
 
     // Directory
@@ -450,7 +450,7 @@ pub fn cmd_status(db: &HcomDb, args: &StatusArgs, _ctx: Option<&CommandContext>)
     }
 
     if show_logs {
-        let log_path = hcom_dir.join(".tmp/logs/hcom.log");
+        let log_path = hcom_dir.join(".tmp/logs/nomadterm.log");
         if log_path.exists() {
             println!("           {}", log_path.display());
             let entries = crate::log::get_recent_logs(1.0, &["ERROR", "WARN"], 20);

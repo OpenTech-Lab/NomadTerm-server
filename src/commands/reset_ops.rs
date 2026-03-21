@@ -9,12 +9,12 @@ pub(crate) fn get_archive_timestamp() -> String {
     chrono::Local::now().format("%Y-%m-%d_%H%M%S").to_string()
 }
 
-/// Archive the current database to ~/.hcom/archive/session-{timestamp}/.
+/// Archive the current database to ~/.nomadterm/archive/session-{timestamp}/.
 pub(crate) fn archive_and_clear_db() -> Result<Option<String>, String> {
     let base = hcom_dir();
-    let db_file = base.join("hcom.db");
-    let db_wal = base.join("hcom.db-wal");
-    let db_shm = base.join("hcom.db-shm");
+    let db_file = base.join("nomadterm.db");
+    let db_wal = base.join("nomadterm.db-wal");
+    let db_shm = base.join("nomadterm.db-shm");
 
     if !db_file.exists() {
         return Ok(None);
@@ -46,12 +46,12 @@ pub(crate) fn archive_and_clear_db() -> Result<Option<String>, String> {
     let session_archive = base.join(ARCHIVE_DIR).join(format!("session-{timestamp}"));
     fs::create_dir_all(&session_archive).map_err(|e| e.to_string())?;
 
-    fs::copy(&db_file, session_archive.join("hcom.db")).map_err(|e| e.to_string())?;
+    fs::copy(&db_file, session_archive.join("nomadterm.db")).map_err(|e| e.to_string())?;
     if db_wal.exists() {
-        let _ = fs::copy(&db_wal, session_archive.join("hcom.db-wal"));
+        let _ = fs::copy(&db_wal, session_archive.join("nomadterm.db-wal"));
     }
     if db_shm.exists() {
-        let _ = fs::copy(&db_shm, session_archive.join("hcom.db-shm"));
+        let _ = fs::copy(&db_shm, session_archive.join("nomadterm.db-shm"));
     }
 
     let _ = fs::remove_file(&db_file);
@@ -192,11 +192,11 @@ pub(crate) fn print_archive_result(result: Result<Option<String>, String>) -> i3
     match result {
         Ok(Some(path)) => {
             println!("Archived to {}/", shorten_path(&path));
-            println!("Started fresh HCOM conversation");
+            println!("Started fresh NOMADTERM conversation");
             0
         }
         Ok(None) => {
-            println!("No HCOM conversation to clear");
+            println!("No NOMADTERM conversation to clear");
             0
         }
         Err(e) => {

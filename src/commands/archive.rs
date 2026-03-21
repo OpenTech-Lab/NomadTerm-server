@@ -1,8 +1,8 @@
-//! `hcom archive` command — list and query archived sessions.
+//! `nomadterm archive` command — list and query archived sessions.
 //!
 //!
-//! Archives are stored in `~/.hcom/archive/session-{timestamp}/`, each containing
-//! a copy of hcom.db from that session. This command lists and queries them.
+//! Archives are stored in `~/.nomadterm/archive/session-{timestamp}/`, each containing
+//! a copy of nomadterm.db from that session. This command lists and queries them.
 
 use std::path::{Path, PathBuf};
 
@@ -10,7 +10,7 @@ use crate::db::HcomDb;
 use crate::paths::{ARCHIVE_DIR, hcom_dir};
 use crate::shared::CommandContext;
 
-/// Parsed arguments for `hcom archive`.
+/// Parsed arguments for `nomadterm archive`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "archive", about = "List and query archived sessions")]
 pub struct ArchiveArgs {
@@ -68,7 +68,7 @@ fn list_archives(here_filter: bool) -> Vec<serde_json::Value> {
     let mut archives = Vec::new();
 
     for session_dir in &session_dirs {
-        let db_path = session_dir.join("hcom.db");
+        let db_path = session_dir.join("nomadterm.db");
         if !db_path.exists() {
             continue;
         }
@@ -182,7 +182,7 @@ fn query_archive_events(
     last: usize,
 ) -> Result<Vec<serde_json::Value>, String> {
     let path = archive["path"].as_str().ok_or("Invalid archive path")?;
-    let db_path = PathBuf::from(path).join("hcom.db");
+    let db_path = PathBuf::from(path).join("nomadterm.db");
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
 
     let query = if let Some(filter) = sql_filter {
@@ -236,7 +236,7 @@ fn query_archive_instances(
     sql_filter: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, String> {
     let path = archive["path"].as_str().ok_or("Invalid archive path")?;
-    let db_path = PathBuf::from(path).join("hcom.db");
+    let db_path = PathBuf::from(path).join("nomadterm.db");
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
 
     let query = if let Some(filter) = sql_filter {
@@ -321,7 +321,7 @@ pub fn cmd_archive(_db: &HcomDb, args: &ArchiveArgs, _ctx: Option<&CommandContex
         Some(a) => a,
         None => {
             eprintln!("Error: Archive not found: {selector}");
-            eprintln!("Run 'hcom archive' to list available archives");
+            eprintln!("Run 'nomadterm archive' to list available archives");
             return 1;
         }
     };

@@ -1,7 +1,7 @@
 //! Broker discovery — parallel TLS handshake to find working MQTT broker.
 //!
 //! Uses std::thread::scope for parallel connections (no async runtime needed).
-//! Used by `hcom relay new` to find and pin the fastest public broker.
+//! Used by `nomadterm relay new` to find and pin the fastest public broker.
 
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::Arc;

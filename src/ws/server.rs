@@ -1,7 +1,7 @@
 //! Axum WebSocket server — Phase 1 & Phase 5 (auth + optional TLS).
 //!
 //! Startup sequence:
-//!   1. Load or generate a random bearer token from ~/.hcom/nomadterm.token
+//!   1. Load or generate a random bearer token from ~/.nomadterm/nomadterm.token
 //!   2. Bind to Tailscale IP (--bind-tailscale) or 0.0.0.0 on the given port
 //!   3. Print connection string + QR code to stdout
 //!   4. Handle /ws upgrades, validating Authorization: Bearer <token>

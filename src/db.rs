@@ -1,6 +1,6 @@
-//! SQLite database access for hcom
+//! SQLite database access for nomadterm
 //!
-//! Minimal read/write access to ~/.hcom/hcom.db for:
+//! Minimal read/write access to ~/.nomadterm/nomadterm.db for:
 //! - Reading unread messages (events table with type='message')
 //! - Updating cursor position (instances.last_event_id)
 //! - Reading instance status
@@ -169,7 +169,7 @@ pub struct RepoRow {
     pub is_active: bool,
 }
 
-/// Database handle for hcom operations
+/// Database handle for nomadterm operations
 pub struct HcomDb {
     conn: Connection,
     db_path: std::path::PathBuf,
@@ -195,13 +195,13 @@ impl HcomDb {
         &self.conn
     }
 
-    /// Open the hcom database at ~/.hcom/hcom.db
+    /// Open the nomadterm database at ~/.nomadterm/nomadterm.db
     pub fn open() -> Result<Self> {
         let db_path = crate::paths::db_path();
         Self::open_at(&db_path)
     }
 
-    /// Open the hcom database at a specific path (for testing)
+    /// Open the nomadterm database at a specific path (for testing)
     pub fn open_at(db_path: &std::path::Path) -> Result<Self> {
         let conn = Connection::open(db_path)
             .with_context(|| format!("Failed to open database: {}", db_path.display()))?;
@@ -220,7 +220,7 @@ impl HcomDb {
         })
     }
 
-    /// Reconnect if the DB file was replaced (e.g., by hcom reset / schema bump).
+    /// Reconnect if the DB file was replaced (e.g., by nomadterm reset / schema bump).
     /// Returns true if reconnection happened.
     pub fn reconnect_if_stale(&mut self) -> bool {
         let current_inode = get_inode(&self.db_path);
@@ -452,7 +452,7 @@ impl HcomDb {
                 Ok(())
             }
             SchemaCompat::NeedsArchive(reason) => {
-                eprintln!("hcom: {}, archiving...", reason);
+                eprintln!("nomadterm: {}, archiving...", reason);
 
                 // Snapshot running instances to pidtrack before archive so orphan
                 // recovery can re-register them into the fresh DB.
@@ -461,8 +461,8 @@ impl HcomDb {
                 // Archive the old DB
                 let archive_path = Self::archive_db_at(&self.db_path)?;
                 if let Some(ref path) = archive_path {
-                    eprintln!("hcom: Archived to {}", path);
-                    eprintln!("       Query with: hcom archive 1");
+                    eprintln!("nomadterm: Archived to {}", path);
+                    eprintln!("       Query with: nomadterm archive 1");
                 }
 
                 // Reconnect to fresh DB file
@@ -653,7 +653,7 @@ impl HcomDb {
         // Copy DB files to archive
         let db_name = db_path
             .file_name()
-            .unwrap_or_else(|| std::ffi::OsStr::new("hcom.db"));
+            .unwrap_or_else(|| std::ffi::OsStr::new("nomadterm.db"));
         std::fs::copy(db_path, archive_dir.join(db_name))?;
         if db_wal.exists() {
             let wal_name = format!("{}-wal", db_name.to_string_lossy());
@@ -674,7 +674,7 @@ impl HcomDb {
 
     /// Snapshot running instances to pidtrack before DB archive.
     ///
-    /// Writes live instances (with their PIDs) to ~/.hcom/.tmp/launched_pids.json
+    /// Writes live instances (with their PIDs) to ~/.nomadterm/.tmp/launched_pids.json
     /// so orphan recovery can re-register them into the fresh DB after schema bump.
     fn snapshot_running_to_pidtrack(&self) {
         let Ok(mut stmt) = self.conn.prepare(
@@ -748,7 +748,7 @@ impl HcomDb {
 
     /// Log _device reset event + set relay timestamp. Call after any DB archive/reset.
     pub fn log_reset_event(&self) -> Result<()> {
-        // Derive hcom_dir from db_path (db is at hcom_dir/hcom.db)
+        // Derive hcom_dir from db_path (db is at hcom_dir/nomadterm.db)
         let hcom_dir = self
             .db_path
             .parent()
@@ -949,7 +949,7 @@ impl HcomDb {
 
     /// Check if instance is idle (safe for PTY injection).
     /// Returns true only when status is "listening" AND detail is not "cmd:listen".
-    /// The "cmd:listen" detail is set by `hcom listen` as its first operation,
+    /// The "cmd:listen" detail is set by `nomadterm listen` as its first operation,
     /// ensuring the gate blocks before any async setup (endpoint registration, etc.).
     pub fn is_idle(&self, name: &str) -> bool {
         match self.get_instance_status(name) {
@@ -1088,7 +1088,7 @@ impl HcomDb {
         let already_sent: bool = self.conn.query_row(
             "SELECT COUNT(*) FROM events
              WHERE type = 'message'
-               AND instance = 'sys_[hcom-launcher]'
+               AND instance = 'sys_[nomadterm-launcher]'
                AND json_extract(data, '$.text') LIKE ?
              LIMIT 1",
             params![format!("%batch: {}%", batch_id)],
@@ -1119,13 +1119,13 @@ impl HcomDb {
 
         // Insert system message
         let msg_data = serde_json::json!({
-            "from": "[hcom-launcher]",
+            "from": "[nomadterm-launcher]",
             "text": text,
             "scope": "mentions",
             "mentions": [launcher],
             "sender_kind": "system",
         });
-        self.log_event_with_ts("message", "sys_[hcom-launcher]", &msg_data, None)?;
+        self.log_event_with_ts("message", "sys_[nomadterm-launcher]", &msg_data, None)?;
 
         Ok(())
     }
@@ -1149,7 +1149,7 @@ impl HcomDb {
         let already_sent: bool = self.conn.query_row(
             "SELECT COUNT(*) FROM events
              WHERE type = 'message'
-               AND instance = 'sys_[hcom-launcher]'
+               AND instance = 'sys_[nomadterm-launcher]'
                AND json_extract(data, '$.text') = ?
              LIMIT 1",
             params![text],
@@ -1161,13 +1161,13 @@ impl HcomDb {
         }
 
         let msg_data = serde_json::json!({
-            "from": "[hcom-launcher]",
+            "from": "[nomadterm-launcher]",
             "text": text,
             "scope": "mentions",
             "mentions": [launcher],
             "sender_kind": "system",
         });
-        self.log_event_with_ts("message", "sys_[hcom-launcher]", &msg_data, None)?;
+        self.log_event_with_ts("message", "sys_[nomadterm-launcher]", &msg_data, None)?;
 
         Ok(())
     }
@@ -1181,7 +1181,7 @@ impl HcomDb {
     ///   context: Gate context like "tui:not-ready", "tui:user-active", etc.
     ///   detail: Human-readable description like "user is typing"
     /// Preserve status_detail when it's "cmd:listen" — gate diagnostics must not
-    /// overwrite the flag that blocks PTY injection during `hcom listen`.
+    /// overwrite the flag that blocks PTY injection during `nomadterm listen`.
     pub fn set_gate_status(&self, name: &str, context: &str, detail: &str) -> Result<()> {
         self.conn.execute(
             "UPDATE instances SET status_context = ?,
@@ -1630,7 +1630,7 @@ impl HcomDb {
                                         .collect();
                                     bail!(
                                         "Session bound to parent '{}'. \
-                                         Subagents must use: hcom start --name <agent_id>\n\
+                                         Subagents must use: nomadterm start --name <agent_id>\n\
                                          Active agent_ids: {}",
                                         existing,
                                         ids.join(", ")
@@ -1756,7 +1756,7 @@ impl HcomDb {
             .is_ok()
     }
 
-    /// Check if instance has a process binding (hcom-launched).
+    /// Check if instance has a process binding (nomadterm-launched).
     pub fn has_process_binding_for_instance(&self, instance_name: &str) -> bool {
         if instance_name.is_empty() {
             return false;
@@ -1916,7 +1916,7 @@ impl HcomDb {
                 .get("sender_kind")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            if sender == "[hcom-events]" || sender_kind == "system" {
+            if sender == "[nomadterm-events]" || sender_kind == "system" {
                 return;
             }
         }
@@ -2422,7 +2422,7 @@ impl HcomDb {
         };
 
         let text = format!("@{} {}", full_name, message);
-        self.send_system_message("[hcom-events]", &text).is_ok()
+        self.send_system_message("[nomadterm-events]", &text).is_ok()
     }
 
     /// Send a system notification message (simplified inline version).
@@ -3800,8 +3800,8 @@ mod tests {
             .unwrap();
 
         // Log event from sys_ instance - should NOT trigger subscription
-        let data = serde_json::json!({"from": "[hcom-events]", "text": "test"});
-        db.log_event("message", "sys_[hcom-events]", &data).unwrap();
+        let data = serde_json::json!({"from": "[nomadterm-events]", "text": "test"});
+        db.log_event("message", "sys_[nomadterm-events]", &data).unwrap();
 
         // Sub should not be updated (last_id should still be 0)
         let sub_after = db.kv_get("events_sub:test").unwrap().unwrap();
@@ -3833,7 +3833,7 @@ mod tests {
 
         // Log system message - recursion guard should skip
         let data = serde_json::json!({
-            "from": "[hcom-events]",
+            "from": "[nomadterm-events]",
             "sender_kind": "system",
             "text": "notification"
         });
@@ -4130,9 +4130,9 @@ mod tests {
         db.kv_set("events_sub:test", Some(&sub.to_string()))
             .unwrap();
 
-        // Log message from [hcom-events] (non-sys_ instance) — guard B should skip
+        // Log message from [nomadterm-events] (non-sys_ instance) — guard B should skip
         let data = serde_json::json!({
-            "from": "[hcom-events]",
+            "from": "[nomadterm-events]",
             "text": "notification from events"
         });
         db.log_event("message", "ext_notifier", &data).unwrap();
@@ -4142,7 +4142,7 @@ mod tests {
         let sub_val: serde_json::Value = serde_json::from_str(&sub_after).unwrap();
         assert_eq!(
             sub_val["last_id"], 0,
-            "[hcom-events] sender should be blocked by guard B"
+            "[nomadterm-events] sender should be blocked by guard B"
         );
 
         cleanup_test_db(db_path);
@@ -4167,7 +4167,7 @@ mod tests {
 
         // No @mentions = broadcast
         let delivered = db
-            .send_system_message("[hcom-test]", "hello everyone")
+            .send_system_message("[nomadterm-test]", "hello everyone")
             .unwrap();
         assert_eq!(delivered.len(), 2);
         assert!(delivered.contains(&"luna".to_string()));
@@ -4195,7 +4195,7 @@ mod tests {
 
         // With @mention = targeted
         let delivered = db
-            .send_system_message("[hcom-test]", "@luna your task is done")
+            .send_system_message("[nomadterm-test]", "@luna your task is done")
             .unwrap();
         assert_eq!(delivered.len(), 1);
         assert!(delivered.contains(&"luna".to_string()));
@@ -4216,7 +4216,7 @@ mod tests {
 
         // Mention by full name (tag-name)
         let delivered = db
-            .send_system_message("[hcom-test]", "@api-luna your task is done")
+            .send_system_message("[nomadterm-test]", "@api-luna your task is done")
             .unwrap();
         assert_eq!(delivered.len(), 1);
         assert!(delivered.contains(&"luna".to_string()));
@@ -4245,7 +4245,7 @@ mod tests {
             .query_row(
                 "SELECT COUNT(*) FROM events
                  WHERE type = 'message'
-                   AND instance = 'sys_[hcom-launcher]'
+                   AND instance = 'sys_[nomadterm-launcher]'
                    AND json_extract(data, '$.text') = '@leku Launch failed: para: boom (batch: batch-1)'",
                 [],
                 |row| row.get(0),

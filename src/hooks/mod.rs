@@ -48,13 +48,13 @@ pub mod test_helpers {
         }
     }
 
-    /// Create an isolated test env: tempdir with .hcom dir, env vars set.
+    /// Create an isolated test env: tempdir with .nomadterm dir, env vars set.
     /// Returns (tempdir, hcom_dir, test_home, guard).
     pub fn isolated_test_env() -> (tempfile::TempDir, PathBuf, PathBuf, EnvGuard) {
         let guard = EnvGuard::new();
         let dir = tempfile::tempdir().unwrap();
         let test_home = dir.path().to_path_buf();
-        let hcom_dir = test_home.join(".hcom");
+        let hcom_dir = test_home.join(".nomadterm");
         std::fs::create_dir_all(&hcom_dir).unwrap();
         unsafe {
             std::env::set_var("HCOM_DIR", &hcom_dir);
@@ -438,12 +438,12 @@ mod tests {
     #[test]
     fn test_hook_result_block() {
         let result = HookResult::Block {
-            reason: "<hcom>message here</hcom>".into(),
+            reason: "<nomadterm>message here</nomadterm>".into(),
         };
         assert_eq!(result.exit_code(), 2);
         match &result {
             HookResult::Block { reason } => {
-                assert_eq!(reason, "<hcom>message here</hcom>");
+                assert_eq!(reason, "<nomadterm>message here</nomadterm>");
             }
             _ => panic!("expected Block"),
         }

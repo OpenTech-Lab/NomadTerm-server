@@ -523,14 +523,14 @@ pub fn create_bash_script(
         } else if cmd_lower.contains("claude") {
             "Claude Code"
         } else {
-            "hcom"
+            "nomadterm"
         }
     });
 
     let mut f = fs::File::create(script_file).context("Failed to create script file")?;
 
     writeln!(f, "#!/bin/bash")?;
-    writeln!(f, "printf \"\\033]0;hcom: starting {}...\\007\"", tool_name)?;
+    writeln!(f, "printf \"\\033]0;nomadterm: starting {}...\\007\"", tool_name)?;
     writeln!(f, "echo \"Starting {}...\"", tool_name)?;
 
     // Unset tool markers and identity vars to prevent inheritance
@@ -551,8 +551,8 @@ pub fn create_bash_script(
         }
     }
 
-    // Always add hcom's own directory
-    add_path(&mut paths_to_add, which_bin("hcom"));
+    // Always add nomadterm's own directory
+    add_path(&mut paths_to_add, which_bin("nomadterm"));
     // Add python3 to PATH for agents that need it
     add_path(&mut paths_to_add, which_bin("python3"));
     // Detect tool from command and add its path
@@ -631,7 +631,7 @@ pub fn create_bash_script(
 
 /// Build clean env for terminal launcher subprocesses.
 ///
-/// Strips AI tool markers, hcom identity vars, and terminal context vars.
+/// Strips AI tool markers, nomadterm identity vars, and terminal context vars.
 fn get_launcher_env() -> HashMap<String, String> {
     let mut strip: std::collections::HashSet<&str> = std::collections::HashSet::new();
     for v in TOOL_MARKER_VARS {
@@ -816,7 +816,7 @@ fn maybe_append_ai_tool_launch_hint(
     }
 
     let hint = if argv.first().map(|s| s.as_str()) == Some("tmux") {
-        "Hint: Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s hcom-external`), then retry."
+        "Hint: Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s nomadterm-external`), then retry."
     } else {
         "Hint: This launch was attempted from inside a managed AI tool session, where terminal or session creation may be restricted. Rerun it with approval/escalation."
     };
@@ -1569,7 +1569,7 @@ mod tests {
             true,
         );
         assert!(message.contains("tmux kill-server"));
-        assert!(message.contains("tmux new-session -d -s hcom-external"));
+        assert!(message.contains("tmux new-session -d -s nomadterm-external"));
     }
 
     #[test]

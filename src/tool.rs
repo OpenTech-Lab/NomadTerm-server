@@ -1,4 +1,4 @@
-//! Tool enum for type-safe tool identification across hcom.
+//! Tool enum for type-safe tool identification across nomadterm.
 //!
 //! Centralizes tool-specific configuration (ready patterns, etc) to avoid
 //! scattered string comparisons and magic values.

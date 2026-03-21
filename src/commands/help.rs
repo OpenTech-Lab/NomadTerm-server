@@ -1,4 +1,4 @@
-//! Native help text for all hcom commands.
+//! Native help text for all nomadterm commands.
 //!
 //! Each command has a list of (usage, description) entries formatted by `get_command_help()`.
 
@@ -62,7 +62,7 @@ const EVENTS_HELP_2: &[HelpEntry] = &[
     ("  --blocked NAME", "--agent NAME --status blocked"),
     ("", ""),
     (
-        "Subscribe (next matching event delivered as messages from [hcom-events]):",
+        "Subscribe (next matching event delivered as messages from [nomadterm-events]):",
         "",
     ),
     ("  events sub list", "List active subscriptions"),
@@ -144,7 +144,7 @@ const LIST_HELP: &[HelpEntry] = &[
         "Print specific field (status, directory, session_id, ...)",
     ),
     ("  --json", "Output as JSON"),
-    ("  --sh", "Shell exports: eval \"$(hcom list self --sh)\""),
+    ("  --sh", "Shell exports: eval \"$(nomadterm list self --sh)\""),
     ("", ""),
     ("list --stopped [name]", "Stopped agents (from events)"),
     ("  --all", "All stopped (default: last 20)"),
@@ -162,7 +162,7 @@ const LIST_HELP: &[HelpEntry] = &[
     ("Tool labels:", ""),
     (
         "",
-        "[CLAUDE] [GEMINI] [CODEX] [OPENCODE]  hcom-launched (PTY + hooks)",
+        "[CLAUDE] [GEMINI] [CODEX] [OPENCODE]  nomadterm-launched (PTY + hooks)",
     ),
     (
         "",
@@ -221,17 +221,17 @@ const SEND_HELP: &[HelpEntry] = &[
         "Format: 3-14:normal,6:full,22-30:detailed",
     ),
     ("  --extends <id>", "Parent bundle (optional)"),
-    ("", "See 'hcom bundle --help' for bundle details"),
+    ("", "See 'nomadterm bundle --help' for bundle details"),
     ("", ""),
     ("Examples:", ""),
-    ("  hcom send @luna -- Hello there!", ""),
+    ("  nomadterm send @luna -- Hello there!", ""),
     (
-        "  hcom send @luna @nova --intent request -- Can you help?",
+        "  nomadterm send @luna @nova --intent request -- Can you help?",
         "",
     ),
-    ("  hcom send -- Broadcast message to everyone", ""),
-    ("  echo 'Complex message' | hcom send @luna", ""),
-    ("  hcom send @luna <<'EOF'", ""),
+    ("  nomadterm send -- Broadcast message to everyone", ""),
+    ("  echo 'Complex message' | nomadterm send @luna", ""),
+    ("  nomadterm send @luna <<'EOF'", ""),
     ("  Multi-line message with special chars", ""),
     ("  EOF", ""),
 ];
@@ -270,7 +270,7 @@ const BUNDLE_HELP: &[HelpEntry] = &[
     ("", "Outputs ready-to-use bundle create command"),
     (
         "",
-        "TIP: Skip 'bundle create' \u{2014} use bundle flags directly in 'hcom send'",
+        "TIP: Skip 'bundle create' \u{2014} use bundle flags directly in 'nomadterm send'",
     ),
     ("", ""),
     ("bundle show <id>", "Show bundle by id/prefix"),
@@ -336,7 +336,7 @@ const BUNDLE_HELP: &[HelpEntry] = &[
 ];
 
 const STOP_HELP: &[HelpEntry] = &[
-    ("stop", "Disconnect self from hcom"),
+    ("stop", "Disconnect self from nomadterm"),
     ("stop <name>", "Disconnect specific agent"),
     ("stop <n1> <n2> ...", "Disconnect multiple"),
     ("stop tag:<name>", "Disconnect all with tag"),
@@ -345,7 +345,7 @@ const STOP_HELP: &[HelpEntry] = &[
 ];
 
 const START_HELP: &[HelpEntry] = &[
-    ("start", "Connect to hcom (from inside any AI session)"),
+    ("start", "Connect to nomadterm (from inside any AI session)"),
     (
         "start --as <name>",
         "Reclaim identity (after compaction/resume/clear)",
@@ -358,7 +358,7 @@ const START_HELP: &[HelpEntry] = &[
     ("", ""),
     (
         "",
-        "Inside a sandbox? Prefix all hcom commands with: HCOM_DIR=$PWD/.hcom",
+        "Inside a sandbox? Prefix all nomadterm commands with: HCOM_DIR=$PWD/.nomadterm",
     ),
 ];
 
@@ -381,7 +381,7 @@ const LISTEN_HELP: &[HelpEntry] = &[
         "",
         "(--agent, --type, --status, --file, --cmd, --from, --intent, etc.)",
     ),
-    ("", "Run 'hcom events --help' for full list"),
+    ("", "Run 'nomadterm events --help' for full list"),
     ("", "Filters combine with --sql using AND logic"),
     ("", ""),
     ("SQL filter mode:", ""),
@@ -393,7 +393,7 @@ const LISTEN_HELP: &[HelpEntry] = &[
     ("  0", "Message received / event matched"),
     ("  1", "Timeout or error"),
     ("", ""),
-    ("", "Quick unread check: hcom listen 1"),
+    ("", "Quick unread check: nomadterm listen 1"),
 ];
 
 const RESET_HELP: &[HelpEntry] = &[
@@ -404,18 +404,18 @@ const RESET_HELP: &[HelpEntry] = &[
     ),
     ("", ""),
     ("Sandbox / local mode:", ""),
-    ("", "If you can't write to ~/.hcom, set:"),
-    ("", "  export HCOM_DIR=\"$PWD/.hcom\""),
+    ("", "If you can't write to ~/.nomadterm, set:"),
+    ("", "  export HCOM_DIR=\"$PWD/.nomadterm\""),
     (
         "",
         "Hooks install under $PWD (.claude/.gemini/.codex) or ~/.config/opencode/, state in $HCOM_DIR",
     ),
     ("", ""),
     ("", "To remove local setup:"),
-    ("", "  hcom hooks remove && rm -rf \"$HCOM_DIR\""),
+    ("", "  nomadterm hooks remove && rm -rf \"$HCOM_DIR\""),
     ("", ""),
     ("", "Explicit location:"),
-    ("", "  export HCOM_DIR=/your/path/.hcom"),
+    ("", "  export HCOM_DIR=/your/path/.nomadterm"),
     ("", ""),
 ];
 
@@ -445,10 +445,10 @@ const CONFIG_HELP: &[HelpEntry] = &[
         "  claude_args / gemini_args / codex_args / opencode_args",
         "",
     ),
-    ("  auto_approve", "Auto-approve safe hcom commands"),
+    ("  auto_approve", "Auto-approve safe nomadterm commands"),
     ("  auto_subscribe", "Event auto-subscribe presets"),
     ("  name_export", "Export agent name to custom env var"),
-    ("", "hcom config <key> --info for details"),
+    ("", "nomadterm config <key> --info for details"),
     ("", ""),
     ("", "Precedence: defaults < config.toml < env vars"),
 ];
@@ -456,7 +456,7 @@ const CONFIG_HELP: &[HelpEntry] = &[
 // config help continued with dynamic config files hint
 const CONFIG_HELP_2: &[HelpEntry] = &[(
     "",
-    "HCOM_DIR: isolate per project (see 'hcom reset --help')",
+    "HCOM_DIR: isolate per project (see 'nomadterm reset --help')",
 )];
 
 const RELAY_HELP: &[HelpEntry] = &[
@@ -499,10 +499,10 @@ const TRANSCRIPT_HELP: &[HelpEntry] = &[
     ("", ""),
     (
         "transcript search \"pattern\"",
-        "Search hcom-tracked transcripts (rg/grep)",
+        "Search nomadterm-tracked transcripts (rg/grep)",
     ),
     ("  --live", "Only currently alive agents"),
-    ("  --all", "All transcripts (includes non-hcom sessions)"),
+    ("  --all", "All transcripts (includes non-nomadterm sessions)"),
     ("  --limit N", "Max results (default: 20)"),
     (
         "  --agent TYPE",
@@ -539,11 +539,11 @@ const RUN_HELP: &[HelpEntry] = &[
     ("run docs", "CLI reference + config + script creation guide"),
     ("", ""),
     ("", "Docs sections:"),
-    ("  hcom run docs --cli", "CLI reference only"),
-    ("  hcom run docs --config", "Config settings only"),
-    ("  hcom run docs --scripts", "Script creation guide"),
+    ("  nomadterm run docs --cli", "CLI reference only"),
+    ("  nomadterm run docs --config", "Config settings only"),
+    ("  nomadterm run docs --scripts", "Script creation guide"),
     ("", ""),
-    ("", "User scripts: ~/.hcom/scripts/"),
+    ("", "User scripts: ~/.nomadterm/scripts/"),
 ];
 
 const STATUS_HELP: &[HelpEntry] = &[
@@ -570,7 +570,7 @@ const HOOKS_HELP: &[HelpEntry] = &[
     ),
     (
         "",
-        "Without hooks, use ad-hoc mode (run hcom start inside any AI tool).",
+        "Without hooks, use ad-hoc mode (run nomadterm start inside any AI tool).",
     ),
     ("", "Restart the tool after adding hooks to activate."),
     (
@@ -598,7 +598,7 @@ const TERM_HELP: &[HelpEntry] = &[
     ("", "ready, prompt_empty, input_text"),
     ("", ""),
     ("", "Debug toggle; instances detect within ~10s."),
-    ("", "Logs: ~/.hcom/.tmp/logs/pty_debug/"),
+    ("", "Logs: ~/.nomadterm/.tmp/logs/pty_debug/"),
 ];
 
 // ── Tool launch help (claude/gemini/codex/opencode) ─────────────────────
@@ -618,8 +618,8 @@ const CLAUDE_SPEC: ToolHelpSpec = ToolHelpSpec {
     name: "claude",
     label: "Claude",
     unique_examples: &[
-        ("hcom 3 claude -p \"prompt\"", "3 headless in background"),
-        ("hcom 1 claude --agent <name>", ".claude/agents/<name>.md"),
+        ("nomadterm 3 claude -p \"prompt\"", "3 headless in background"),
+        ("nomadterm 1 claude --agent <name>", ".claude/agents/<name>.md"),
     ],
     extra_env: &[(
         "HCOM_SUBAGENT_TIMEOUT",
@@ -631,7 +631,7 @@ const CLAUDE_SPEC: ToolHelpSpec = ToolHelpSpec {
 const GEMINI_SPEC: ToolHelpSpec = ToolHelpSpec {
     name: "gemini",
     label: "Gemini",
-    unique_examples: &[("hcom N gemini --yolo", "Flags forwarded to gemini")],
+    unique_examples: &[("nomadterm N gemini --yolo", "Flags forwarded to gemini")],
     extra_env: &[("HCOM_GEMINI_SYSTEM_PROMPT", "System prompt (env var)")],
     has_fork: false,
 };
@@ -640,7 +640,7 @@ const CODEX_SPEC: ToolHelpSpec = ToolHelpSpec {
     name: "codex",
     label: "Codex",
     unique_examples: &[(
-        "hcom codex --sandbox danger-full-access",
+        "nomadterm codex --sandbox danger-full-access",
         "Flags forwarded to codex",
     )],
     extra_env: &[(
@@ -684,25 +684,25 @@ fn generate_tool_help(spec: &ToolHelpSpec) -> String {
     // Usage + examples
     lines.push("Usage:".to_string());
     lines.push(format!(
-        "  hcom [N] {} [args...]       Launch N {} agents (default N=1)",
+        "  nomadterm [N] {} [args...]       Launch N {} agents (default N=1)",
         t, spec.label
     ));
     lines.push(String::new());
     // Example block — all at same indent level using format helper
     let ex = |usage: &str, desc: &str| -> String { format!("    {:<34} {}", usage, desc) };
-    lines.push(ex(&format!("hcom {}", t), term_desc));
-    lines.push(ex(&format!("hcom 3 {}", t), "Opens 3 new terminal windows"));
+    lines.push(ex(&format!("nomadterm {}", t), term_desc));
+    lines.push(ex(&format!("nomadterm 3 {}", t), "Opens 3 new terminal windows"));
     for (u, d) in spec.unique_examples {
         lines.push(ex(u, d));
     }
 
-    // hcom flags
+    // nomadterm flags
     lines.push(String::new());
-    lines.push("hcom Flags:".to_string());
+    lines.push("nomadterm Flags:".to_string());
     lines.push("    --tag <name>                 Group tag (names become tag-*)".to_string());
     lines.push("    --terminal <preset>          Where new windows open".to_string());
-    lines.push("    --hcom-prompt <text>          Initial prompt".to_string());
-    lines.push("    --hcom-system-prompt <text>   System prompt".to_string());
+    lines.push("    --nomadterm-prompt <text>          Initial prompt".to_string());
+    lines.push("    --nomadterm-system-prompt <text>   System prompt".to_string());
 
     // Environment
     lines.push(String::new());
@@ -732,15 +732,15 @@ fn generate_tool_help(spec: &ToolHelpSpec) -> String {
     lines.push(String::new());
     if spec.has_fork {
         lines.push("Resume / Fork:".to_string());
-        lines.push("    hcom r <name>                  Resume stopped agent by name".to_string());
+        lines.push("    nomadterm r <name>                  Resume stopped agent by name".to_string());
         lines.push(
-            "    hcom f <name>                  Fork agent session (active or stopped)".to_string(),
+            "    nomadterm f <name>                  Fork agent session (active or stopped)".to_string(),
         );
     } else {
         lines.push("Resume:".to_string());
-        lines.push("    hcom r <name>                  Resume stopped agent by name".to_string());
+        lines.push("    nomadterm r <name>                  Resume stopped agent by name".to_string());
         lines.push(format!(
-            "  {} does not support session forking (hcom f).",
+            "  {} does not support session forking (nomadterm f).",
             spec.label
         ));
     }
@@ -748,7 +748,7 @@ fn generate_tool_help(spec: &ToolHelpSpec) -> String {
     // Footer
     lines.push(String::new());
     lines.push(format!("  Run \"{} --help\" for {} options.", t, t));
-    lines.push("  Run \"hcom config terminal --info\" for terminal presets.".to_string());
+    lines.push("  Run \"nomadterm config terminal --info\" for terminal presets.".to_string());
 
     lines.join("\n")
 }
@@ -775,7 +775,7 @@ fn format_entry(usage: &str, desc: &str) -> String {
         }
     } else {
         // Command line
-        format!("  hcom {:<26} {}", usage, desc)
+        format!("  nomadterm {:<26} {}", usage, desc)
     }
 }
 
@@ -814,17 +814,17 @@ pub const COMMAND_NAMES: &[&str] = &[
 /// Get the top-level help text as a String.
 pub fn get_help_text() -> String {
     format!(
-        "hcom (hook-comms) v{} - multi-agent communication\n\
+        "nomadterm (hook-comms) v{} - multi-agent communication\n\
 \n\
 Usage:\n\
-  hcom                                  TUI dashboard\n\
-  hcom <command>                        Run command\n\
+  nomadterm                                  TUI dashboard\n\
+  nomadterm <command>                        Run command\n\
 \n\
 Launch:\n\
-  hcom [N] claude|gemini|codex|opencode [flags] [tool-args]\n\
-  hcom r <name>                         Resume stopped agent\n\
-  hcom f <name>                         Fork agent session\n\
-  hcom kill <name(s)|tag:T|all>         Kill + close terminal pane\n\
+  nomadterm [N] claude|gemini|codex|opencode [flags] [tool-args]\n\
+  nomadterm r <name>                         Resume stopped agent\n\
+  nomadterm f <name>                         Fork agent session\n\
+  nomadterm kill <name(s)|tag:T|all>         Kill + close terminal pane\n\
 \n\
 Commands:\n\
   send         Send message to your buddies\n\
@@ -833,12 +833,12 @@ Commands:\n\
   events       Query event stream, manage subscriptions\n\
   bundle       Structured context packages for handoffs\n\
   transcript   Read another agent's conversation\n\
-  start        Connect to hcom (run inside any AI tool)\n\
-  stop         Disconnect from hcom\n\
+  start        Connect to nomadterm (run inside any AI tool)\n\
+  stop         Disconnect from nomadterm\n\
   config       Get/set global and per-agent settings\n\
   run          Execute workflow scripts\n\
   relay        Cross-device sync + relay daemon\n\
-  archive      Query past hcom sessions\n\
+  archive      Query past nomadterm sessions\n\
   reset        Archive and clear database\n\
   hooks        Add or remove hooks\n\
   status       Installation and diagnostics\n\
@@ -893,7 +893,7 @@ pub fn get_command_help(name: &str) -> String {
         // Dynamic: resolved config file paths
         let hcom_dir = env::var("HCOM_DIR")
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().join(".hcom"));
+            .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().join(".nomadterm"));
         let config_toml = hcom_dir.join("config.toml");
         let env_file = hcom_dir.join("config.env");
         lines.push(format!(
@@ -916,7 +916,7 @@ pub fn get_command_help(name: &str) -> String {
                 return get_command_help(parent);
             }
         }
-        format!("Usage: hcom {}", name)
+        format!("Usage: nomadterm {}", name)
     }
 }
 
@@ -929,10 +929,10 @@ pub fn print_help() {
     println!("{}", get_help_text());
     println!();
     println!("Identity:");
-    println!("  1. Run hcom start to get a name");
-    println!("  2. Use --name <name> on all hcom commands");
+    println!("  1. Run nomadterm start to get a name");
+    println!("  2. Use --name <name> on all nomadterm commands");
     println!();
-    println!("Run 'hcom <command> --help' for details.");
+    println!("Run 'nomadterm <command> --help' for details.");
 }
 
 #[cfg(test)]
@@ -985,7 +985,7 @@ mod tests {
     #[test]
     fn unknown_command_fallback() {
         let help = get_command_help("nonexistent");
-        assert_eq!(help, "Usage: hcom nonexistent");
+        assert_eq!(help, "Usage: nomadterm nonexistent");
     }
 
     #[test]
@@ -1008,6 +1008,6 @@ mod tests {
         // Section header
         assert!(format_entry("Examples:", "").starts_with('\n'));
         // Command line
-        assert!(format_entry("list", "Show agents").contains("hcom list"));
+        assert!(format_entry("list", "Show agents").contains("nomadterm list"));
     }
 }

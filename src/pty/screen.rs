@@ -813,12 +813,12 @@ mod tests {
         // Should return the text (it's real input, not placeholder)
         let mut t = make_tracker(24, 80, "? for shortcuts");
         // Non-dim text after prompt, ready pattern on next line
-        t.process("› <hcom>test message</hcom>\r\n? for shortcuts\r\n".as_bytes());
+        t.process("› <nomadterm>test message</nomadterm>\r\n? for shortcuts\r\n".as_bytes());
         // Current bug: returns empty because is_ready()=true
         // After fix: should return the actual text
         assert_eq!(
             t.get_codex_input_text(),
-            Some("<hcom>test message</hcom>".to_string())
+            Some("<nomadterm>test message</nomadterm>".to_string())
         );
     }
 

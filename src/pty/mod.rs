@@ -586,7 +586,7 @@ impl Proxy {
                 .context("spawn failed")?
         };
 
-        // Write PID and launch context to database for hcom kill
+        // Write PID and launch context to database for nomadterm kill
         if let Some(ref instance_name) = config.instance_name {
             if let Ok(db) = crate::db::HcomDb::open() {
                 let _ = db.update_instance_pid(instance_name, child.id());

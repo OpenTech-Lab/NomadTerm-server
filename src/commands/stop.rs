@@ -1,4 +1,4 @@
-//! `hcom stop` command — end hcom participation.
+//! `nomadterm stop` command — end nomadterm participation.
 //!
 //!
 //! Supports: self-stop, named stop, multi-stop, `all`, `tag:<name>`.
@@ -14,9 +14,9 @@ use crate::instances::{
 use crate::log::log_info;
 use crate::shared::{CommandContext, SENDER, SenderKind, is_inside_ai_tool};
 
-/// Parsed arguments for `hcom stop`.
+/// Parsed arguments for `nomadterm stop`.
 #[derive(clap::Parser, Debug)]
-#[command(name = "stop", about = "Stop hcom participation")]
+#[command(name = "stop", about = "Stop nomadterm participation")]
 pub struct StopArgs {
     /// Targets to stop (names, tag:X, or "all")
     pub targets: Vec<String>,
@@ -44,7 +44,7 @@ fn resolve_initiator(
     }
 }
 
-/// Main entry point for `hcom stop` command.
+/// Main entry point for `nomadterm stop` command.
 ///
 /// Returns exit code (0 = success, 1 = error).
 pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i32 {
@@ -144,7 +144,7 @@ pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i
                     "No active agents with tag '{tag}' (already stopped: {})",
                     names.join(", ")
                 );
-                println!("Use 'hcom kill tag:{tag}' to terminate their processes.");
+                println!("Use 'nomadterm kill tag:{tag}' to terminate their processes.");
                 return 0;
             }
             eprintln!("Error: No agents with tag '{tag}'");
@@ -272,7 +272,7 @@ pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i
             Some(id) => id.name,
             None => {
                 eprintln!(
-                    "Error: Cannot determine identity\nUsage: hcom stop <name> | hcom stop all | run 'hcom stop' inside Claude/Gemini/Codex"
+                    "Error: Cannot determine identity\nUsage: nomadterm stop <name> | nomadterm stop all | run 'nomadterm stop' inside Claude/Gemini/Codex"
                 );
                 return 1;
             }
@@ -282,7 +282,7 @@ pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i
         if let Ok(Some(inst_data)) = db.get_instance_full(&name) {
             let rt = parse_running_tasks(inst_data.running_tasks.as_deref());
             if rt.active {
-                eprintln!("Error: Cannot run hcom stop from within a Task subagent");
+                eprintln!("Error: Cannot run nomadterm stop from within a Task subagent");
                 return 1;
             }
         }
@@ -292,7 +292,7 @@ pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i
 
     // Handle SENDER (not real instance)
     if instance_name == SENDER {
-        eprintln!("Error: Cannot resolve identity - launch via 'hcom <n>' for stable identity");
+        eprintln!("Error: Cannot resolve identity - launch via 'nomadterm <n>' for stable identity");
         return 1;
     }
 
@@ -337,9 +337,9 @@ pub fn cmd_stop(db: &HcomDb, args: &StopArgs, ctx: Option<&CommandContext>) -> i
     stop_instance(db, &instance_name, &launcher, reason);
 
     if is_subagent_instance(&position) {
-        println!("Stopped hcom for subagent {display}.");
+        println!("Stopped nomadterm for subagent {display}.");
     } else {
-        println!("Stopped hcom for {display}.");
+        println!("Stopped nomadterm for {display}.");
     }
 
     if position.background != 0 && !position.background_log_file.is_empty() {
@@ -376,5 +376,5 @@ fn print_stop_preview(scope: &str, cmd_suffix: &str, instances: &[crate::db::Ins
     println!("  • Subagents: recursively stopped when parent stops\n");
     println!("Instance data preserved in events table (life.stopped with snapshot).\n");
     println!("Add --go flag and run again to proceed:");
-    println!("  hcom --go stop {cmd_suffix}\n");
+    println!("  nomadterm --go stop {cmd_suffix}\n");
 }

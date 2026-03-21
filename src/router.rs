@@ -79,7 +79,7 @@ const COMMANDS: &[&str] = &[
     "run",
 ];
 
-/// Tools that support launch commands (hcom [N] <tool>)
+/// Tools that support launch commands (nomadterm [N] <tool>)
 const LAUNCH_TOOLS: &[&str] = &["claude", "codex", "gemini", "opencode", "f", "r"];
 
 fn is_command(name: &str) -> bool {
@@ -99,7 +99,7 @@ pub enum Action {
     Hook { hook: String, args: Vec<String> },
     /// Run a CLI command. Args are the full argv[1..] passed through.
     Command { cmd: String, args: Vec<String> },
-    /// Launch tool (e.g. `hcom 3 claude --model haiku`)
+    /// Launch tool (e.g. `nomadterm 3 claude --model haiku`)
     Launch { args: Vec<String> },
     /// Run PTY wrapper mode
     Pty { args: Vec<String> },
@@ -136,9 +136,9 @@ pub struct GlobalFlags {
 
 // ── Argv parsing (clap for flags, manual for command routing) ───────────
 //
-// Top-level command/hook routing stays manual because hcom's CLI is unusual:
-// hooks appear as bare subcommands (`hcom sessionstart`), launch commands can
-// start with a numeric count (`hcom 3 claude`), and ~40 hook/command/tool names
+// Top-level command/hook routing stays manual because nomadterm's CLI is unusual:
+// hooks appear as bare subcommands (`nomadterm sessionstart`), launch commands can
+// start with a numeric count (`nomadterm 3 claude`), and ~40 hook/command/tool names
 // need classification. clap will be used for per-command arg parsing as commands
 // are ported to Rust.
 
@@ -168,7 +168,7 @@ struct GlobalFlagParser {
 ///
 /// NOTE: clap's trailing_var_arg means --name after a positional (command token)
 /// is NOT extracted. Use `extract_global_flags_full()` when you need to find
-/// --name anywhere in argv (e.g., `hcom send --name vami @luna -- hello`).
+/// --name anywhere in argv (e.g., `nomadterm send --name vami @luna -- hello`).
 pub fn extract_global_flags(argv: &[String]) -> (Vec<String>, GlobalFlags) {
     match GlobalFlagParser::try_parse_from(argv) {
         Ok(parsed) => (
@@ -216,7 +216,7 @@ fn extract_global_flags_manual(argv: &[String]) -> (Vec<String>, GlobalFlags) {
 ///
 /// Unlike `extract_global_flags()` (clap-based, only finds flags before first
 /// positional), this scans the full argv up to `--`. Used by `dispatch_native_command()`
-/// to handle `hcom send --name vami @luna -- hello` correctly.
+/// to handle `nomadterm send --name vami @luna -- hello` correctly.
 ///
 /// Also detects --help/-h requests (before `--`) for per-command help dispatch.
 pub fn extract_global_flags_full(argv: &[String]) -> (Vec<String>, GlobalFlags, bool) {
@@ -313,7 +313,7 @@ pub fn resolve_action(argv: &[String]) -> Action {
         return Action::RelayWorker;
     }
 
-    // PTY mode: `hcom pty <tool> [args...]`
+    // PTY mode: `nomadterm pty <tool> [args...]`
     if first == "pty" {
         return Action::Pty {
             args: argv[1..].to_vec(),
@@ -348,7 +348,7 @@ pub fn resolve_action(argv: &[String]) -> Action {
             args: argv.to_vec(),
         };
     }
-    // Numeric count + tool: `hcom 3 claude`
+    // Numeric count + tool: `nomadterm 3 claude`
     if cmd_token.parse::<u32>().is_ok() {
         if let Some(second) = stripped.get(1) {
             if is_launch_tool(second.as_str()) {
@@ -359,7 +359,7 @@ pub fn resolve_action(argv: &[String]) -> Action {
         }
     }
 
-    // --new-terminal can appear after flags: `hcom --name foo --new-terminal`
+    // --new-terminal can appear after flags: `nomadterm --name foo --new-terminal`
     if stripped.iter().any(|a| a == "--new-terminal") {
         return Action::NewTerminal;
     }
@@ -375,8 +375,8 @@ pub fn resolve_action(argv: &[String]) -> Action {
 
 /// If HCOM_DEV_ROOT is set and points to a different worktree, re-exec using
 /// that worktree's binary.
-/// so worktree development works: `HCOM_DEV_ROOT=/path/to/worktree hcom list`
-/// will run the worktree's hcom binary instead of the installed one.
+/// so worktree development works: `HCOM_DEV_ROOT=/path/to/worktree nomadterm list`
+/// will run the worktree's nomadterm binary instead of the installed one.
 pub fn maybe_reexec_dev_root() {
     let dev_root = match env::var("HCOM_DEV_ROOT") {
         Ok(r) if !r.is_empty() => PathBuf::from(r),
@@ -389,13 +389,13 @@ pub fn maybe_reexec_dev_root() {
         Err(_) => return,
     };
 
-    // The dev root's binary lives at bin/hcom-<platform> or the cargo
+    // The dev root's binary lives at bin/nomadterm-<platform> or the cargo
     // target dir. Check the bundled location first (matches build.sh output).
     let platform_tag = get_platform_tag();
-    let dev_binary = dev_root.join("bin").join(format!("hcom-{}", platform_tag));
+    let dev_binary = dev_root.join("bin").join(format!("nomadterm-{}", platform_tag));
 
     // Also check cargo target dir (for when running cargo build without build.sh)
-    let dev_binary_cargo = dev_root.join("target/release/hcom");
+    let dev_binary_cargo = dev_root.join("target/release/nomadterm");
 
     let target_binary = if dev_binary.exists() {
         &dev_binary
@@ -663,11 +663,11 @@ pub fn dispatch() -> anyhow::Result<()> {
         }
         Action::Hook { ref hook, .. } | Action::Command { cmd: ref hook, .. } => {
             eprintln!("Error: Unknown command '{}'", hook);
-            eprintln!("Run 'hcom --help' for usage.");
+            eprintln!("Run 'nomadterm --help' for usage.");
             std::process::exit(1);
         }
         Action::Version => {
-            println!("hcom {}", env!("CARGO_PKG_VERSION"));
+            println!("nomadterm {}", env!("CARGO_PKG_VERSION"));
         }
         Action::Help => {
             crate::commands::help::print_help();
@@ -692,7 +692,7 @@ fn launch_new_terminal() -> i32 {
     let exe = match env::current_exe() {
         Ok(p) => p.to_string_lossy().to_string(),
         Err(e) => {
-            eprintln!("Error: Cannot determine hcom binary path: {}", e);
+            eprintln!("Error: Cannot determine nomadterm binary path: {}", e);
             return 1;
         }
     };
@@ -701,7 +701,7 @@ fn launch_new_terminal() -> i32 {
         .ok()
         .map(|p| p.to_string_lossy().to_string());
 
-    // Pass through HCOM env vars
+    // Pass through NOMADTERM env vars
     let mut env_vars = HashMap::new();
     for (k, v) in env::vars() {
         if k.starts_with("HCOM_") {
@@ -745,7 +745,7 @@ fn dispatch_native_command(cmd: &str, args: &[String]) -> i32 {
 
     // Extract global flags (--name, --go, --help) from anywhere in args,
     // respecting -- separator. Uses full scan (not clap) so --name works
-    // regardless of position: `hcom send --name vami @luna -- hello`.
+    // regardless of position: `nomadterm send --name vami @luna -- hello`.
     let (stripped, flags, help_requested) = extract_global_flags_full(args);
 
     // Per-command --help: native help text
@@ -818,7 +818,7 @@ fn dispatch_native_command(cmd: &str, args: &[String]) -> i32 {
             if crate::instances::in_subagent_context(&db, &identity.name) {
                 eprintln!(
                     "Error: Subagent context active - explicit identity required\n\
-                     Use: hcom {cmd} --name parent (for parent) or --name <uuid> (for subagent)"
+                     Use: nomadterm {cmd} --name parent (for parent) or --name <uuid> (for subagent)"
                 );
                 return 1;
             }

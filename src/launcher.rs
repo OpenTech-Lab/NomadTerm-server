@@ -223,7 +223,7 @@ fn write_system_prompt_file(system_prompt: &str, tool: &str) -> String {
 
     if let Err(e) = fs::write(&filepath, system_prompt) {
         eprintln!(
-            "[hcom] warn: failed to write system prompt to {}: {e}",
+            "[nomadterm] warn: failed to write system prompt to {}: {e}",
             filepath.display()
         );
     }
@@ -255,7 +255,7 @@ fn ensure_hooks_installed(tool: &LaunchTool) -> Result<()> {
             if crate::hooks::claude::setup_claude_hooks(include_permissions) {
                 return Ok(());
             }
-            bail!("Failed to setup Claude hooks. Run: hcom hooks add claude");
+            bail!("Failed to setup Claude hooks. Run: nomadterm hooks add claude");
         }
         LaunchTool::Gemini => {
             if !crate::hooks::gemini::is_gemini_version_supported() {
@@ -276,7 +276,7 @@ fn ensure_hooks_installed(tool: &LaunchTool) -> Result<()> {
             if crate::hooks::gemini::setup_gemini_hooks(include_permissions) {
                 return Ok(());
             }
-            bail!("Failed to setup Gemini hooks. Run: hcom hooks add gemini");
+            bail!("Failed to setup Gemini hooks. Run: nomadterm hooks add gemini");
         }
         LaunchTool::Codex => {
             if crate::hooks::codex::verify_codex_hooks_installed(include_permissions) {
@@ -285,13 +285,13 @@ fn ensure_hooks_installed(tool: &LaunchTool) -> Result<()> {
             if crate::hooks::codex::setup_codex_hooks(include_permissions) {
                 return Ok(());
             }
-            bail!("Failed to setup Codex hooks. Run: hcom hooks add codex");
+            bail!("Failed to setup Codex hooks. Run: nomadterm hooks add codex");
         }
         LaunchTool::OpenCode => {
             if crate::hooks::opencode::ensure_plugin_installed() {
                 return Ok(());
             }
-            bail!("Failed to setup OpenCode plugin. Run: hcom hooks add opencode");
+            bail!("Failed to setup OpenCode plugin. Run: nomadterm hooks add opencode");
         }
     }
 }
@@ -314,9 +314,9 @@ fn tool_extra_env(tool: &str) -> HashMap<String, String> {
     m
 }
 
-/// Create a bash script that runs a tool via the hcom native PTY wrapper.
+/// Create a bash script that runs a tool via the nomadterm native PTY wrapper.
 ///
-/// The script sets up the environment and calls `hcom pty <tool> [args...]`.
+/// The script sets up the environment and calls `nomadterm pty <tool> [args...]`.
 pub fn create_runner_script(
     tool: &str,
     cwd: &str,
@@ -325,7 +325,7 @@ pub fn create_runner_script(
     tool_args: &[String],
     run_here: bool,
 ) -> Result<String> {
-    let native_bin = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("hcom"));
+    let native_bin = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("nomadterm"));
     let native_bin_str = native_bin.to_string_lossy();
 
     let launch_dir = paths::hcom_path(&[paths::LAUNCH_DIR]);
@@ -352,12 +352,12 @@ pub fn create_runner_script(
     // Dev mode: prepend worktree binary dir
     if let Ok(dev_root) = std::env::var("HCOM_DEV_ROOT") {
         let dev_bin = format!("{}/target/release", dev_root);
-        if Path::new(&dev_bin).join("hcom").exists() {
+        if Path::new(&dev_bin).join("nomadterm").exists() {
             path_dirs.push(dev_bin);
         }
     }
 
-    for bin_name in &[tool, "hcom", "python3", "node"] {
+    for bin_name in &[tool, "nomadterm", "python3", "node"] {
         if let Some(bin_path) = terminal::which_bin(bin_name) {
             if let Some(dir) = Path::new(&bin_path).parent() {
                 let d = dir.to_string_lossy().to_string();
@@ -378,7 +378,7 @@ pub fn create_runner_script(
 
     let content = format!(
         "#!/bin/bash\n\
-         # {} hcom native PTY runner ({})\n\
+         # {} nomadterm native PTY runner ({})\n\
          # Using: {}\n\
          cd {}\n\
          \n\
@@ -504,7 +504,7 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
 
     // Load config
     let hcom_config = HcomConfig::load(None).unwrap_or_else(|e| {
-        eprintln!("[hcom] warn: config load failed, using defaults: {e}");
+        eprintln!("[nomadterm] warn: config load failed, using defaults: {e}");
         let mut c = HcomConfig::default();
         c.normalize();
         c
@@ -564,7 +564,7 @@ pub fn launch(db: &HcomDb, mut params: LaunchParams) -> Result<LaunchResult> {
         }
     }
 
-    // Inject --hcom-prompt into tool args (translated per-tool)
+    // Inject --nomadterm-prompt into tool args (translated per-tool)
     if let Some(ref prompt) = params.initial_prompt {
         match normalized {
             LaunchTool::Claude | LaunchTool::ClaudePty => {

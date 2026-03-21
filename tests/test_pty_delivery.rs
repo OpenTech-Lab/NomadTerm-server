@@ -8,7 +8,7 @@
 //! - Target tool CLI installed (claude/gemini/codex/opencode)
 //!
 //! Phases (claude/gemini/codex):
-//! 1. Launch tool via `hcom 1 <tool>` with HCOM_TERMINAL=tmux
+//! 1. Launch tool via `nomadterm 1 <tool>` with HCOM_TERMINAL=tmux
 //! 2. Wait for ready event, capture and validate full screen state
 //! 3. Send message → verify delivery via events, capture post-delivery screen
 //! 4. Inject uncommitted text → verify gate blocks delivery, capture screen
@@ -22,8 +22,8 @@
 //! 4. Cleanup
 //!
 //! Run (must use --test-threads=1 — tests launch real agents and interfere in parallel):
-//!     cargo test -p hcom --test test_pty_delivery -- --ignored --nocapture --test-threads=1
-//!     cargo test -p hcom --test test_pty_delivery test_pty_claude -- --ignored --nocapture --test-threads=1
+//!     cargo test -p nomadterm --test test_pty_delivery -- --ignored --nocapture --test-threads=1
+//!     cargo test -p nomadterm --test test_pty_delivery test_pty_claude -- --ignored --nocapture --test-threads=1
 
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
@@ -113,18 +113,18 @@ const SENDER: &str = "ptytest";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-fn hcom(cmd: &str) -> Output {
-    Command::new("hcom")
+fn nomadterm(cmd: &str) -> Output {
+    Command::new("nomadterm")
         .args(shell_words::split(cmd).unwrap())
         .output()
-        .expect("failed to execute hcom")
+        .expect("failed to execute nomadterm")
 }
 
 fn hcom_check(cmd: &str) -> String {
-    let out = hcom(cmd);
+    let out = nomadterm(cmd);
     assert!(
         out.status.success(),
-        "Command failed: hcom {cmd}\nstderr: {}\nstdout: {}",
+        "Command failed: nomadterm {cmd}\nstderr: {}\nstdout: {}",
         String::from_utf8_lossy(&out.stderr),
         String::from_utf8_lossy(&out.stdout),
     );
@@ -136,7 +136,7 @@ fn send_msg(msg: &str) {
 }
 
 fn get_screen(name: &str) -> Option<serde_json::Value> {
-    let out = hcom(&format!("term {name} --json"));
+    let out = nomadterm(&format!("term {name} --json"));
     if !out.status.success() {
         return None;
     }
@@ -145,7 +145,7 @@ fn get_screen(name: &str) -> Option<serde_json::Value> {
 
 fn get_events(instance: &str, last: u32, full: bool) -> Vec<serde_json::Value> {
     let full_flag = if full { " --full" } else { "" };
-    let out = hcom(&format!(
+    let out = nomadterm(&format!(
         "events --agent {instance} --last {last}{full_flag}"
     ));
     if !out.status.success() {
@@ -191,7 +191,7 @@ impl Drop for InstanceGuard {
     fn drop(&mut self) {
         if let Some(name) = &self.base_name {
             eprintln!("\nCleaning up {name}...");
-            let _ = hcom(&format!("kill {name}"));
+            let _ = nomadterm(&format!("kill {name}"));
             thread::sleep(Duration::from_secs(1));
         }
     }
@@ -450,7 +450,7 @@ fn run_pty_test(tool: &str) {
 
     // Record last event ID before launch
     let pre_launch_id = {
-        let out = hcom("events --last 1");
+        let out = nomadterm("events --last 1");
         if out.status.success() {
             String::from_utf8_lossy(&out.stdout)
                 .lines()
@@ -472,7 +472,7 @@ fn run_pty_test(tool: &str) {
         "codex" => " --model gpt-5.1-codex-mini",
         _ => "",
     };
-    let out = hcom(&format!("--go 1 {tool}{model_flag}"));
+    let out = nomadterm(&format!("--go 1 {tool}{model_flag}"));
     assert!(
         out.status.success(),
         "Launch failed: {}",
@@ -485,7 +485,7 @@ fn run_pty_test(tool: &str) {
 
     let base_name: String = poll_until(
         || {
-            let out = hcom("events --action ready --last 5");
+            let out = nomadterm("events --action ready --last 5");
             if !out.status.success() {
                 return None;
             }
@@ -826,7 +826,7 @@ fn run_pty_test_opencode() {
     logln!(log, "{}", "=".repeat(60));
 
     let pre_launch_id = {
-        let out = hcom("events --last 1");
+        let out = nomadterm("events --last 1");
         if out.status.success() {
             String::from_utf8_lossy(&out.stdout)
                 .lines()
@@ -843,7 +843,7 @@ fn run_pty_test_opencode() {
     logln!(log, "\n[Phase 1] Launching {tool} in tmux...");
     let t0 = Instant::now();
 
-    let out = hcom(&format!("--go 1 {tool}"));
+    let out = nomadterm(&format!("--go 1 {tool}"));
     assert!(
         out.status.success(),
         "Launch failed: {}",
@@ -855,7 +855,7 @@ fn run_pty_test_opencode() {
 
     let base_name: String = poll_until(
         || {
-            let out = hcom("events --action ready --last 5");
+            let out = nomadterm("events --action ready --last 5");
             if !out.status.success() {
                 return None;
             }
@@ -986,15 +986,15 @@ fn run_pty_test_opencode() {
         active_id, listening_event["id"]
     ));
 
-    // Check hcom.log for bootstrap_inject (non-fatal)
-    let log_path = dirs::home_dir().unwrap().join(".hcom/.tmp/logs/hcom.log");
+    // Check nomadterm.log for bootstrap_inject (non-fatal)
+    let log_path = dirs::home_dir().unwrap().join(".nomadterm/.tmp/logs/nomadterm.log");
     if let Ok(content) = fs::read_to_string(&log_path) {
         if content.contains("delivery.bootstrap_inject") && content.contains(&base_name) {
-            logln!(log, "  OK: Bootstrap inject confirmed in hcom.log");
+            logln!(log, "  OK: Bootstrap inject confirmed in nomadterm.log");
         } else {
             logln!(
                 log,
-                "  WARN: delivery.bootstrap_inject not found in hcom.log (may have rotated)"
+                "  WARN: delivery.bootstrap_inject not found in nomadterm.log (may have rotated)"
             );
         }
     }

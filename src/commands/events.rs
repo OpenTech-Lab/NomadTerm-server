@@ -1,11 +1,11 @@
-//! `hcom events` command — query events, manage subscriptions.
+//! `nomadterm events` command — query events, manage subscriptions.
 //!
 //!
 //! Modes:
-//! - Query: `hcom events [--last N] [--all] [--full] [--wait SEC] [--sql EXPR] [filters...]`
-//! - Subscribe: `hcom events sub [list | SQL | filters...] [--once] [--for name]`
-//! - Unsubscribe: `hcom events unsub <id>`
-//! - Launch status: `hcom events launch [batch_id] [--timeout N]`
+//! - Query: `nomadterm events [--last N] [--all] [--full] [--wait SEC] [--sql EXPR] [filters...]`
+//! - Subscribe: `nomadterm events sub [list | SQL | filters...] [--once] [--for name]`
+//! - Unsubscribe: `nomadterm events unsub <id>`
+//! - Launch status: `nomadterm events launch [batch_id] [--timeout N]`
 
 use std::collections::HashMap;
 use std::net::TcpListener;
@@ -18,7 +18,7 @@ use crate::core::launch_status::wait_for_launch;
 use crate::db::HcomDb;
 use crate::shared::CommandContext;
 
-/// Parsed arguments for `hcom events`.
+/// Parsed arguments for `nomadterm events`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "events", about = "Query and subscribe to events")]
 pub struct EventsArgs {
@@ -56,7 +56,7 @@ pub enum EventsSubcmd {
     Launch(EventsLaunchArgs),
 }
 
-/// Args for `hcom events sub`.
+/// Args for `nomadterm events sub`.
 #[derive(clap::Args, Debug)]
 pub struct EventsSubArgs {
     /// Auto-remove after first match
@@ -72,14 +72,14 @@ pub struct EventsSubArgs {
     pub rest: Vec<String>,
 }
 
-/// Args for `hcom events unsub`.
+/// Args for `nomadterm events unsub`.
 #[derive(clap::Args, Debug)]
 pub struct EventsUnsubArgs {
     /// Subscription ID to remove
     pub id: String,
 }
 
-/// Args for `hcom events launch`.
+/// Args for `nomadterm events launch`.
 #[derive(clap::Args, Debug)]
 pub struct EventsLaunchArgs {
     /// Batch ID to wait for
@@ -475,7 +475,7 @@ fn events_sub_sql(db: &HcomDb, sql_parts: &[String], caller: &str, once: bool) -
     0
 }
 
-/// Handle `hcom events sub` subcommand.
+/// Handle `nomadterm events sub` subcommand.
 fn cmd_events_sub(db: &HcomDb, args: &EventsSubArgs, caller_name: Option<&str>) -> i32 {
     // Handle 'list' subcommand
     if args.rest.first().map(|s| s.as_str()) == Some("list") {
@@ -516,7 +516,7 @@ fn cmd_events_sub(db: &HcomDb, args: &EventsSubArgs, caller_name: Option<&str>) 
             Some(name) => name,
             None => {
                 eprintln!("Not found: {target}");
-                eprintln!("Use 'hcom list' to see available agents");
+                eprintln!("Use 'nomadterm list' to see available agents");
                 return 1;
             }
         }
@@ -527,7 +527,7 @@ fn cmd_events_sub(db: &HcomDb, args: &EventsSubArgs, caller_name: Option<&str>) 
             Ok(id) => id.name,
             Err(_) => {
                 eprintln!("Error: Cannot create subscription without identity.");
-                eprintln!("Run 'hcom start' first, or use --name.");
+                eprintln!("Run 'nomadterm start' first, or use --name.");
                 return 1;
             }
         }
@@ -541,7 +541,7 @@ fn cmd_events_sub(db: &HcomDb, args: &EventsSubArgs, caller_name: Option<&str>) 
     // No filters and no SQL: show help
     if sql_parts.is_empty() {
         println!(
-            "Event subscriptions: get notified via hcom message when a future event matches.\n\n\
+            "Event subscriptions: get notified via nomadterm message when a future event matches.\n\n\
              Usage:\n\
              \x20 events sub [filters] [--once]     Subscribe using filter flags\n\
              \x20 events sub \"SQL WHERE\" [--once]   Subscribe using raw SQL\n\
@@ -577,7 +577,7 @@ fn cmd_events_sub(db: &HcomDb, args: &EventsSubArgs, caller_name: Option<&str>) 
     events_sub_sql(db, &sql_parts, &caller, once)
 }
 
-/// Handle `hcom events unsub <id>`.
+/// Handle `nomadterm events unsub <id>`.
 fn cmd_events_unsub(db: &HcomDb, args: &EventsUnsubArgs) -> i32 {
     let mut sub_id = args.id.clone();
     if !sub_id.starts_with("sub-") {
@@ -589,7 +589,7 @@ fn cmd_events_unsub(db: &HcomDb, args: &EventsUnsubArgs) -> i32 {
     // Check exists
     if db.kv_get(&key).ok().flatten().is_none() {
         eprintln!("Not found: {sub_id}");
-        eprintln!("Use 'hcom events sub list' to list active subscriptions.");
+        eprintln!("Use 'nomadterm events sub list' to list active subscriptions.");
         return 1;
     }
 
@@ -598,7 +598,7 @@ fn cmd_events_unsub(db: &HcomDb, args: &EventsUnsubArgs) -> i32 {
     0
 }
 
-/// Handle `hcom events launch [batch_id] [--timeout N]`.
+/// Handle `nomadterm events launch [batch_id] [--timeout N]`.
 fn cmd_events_launch(db: &HcomDb, args: &EventsLaunchArgs, instance_name: Option<&str>) -> i32 {
     let timeout = args.timeout;
 
@@ -727,11 +727,11 @@ fn events_wait(
             break 0;
         }
 
-        // Check for unread messages (interrupt wait) — use <hcom> XML tag format
+        // Check for unread messages (interrupt wait) — use <nomadterm> XML tag format
         if let Some(name) = instance_name {
             let messages = db.get_unread_messages(name);
             if !messages.is_empty() {
-                // Format as <hcom> XML tag
+                // Format as <nomadterm> XML tag
                 let preview = build_message_preview(db, name);
                 println!("{preview}");
                 break 0;
@@ -805,11 +805,11 @@ fn sha256_hash(input: &str) -> String {
     result.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Build <hcom> XML message preview for unread notification.
+/// Build <nomadterm> XML message preview for unread notification.
 fn build_message_preview(db: &HcomDb, instance_name: &str) -> String {
     let messages = db.get_unread_messages(instance_name);
     if messages.is_empty() {
-        return "<hcom></hcom>".to_string();
+        return "<nomadterm></nomadterm>".to_string();
     }
 
     // Build simple "sender → you" format
@@ -840,15 +840,15 @@ fn build_message_preview(db: &HcomDb, instance_name: &str) -> String {
             .rev()
             .find(|&i| preview.is_char_boundary(i))
             .unwrap_or(0);
-        format!("<hcom>{}...</hcom>", &preview[..end])
+        format!("<nomadterm>{}...</nomadterm>", &preview[..end])
     } else {
-        format!("<hcom>{preview}</hcom>")
+        format!("<nomadterm>{preview}</nomadterm>")
     }
 }
 
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
-/// Main entry point for `hcom events` command.
+/// Main entry point for `nomadterm events` command.
 pub fn cmd_events(db: &HcomDb, args: &EventsArgs, ctx: Option<&CommandContext>) -> i32 {
     // Resolve identity context
     let instance_name = ctx
@@ -945,7 +945,7 @@ pub fn cmd_events(db: &HcomDb, args: &EventsArgs, ctx: Option<&CommandContext>) 
                     if !path.is_dir() {
                         continue;
                     }
-                    let db_path = path.join("hcom.db");
+                    let db_path = path.join("nomadterm.db");
                     if !db_path.exists() {
                         continue;
                     }

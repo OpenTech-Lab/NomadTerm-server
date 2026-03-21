@@ -1,4 +1,4 @@
-//! `hcom term` command — terminal admin: screen queries, text injection, debug logging.
+//! `nomadterm term` command — terminal admin: screen queries, text injection, debug logging.
 //!
 //!
 //! Talks to PTY instances via their TCP inject ports.
@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use crate::db::HcomDb;
 
-/// Parsed arguments for `hcom term`.
+/// Parsed arguments for `nomadterm term`.
 #[derive(clap::Parser, Debug)]
 #[command(
     name = "term",
@@ -175,7 +175,7 @@ fn format_screen(data: &serde_json::Value) -> String {
     out.join("\n")
 }
 
-/// Handle: hcom term debug on|off|logs
+/// Handle: nomadterm term debug on|off|logs
 fn handle_debug(argv: &[String]) -> i32 {
     let sub = argv.first().map(|s| s.as_str());
 
@@ -197,7 +197,7 @@ fn handle_debug(argv: &[String]) -> i32 {
         Some("logs") => list_logs(),
         _ => {
             let status = if flag_path().exists() { "on" } else { "off" };
-            println!("PTY debug logging is {status}. Usage: hcom term debug on|off|logs");
+            println!("PTY debug logging is {status}. Usage: nomadterm term debug on|off|logs");
             0
         }
     }
@@ -250,7 +250,7 @@ fn list_logs() -> i32 {
     0
 }
 
-/// Handle screen query: hcom term [name] [--json]
+/// Handle screen query: nomadterm term [name] [--json]
 fn handle_screen(db: &HcomDb, argv: &[String]) -> i32 {
     let raw_json = argv.iter().any(|a| a == "--json");
     let args: Vec<&str> = argv
@@ -323,13 +323,13 @@ pub fn cmd_term(db: &HcomDb, args: &TermArgs, _ctx: Option<&CommandContext>) -> 
 
     if sub == Some("--help") || sub == Some("-h") {
         println!(
-            "hcom term - Terminal admin: screen query, text injection, debug logging\n\n\
+            "nomadterm term - Terminal admin: screen query, text injection, debug logging\n\n\
              Usage:\n  \
-             hcom term                  Query all PTY screens\n  \
-             hcom term <name>           Query specific instance screen\n  \
-             hcom term <name> --json    JSON output\n  \
-             hcom term inject <name> [text] [--enter]   Inject text/enter\n  \
-             hcom term debug on|off|logs                 PTY debug logging"
+             nomadterm term                  Query all PTY screens\n  \
+             nomadterm term <name>           Query specific instance screen\n  \
+             nomadterm term <name> --json    JSON output\n  \
+             nomadterm term inject <name> [text] [--enter]   Inject text/enter\n  \
+             nomadterm term debug on|off|logs                 PTY debug logging"
         );
         return 0;
     }
@@ -342,7 +342,7 @@ pub fn cmd_term(db: &HcomDb, args: &TermArgs, _ctx: Option<&CommandContext>) -> 
             .map(|s| s.as_str())
             .collect();
         if args.is_empty() {
-            println!("Usage: hcom term inject <name> [text] [--enter]");
+            println!("Usage: nomadterm term inject <name> [text] [--enter]");
             return 1;
         }
         let name = resolve_display_name(db, args[0]).unwrap_or_else(|| args[0].to_string());

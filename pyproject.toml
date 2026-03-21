@@ -3,7 +3,7 @@ requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "hcom"
+name = "nomadterm"
 version = "0.7.5"
 description = "Let AI agents message, watch, and spawn each other across terminals. Claude Code, Gemini CLI, Codex, OpenCode."
 readme = "README.md"
@@ -24,10 +24,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aannoo/hcom"
-Repository = "https://github.com/aannoo/hcom"
-Issues = "https://github.com/aannoo/hcom/issues"
-Documentation = "https://github.com/aannoo/hcom#readme"
+Homepage = "https://github.com/aannoo/nomadterm"
+Repository = "https://github.com/aannoo/nomadterm"
+Issues = "https://github.com/aannoo/nomadterm/issues"
+Documentation = "https://github.com/aannoo/nomadterm#readme"
 
 [tool.maturin]
 bindings = "bin"

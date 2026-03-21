@@ -484,16 +484,16 @@ pub fn validate_conflicts(spec: &GeminiArgsSpec) -> Vec<String> {
     let has_prompt_flag = spec.has_flag(&["-p", "--prompt"], &["-p=", "--prompt="]);
     if !spec.positional_tokens.is_empty() {
         warnings.push(
-            "ERROR: Gemini headless mode (positional query) not supported in hcom.\n\
+            "ERROR: Gemini headless mode (positional query) not supported in nomadterm.\n\
              Use -i/--prompt-interactive for interactive sessions with initial prompt.\n\
-             For headless: use 'hcom N claude -p \"task\"'"
+             For headless: use 'nomadterm N claude -p \"task\"'"
                 .to_string(),
         );
     } else if has_prompt_flag {
         warnings.push(
-            "ERROR: Gemini headless mode (-p/--prompt flag) not supported in hcom.\n\
+            "ERROR: Gemini headless mode (-p/--prompt flag) not supported in nomadterm.\n\
              Use -i/--prompt-interactive for interactive sessions with initial prompt.\n\
-             For headless: use 'hcom N claude -p \"task\"'"
+             For headless: use 'nomadterm N claude -p \"task\"'"
                 .to_string(),
         );
     }

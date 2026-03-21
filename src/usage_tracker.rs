@@ -154,6 +154,6 @@ fn read_rapl_cpu_watts() -> Option<f64> {
 /// When PTY hooks accumulate `usage: {input_tokens, output_tokens}` JSON from
 /// CLI stdout, those will be summed per CLI and written to the DB here.
 fn collect_ai_usage() -> HashMap<String, AiUsage> {
-    // TODO(phase-a): query hcom DB for token counts per CLI session.
+    // TODO(phase-a): query nomadterm DB for token counts per CLI session.
     HashMap::new()
 }

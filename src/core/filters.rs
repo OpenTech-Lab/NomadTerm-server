@@ -1,8 +1,8 @@
 //! Composable event filter system for queries, subscriptions, and listen.
 //!
-//! - `hcom events` (queries)
-//! - `hcom events sub` (subscriptions)
-//! - `hcom listen` (blocking waits)
+//! - `nomadterm events` (queries)
+//! - `nomadterm events sub` (subscriptions)
+//! - `nomadterm listen` (blocking waits)
 //!
 //! Flag parsing extracts known filter flags from argv, SQL generation builds
 //! WHERE clauses from parsed filters.

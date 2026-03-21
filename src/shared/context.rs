@@ -1,4 +1,4 @@
-//! Per-request execution context for hcom.
+//! Per-request execution context for nomadterm.
 //!
 //! HcomContext is constructed once at request entry and passed by reference
 //! to all handlers. No global state or thread-locals.
@@ -21,7 +21,7 @@ pub struct HcomContext {
     // === Identity ===
     /// HCOM_PROCESS_ID — identifies launched instances.
     pub process_id: Option<String>,
-    /// HCOM_LAUNCHED=1 — true if launched by hcom.
+    /// HCOM_LAUNCHED=1 — true if launched by nomadterm.
     pub is_launched: bool,
     /// HCOM_PTY_MODE=1 — running in PTY wrapper.
     pub is_pty_mode: bool,
@@ -31,7 +31,7 @@ pub struct HcomContext {
     pub background_name: Option<String>,
 
     // === Paths ===
-    /// Path to hcom data directory (~/.hcom or HCOM_DIR).
+    /// Path to nomadterm data directory (~/.nomadterm or HCOM_DIR).
     pub hcom_dir: PathBuf,
     /// True if HCOM_DIR was explicitly set.
     pub hcom_dir_override: bool,
@@ -164,9 +164,9 @@ impl HcomContext {
 
     // === Derived paths ===
 
-    /// Path to hcom.db.
+    /// Path to nomadterm.db.
     pub fn db_path(&self) -> PathBuf {
-        self.hcom_dir.join("hcom.db")
+        self.hcom_dir.join("nomadterm.db")
     }
 
     /// Path to logs directory.
@@ -174,9 +174,9 @@ impl HcomContext {
         self.hcom_dir.join(".tmp").join("logs")
     }
 
-    /// Path to hcom.log.
+    /// Path to nomadterm.log.
     pub fn log_path(&self) -> PathBuf {
-        self.log_dir().join("hcom.log")
+        self.log_dir().join("nomadterm.log")
     }
 
     /// Whether running inside any AI tool.
@@ -189,7 +189,7 @@ impl HcomContext {
         self.tool.as_str()
     }
 
-    /// Detect vanilla (non-hcom-launched) tool, or None.
+    /// Detect vanilla (non-nomadterm-launched) tool, or None.
     pub fn detect_vanilla_tool(&self) -> Option<&'static str> {
         if self.is_launched {
             return None;
@@ -290,33 +290,33 @@ mod tests {
         let env = make_env(&[("HOME", "/home/test")]);
         let ctx = HcomContext::from_env(&env, PathBuf::from("/tmp"));
 
-        assert_eq!(ctx.hcom_dir, PathBuf::from("/home/test/.hcom"));
+        assert_eq!(ctx.hcom_dir, PathBuf::from("/home/test/.nomadterm"));
         assert!(!ctx.hcom_dir_override);
     }
 
     #[test]
     fn test_hcom_dir_override() {
-        let env = make_env(&[("HCOM_DIR", "/custom/hcom"), ("HOME", "/home/test")]);
+        let env = make_env(&[("HCOM_DIR", "/custom/nomadterm"), ("HOME", "/home/test")]);
         let ctx = HcomContext::from_env(&env, PathBuf::from("/tmp"));
 
-        assert_eq!(ctx.hcom_dir, PathBuf::from("/custom/hcom"));
+        assert_eq!(ctx.hcom_dir, PathBuf::from("/custom/nomadterm"));
         assert!(ctx.hcom_dir_override);
     }
 
     #[test]
     fn test_hcom_dir_tilde_expansion() {
-        let env = make_env(&[("HCOM_DIR", "~/custom/.hcom"), ("HOME", "/home/test")]);
+        let env = make_env(&[("HCOM_DIR", "~/custom/.nomadterm"), ("HOME", "/home/test")]);
         let ctx = HcomContext::from_env(&env, PathBuf::from("/tmp"));
 
-        assert_eq!(ctx.hcom_dir, PathBuf::from("/home/test/custom/.hcom"));
+        assert_eq!(ctx.hcom_dir, PathBuf::from("/home/test/custom/.nomadterm"));
     }
 
     #[test]
     fn test_hcom_dir_relative_resolved_to_absolute() {
-        let env = make_env(&[("HCOM_DIR", "relative/.hcom"), ("HOME", "/home/test")]);
+        let env = make_env(&[("HCOM_DIR", "relative/.nomadterm"), ("HOME", "/home/test")]);
         let ctx = HcomContext::from_env(&env, PathBuf::from("/tmp/worktree"));
 
-        assert_eq!(ctx.hcom_dir, PathBuf::from("/tmp/worktree/relative/.hcom"));
+        assert_eq!(ctx.hcom_dir, PathBuf::from("/tmp/worktree/relative/.nomadterm"));
     }
 
     #[test]
@@ -370,11 +370,11 @@ mod tests {
         let env = make_env(&[("HOME", "/home/test")]);
         let ctx = HcomContext::from_env(&env, PathBuf::from("/tmp"));
 
-        assert_eq!(ctx.db_path(), PathBuf::from("/home/test/.hcom/hcom.db"));
-        assert_eq!(ctx.log_dir(), PathBuf::from("/home/test/.hcom/.tmp/logs"));
+        assert_eq!(ctx.db_path(), PathBuf::from("/home/test/.nomadterm/nomadterm.db"));
+        assert_eq!(ctx.log_dir(), PathBuf::from("/home/test/.nomadterm/.tmp/logs"));
         assert_eq!(
             ctx.log_path(),
-            PathBuf::from("/home/test/.hcom/.tmp/logs/hcom.log")
+            PathBuf::from("/home/test/.nomadterm/.tmp/logs/nomadterm.log")
         );
     }
 
@@ -399,14 +399,14 @@ mod tests {
 
     #[test]
     fn test_detect_vanilla_tool() {
-        // Claude not launched by hcom = vanilla
+        // Claude not launched by nomadterm = vanilla
         let ctx = HcomContext::from_env(
             &make_env(&[("CLAUDECODE", "1"), ("HOME", "/home/test")]),
             PathBuf::from("/tmp"),
         );
         assert_eq!(ctx.detect_vanilla_tool(), Some("claude"));
 
-        // Claude launched by hcom = not vanilla
+        // Claude launched by nomadterm = not vanilla
         let ctx = HcomContext::from_env(
             &make_env(&[
                 ("CLAUDECODE", "1"),

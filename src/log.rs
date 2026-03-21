@@ -19,7 +19,7 @@ fn log_backups() -> u32 {
         .unwrap_or(DEFAULT_BACKUPS)
 }
 
-const LOG_FILE: &str = "hcom.log";
+const LOG_FILE: &str = "nomadterm.log";
 
 /// ISO 8601 timestamp for log entries.
 fn timestamp_now() -> String {
@@ -27,7 +27,7 @@ fn timestamp_now() -> String {
 }
 
 /// Rotate log file if over size limit.
-/// hcom.log -> hcom.log.1 -> hcom.log.2 -> hcom.log.3 (oldest deleted).
+/// nomadterm.log -> nomadterm.log.1 -> nomadterm.log.2 -> nomadterm.log.3 (oldest deleted).
 fn rotate_if_needed(path: &std::path::Path) {
     let size = match fs::metadata(path) {
         Ok(m) => m.len(),
@@ -54,7 +54,7 @@ fn rotate_if_needed(path: &std::path::Path) {
     let _ = fs::rename(path, path.with_file_name(format!("{}.1", LOG_FILE)));
 }
 
-/// Log a structured event to the hcom log file.
+/// Log a structured event to the nomadterm log file.
 ///
 /// Uses manual serde_json writes for full control over field ordering and
 /// optional fields.

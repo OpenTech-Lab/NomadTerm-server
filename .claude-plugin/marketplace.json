@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "hcom",
+  "name": "nomadterm",
   "version": "1.0.0",
   "description": "Let AI agents message, watch, and spawn each other across terminals. Claude Code, Gemini CLI, Codex, OpenCode.",
   "metadata": {
@@ -11,11 +11,11 @@
   },
   "plugins": [
     {
-      "name": "hcom",
-      "source": "./plugin/hcom",
+      "name": "nomadterm",
+      "source": "./plugin/nomadterm",
       "description": "Let AI agents message, watch, and spawn each other across terminals. Claude Code, Gemini CLI, Codex, OpenCode.",
       "category": "productivity",
-      "homepage": "https://github.com/aannoo/hcom"
+      "homepage": "https://github.com/aannoo/nomadterm"
     }
   ]
 }

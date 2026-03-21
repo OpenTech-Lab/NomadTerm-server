@@ -3,8 +3,8 @@ import type { Event } from "@opencode-ai/sdk"
 import { appendFileSync } from "fs"
 import { homedir } from "os"
 
-const HCOM_DIR = process.env.HCOM_DIR || `${homedir()}/.hcom`
-const LOG_PATH = `${HCOM_DIR}/.tmp/logs/hcom.log`
+const HCOM_DIR = process.env.HCOM_DIR || `${homedir()}/.nomadterm`
+const LOG_PATH = `${HCOM_DIR}/.tmp/logs/nomadterm.log`
 
 function log(
   level: "DEBUG" | "INFO" | "WARN" | "ERROR",
@@ -40,7 +40,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
   function checkHcom(): boolean {
     if (!hcomChecked) {
       hcomChecked = true
-      hcomAvailable = Bun.which("hcom") !== null
+      hcomAvailable = Bun.which("nomadterm") !== null
       if (!hcomAvailable) {
         log("WARN", "plugin.no_hcom")
       }
@@ -68,8 +68,8 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
           : `[new message #${m.event_id}]`
       return `${prefix} ${m.from} -> ${recipientName}: ${m.message}`
     })
-    if (messages.length === 1) return `<hcom>${parts[0]}</hcom>`
-    return `<hcom>[${messages.length} new messages] | ${parts.join(" | ")}</hcom>`
+    if (messages.length === 1) return `<nomadterm>${parts[0]}</nomadterm>`
+    return `<nomadterm>[${messages.length} new messages] | ${parts.join(" | ")}</nomadterm>`
   }
 
   // Deliver pending messages via promptAsync. Ack is deferred to transform
@@ -84,7 +84,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
       log("DEBUG", "plugin.delivery_skipped", instanceName, { reason: "pending_ack_in_flight", pending_ack: pendingAckId })
       return false
     }
-    const msgResult = await $.nothrow()`hcom opencode-read --name ${instanceName}`.quiet()
+    const msgResult = await $.nothrow()`nomadterm opencode-read --name ${instanceName}`.quiet()
     if (msgResult.exitCode !== 0) {
       log("WARN", "plugin.delivery_read_failed", instanceName, { exit_code: msgResult.exitCode, stderr: msgResult.stderr.toString().slice(0, 200) })
       return false
@@ -134,7 +134,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
       const hcomStatus = isIdle ? "listening" : "active"
       if (hcomStatus !== lastReportedStatus) {
         lastReportedStatus = hcomStatus
-        await $.nothrow()`hcom opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
+        await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
         log("INFO", "plugin.reconcile_status", instanceName, { status: hcomStatus })
       }
     } catch (e) {
@@ -151,7 +151,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
     if (reconcileTimer) { clearInterval(reconcileTimer); reconcileTimer = null }
   }
 
-  // TCP notify server: instant wake when hcom messages arrive.
+  // TCP notify server: instant wake when nomadterm messages arrive.
   // notify_all_instances() TCP-connects to this port on every send.
   function startNotifyServer(): number | null {
     if (notifyServer) return notifyServer.port
@@ -194,8 +194,8 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
         // Start TCP notify server before binding so port is registered atomically
         const notifyPort = startNotifyServer()
         const result = notifyPort
-          ? await $.nothrow()`hcom opencode-start --session-id ${sid} --notify-port ${String(notifyPort)}`.quiet()
-          : await $.nothrow()`hcom opencode-start --session-id ${sid}`.quiet()
+          ? await $.nothrow()`nomadterm opencode-start --session-id ${sid} --notify-port ${String(notifyPort)}`.quiet()
+          : await $.nothrow()`nomadterm opencode-start --session-id ${sid}`.quiet()
         if (result.exitCode !== 0) { stopNotifyServer(); return }
         const json = JSON.parse(result.text())
         if (json.error) {
@@ -242,7 +242,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
             }
             if (instanceName) {
               lastReportedStatus = "blocked"
-              await $.nothrow()`hcom opencode-status --name ${instanceName} --status blocked --context ${"approval"} --detail ${event.properties.permission}`.quiet()
+              await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status blocked --context ${"approval"} --detail ${event.properties.permission}`.quiet()
               log("INFO", "plugin.permission_asked", instanceName, { permission: event.properties.permission, request_id: event.properties.id })
             }
             break
@@ -255,7 +255,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
               const current = eventSessionId ? statusResult.data?.[eventSessionId] : null
               const hcomStatus = !current || current.type === "idle" ? "listening" : "active"
               lastReportedStatus = hcomStatus
-              await $.nothrow()`hcom opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
+              await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
               if (hcomStatus === "listening" && eventSessionId) {
                 await deliverPendingToIdle(eventSessionId)
               }
@@ -273,7 +273,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
               await bindIdentity(eventSessionId)
             }
 
-            // Report status to hcom daemon (skip if unchanged)
+            // Report status to nomadterm daemon (skip if unchanged)
             if (permissionPending) {
               startReconcileTimer()
               break
@@ -282,7 +282,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
               const hcomStatus = statusType === "idle" ? "listening" : "active"
               if (hcomStatus !== lastReportedStatus) {
                 lastReportedStatus = hcomStatus
-                await $.nothrow()`hcom opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
+                await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status ${hcomStatus}`.quiet()
               }
               // Ensure reconcile timer is running (catches missed idle events)
               startReconcileTimer()
@@ -299,7 +299,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
             stopNotifyServer()
             stopReconcileTimer()
             if (instanceName) {
-              await $.nothrow()`hcom opencode-stop --name ${instanceName} --reason closed`.quiet()
+              await $.nothrow()`nomadterm opencode-stop --name ${instanceName} --reason closed`.quiet()
             }
             instanceName = null
             sessionId = null
@@ -312,7 +312,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
           case "file.edited": {
             const filePath = event.properties.file
             if (instanceName) {
-              await $.nothrow()`hcom opencode-status --name ${instanceName} --status active --context ${"tool:write"} --detail ${filePath}`.quiet()
+              await $.nothrow()`nomadterm opencode-status --name ${instanceName} --status active --context ${"tool:write"} --detail ${filePath}`.quiet()
             }
             break
           }
@@ -376,7 +376,7 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
         if (pendingAckId !== null) {
           const ackId = pendingAckId
           pendingAckId = null
-          await $.nothrow()`hcom opencode-read --name ${instanceName} --ack --up-to ${String(ackId)}`.quiet()
+          await $.nothrow()`nomadterm opencode-read --name ${instanceName} --ack --up-to ${String(ackId)}`.quiet()
           log("INFO", "plugin.deferred_ack", instanceName, { acked_to: ackId })
         }
       } catch (e) {
@@ -390,8 +390,8 @@ export const HcomPlugin: Plugin = async ({ client, $ }) => {
         if (!instanceName) return
 
         output.context.push(
-          `You are connected to hcom as "${instanceName}". ` +
-          `Use --name ${instanceName} for all hcom commands.`
+          `You are connected to nomadterm as "${instanceName}". ` +
+          `Use --name ${instanceName} for all nomadterm commands.`
         )
         log("INFO", "plugin.compaction_reset", instanceName)
       } catch (e) {

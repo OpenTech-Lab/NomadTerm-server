@@ -1,4 +1,4 @@
-//! CLI commands for hcom.
+//! CLI commands for nomadterm.
 //!
 
 // Messaging

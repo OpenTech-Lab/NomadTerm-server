@@ -1,4 +1,4 @@
-//! `hcom relay` command — cross-device sync via MQTT pub/sub.
+//! `nomadterm relay` command — cross-device sync via MQTT pub/sub.
 
 use crate::config;
 use crate::db::HcomDb;
@@ -6,7 +6,7 @@ use crate::relay::{self, DEFAULT_BROKERS};
 use crate::shared::CommandContext;
 use crate::shared::ansi::{FG_GRAY, FG_GREEN, FG_RED, FG_YELLOW, RESET};
 
-/// Parsed arguments for `hcom relay`.
+/// Parsed arguments for `nomadterm relay`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "relay", about = "Cross-device sync via MQTT")]
 pub struct RelayArgs {
@@ -85,13 +85,13 @@ fn relay_status(db: &HcomDb) -> i32 {
 
     if config.relay_id.is_empty() {
         println!("{FG_GRAY}Relay: not configured{RESET}");
-        println!("Run: hcom relay new");
+        println!("Run: nomadterm relay new");
         return 0;
     }
 
     if !config.relay_enabled {
         println!("{FG_YELLOW}Relay: disabled{RESET}");
-        println!("\nRun: hcom relay connect");
+        println!("\nRun: nomadterm relay connect");
         return 0;
     }
 
@@ -259,7 +259,7 @@ fn relay_status(db: &HcomDb) -> i32 {
     // Show join token
     if !config.relay.is_empty() && !config.relay_id.is_empty() {
         if let Some(token) = encode_join_token(&config.relay_id, &config.relay) {
-            println!("\nAdd devices: hcom relay connect {token}");
+            println!("\nAdd devices: nomadterm relay connect {token}");
         }
     }
 
@@ -272,7 +272,7 @@ fn relay_toggle(db: &HcomDb, enable: bool) -> i32 {
 
     if config.relay_id.is_empty() {
         eprintln!("No relay configured.");
-        eprintln!("Run: hcom relay new");
+        eprintln!("Run: nomadterm relay new");
         return 1;
     }
 
@@ -301,7 +301,7 @@ fn relay_toggle(db: &HcomDb, enable: bool) -> i32 {
         relay_status(db)
     } else {
         println!("{FG_YELLOW}Relay: disabled{RESET}");
-        println!("\nRun 'hcom relay connect' to reconnect");
+        println!("\nRun 'nomadterm relay connect' to reconnect");
         0
     }
 }
@@ -315,7 +315,7 @@ fn relay_new(_db: &HcomDb, argv: &[String]) -> i32 {
     // Show previous group token if switching
     if !config.relay_id.is_empty() && !config.relay.is_empty() {
         if let Some(old_token) = encode_join_token(&config.relay_id, &config.relay) {
-            println!("Current group: hcom relay connect {old_token}\n");
+            println!("Current group: nomadterm relay connect {old_token}\n");
         }
     }
 
@@ -359,7 +359,7 @@ fn relay_new(_db: &HcomDb, argv: &[String]) -> i32 {
             Some(b) => b,
             None => {
                 eprintln!("\nNo broker reachable. Check your network.");
-                eprintln!("Or use a private broker: hcom relay new --broker mqtts://host:port");
+                eprintln!("Or use a private broker: nomadterm relay new --broker mqtts://host:port");
                 return 1;
             }
         }
@@ -385,7 +385,7 @@ fn relay_new(_db: &HcomDb, argv: &[String]) -> i32 {
         if auth_token.is_some() {
             println!("Password: set");
         }
-        println!("\nOn other devices: hcom relay connect {token}");
+        println!("\nOn other devices: nomadterm relay connect {token}");
         if auth_token.is_some() {
             println!("  (they will also need: --password <secret>)");
         }
@@ -394,9 +394,9 @@ fn relay_new(_db: &HcomDb, argv: &[String]) -> i32 {
     if crate::relay::worker::ensure_worker(false) {
         println!("\nConnected.");
     } else if crate::relay::worker::is_relay_worker_running() {
-        println!("\nDaemon started (not yet ready). Run 'hcom relay status' to confirm.");
+        println!("\nDaemon started (not yet ready). Run 'nomadterm relay status' to confirm.");
     } else {
-        println!("\nCould not start daemon automatically. Run 'hcom relay daemon start'.");
+        println!("\nCould not start daemon automatically. Run 'nomadterm relay daemon start'.");
     }
     0
 }
@@ -412,7 +412,7 @@ fn relay_connect(db: &HcomDb, argv: &[String]) -> i32 {
         let config = config::load_config_snapshot().core;
         if config.relay_id.is_empty() {
             eprintln!("No relay configured.");
-            eprintln!("Run: hcom relay new");
+            eprintln!("Run: nomadterm relay new");
             return 1;
         }
         if config.relay_enabled {
@@ -444,7 +444,7 @@ fn relay_connect(db: &HcomDb, argv: &[String]) -> i32 {
     // Show previous group if switching
     if !config.relay_id.is_empty() && !config.relay.is_empty() && config.relay_id != relay_id {
         if let Some(old_token) = encode_join_token(&config.relay_id, &config.relay) {
-            println!("Current group: hcom relay connect {old_token}\n");
+            println!("Current group: nomadterm relay connect {old_token}\n");
         }
     }
 
@@ -484,9 +484,9 @@ fn relay_connect(db: &HcomDb, argv: &[String]) -> i32 {
     if crate::relay::worker::ensure_worker(false) {
         println!("\nConnected.");
     } else if crate::relay::worker::is_relay_worker_running() {
-        println!("\nDaemon started (not yet ready). Run 'hcom relay status' to confirm.");
+        println!("\nDaemon started (not yet ready). Run 'nomadterm relay status' to confirm.");
     } else {
-        println!("\nCould not start daemon automatically. Run 'hcom relay daemon start'.");
+        println!("\nCould not start daemon automatically. Run 'nomadterm relay daemon start'.");
     }
     0
 }
@@ -540,23 +540,23 @@ pub fn cmd_relay(db: &HcomDb, args: &RelayArgs, _ctx: Option<&CommandContext>) -
 
     if first == "--help" || first == "-h" {
         println!(
-            "hcom relay - Cross-device sync via MQTT pub/sub\n\n\
+            "nomadterm relay - Cross-device sync via MQTT pub/sub\n\n\
              Usage:\n  \
-             hcom relay                  Show relay status\n  \
-             hcom relay status           Same as above\n  \
-             hcom relay new              Create new relay group\n  \
-             hcom relay connect          Re-enable existing relay\n  \
-             hcom relay connect <token>  Join relay from another device\n  \
-             hcom relay off              Disable relay sync\n  \
-             hcom relay disconnect       Disable relay sync\n\n\
+             nomadterm relay                  Show relay status\n  \
+             nomadterm relay status           Same as above\n  \
+             nomadterm relay new              Create new relay group\n  \
+             nomadterm relay connect          Re-enable existing relay\n  \
+             nomadterm relay connect <token>  Join relay from another device\n  \
+             nomadterm relay off              Disable relay sync\n  \
+             nomadterm relay disconnect       Disable relay sync\n\n\
              Daemon:\n  \
-             hcom relay daemon           Show daemon status\n  \
-             hcom relay daemon start     Start the relay daemon\n  \
-             hcom relay daemon stop      Stop the relay daemon\n  \
-             hcom relay daemon restart   Restart the relay daemon\n\n\
+             nomadterm relay daemon           Show daemon status\n  \
+             nomadterm relay daemon start     Start the relay daemon\n  \
+             nomadterm relay daemon stop      Stop the relay daemon\n  \
+             nomadterm relay daemon restart   Restart the relay daemon\n\n\
              Private broker:\n  \
-             hcom relay new --broker mqtts://host:port [--password secret]\n  \
-             hcom relay connect <token> --broker mqtts://host:port [--password secret]"
+             nomadterm relay new --broker mqtts://host:port [--password secret]\n  \
+             nomadterm relay connect <token> --broker mqtts://host:port [--password secret]"
         );
         return 0;
     }
@@ -574,7 +574,7 @@ pub fn cmd_relay(db: &HcomDb, args: &RelayArgs, _ctx: Option<&CommandContext>) -
                 relay_connect(db, argv)
             } else {
                 eprintln!("Error: Unknown subcommand: {first}");
-                eprintln!("Usage: hcom relay [new|connect|disconnect|status]");
+                eprintln!("Usage: nomadterm relay [new|connect|disconnect|status]");
                 1
             }
         }

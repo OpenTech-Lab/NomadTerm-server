@@ -168,10 +168,10 @@ fn run_app(app: &mut App, viewport_height: u16, in_alt_screen: &mut bool) -> Res
 fn run_inner(viewport_height: u16) -> Result<()> {
     execute!(stdout(), EnableBracketedPaste)?;
 
-    // Save current title (push stack) and set hcom title
+    // Save current title (push stack) and set nomadterm title
     {
         let mut out = stdout();
-        let _ = write!(out, "\x1b[22;0t\x1b]0;hcom\x07");
+        let _ = write!(out, "\x1b[22;0t\x1b]0;nomadterm\x07");
         let _ = out.flush();
     }
 

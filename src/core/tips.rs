@@ -35,7 +35,7 @@ pub fn get_tip(key: &str) -> Option<&'static str> {
         ),
         // Subscriptions
         "sub:created" => Some(
-            "[tip] You'll be notified via hcom message when the next matching event occurs. Safe to end your turn.",
+            "[tip] You'll be notified via nomadterm message when the next matching event occurs. Safe to end your turn.",
         ),
         _ => None,
     }
@@ -137,7 +137,7 @@ pub fn print_launch_tips(
 
     if let Some(t) = tag {
         tips.push(format!(
-            "[tip] Tag prefix targets all agents with that tag: hcom send @{t}- <message>"
+            "[tip] Tag prefix targets all agents with that tag: nomadterm send @{t}- <message>"
         ));
     }
 
@@ -160,7 +160,7 @@ pub fn print_launch_tips(
                 &mut tips,
                 launcher_name,
                 "launch:start",
-                "[tip] Run 'hcom start' to receive notifications/messages from instances",
+                "[tip] Run 'nomadterm start' to receive notifications/messages from instances",
             );
         }
 
@@ -170,7 +170,7 @@ pub fn print_launch_tips(
                 &mut tips,
                 launcher_name,
                 "launch:kill",
-                "[tip] Kill agents and close their panes: hcom kill <name1> <name2> ...",
+                "[tip] Kill agents and close their panes: nomadterm kill <name1> <name2> ...",
             );
         }
 
@@ -180,7 +180,7 @@ pub fn print_launch_tips(
                 &mut tips,
                 launcher_name,
                 "launch:term",
-                "[tip] View an agent's screen: hcom term <name> | Inject keystrokes: hcom term inject <name> [text] --enter",
+                "[tip] View an agent's screen: nomadterm term <name> | Inject keystrokes: nomadterm term inject <name> [text] --enter",
             );
         }
 
@@ -190,7 +190,7 @@ pub fn print_launch_tips(
                 &mut tips,
                 launcher_name,
                 "launch:sub-blocked",
-                "[tip] Get notified when an agent needs approval: hcom events sub --blocked <name>",
+                "[tip] Get notified when an agent needs approval: nomadterm events sub --blocked <name>",
             );
         } else {
             once(
@@ -198,7 +198,7 @@ pub fn print_launch_tips(
                 &mut tips,
                 launcher_name,
                 "launch:sub-idle",
-                "[tip] Get notified when an agent goes idle: hcom events sub --idle <name>",
+                "[tip] Get notified when an agent goes idle: nomadterm events sub --idle <name>",
             );
         }
 
@@ -215,14 +215,14 @@ pub fn print_launch_tips(
             &mut tips,
             launcher_name,
             "launch:send",
-            "[tip] Send a message to an agent: hcom send @<name> <message>",
+            "[tip] Send a message to an agent: nomadterm send @<name> <message>",
         );
         once(
             db,
             &mut tips,
             launcher_name,
             "launch:list",
-            "[tip] Check status: hcom list",
+            "[tip] Check status: nomadterm list",
         );
     }
 

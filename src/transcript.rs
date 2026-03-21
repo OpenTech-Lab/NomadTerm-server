@@ -129,12 +129,12 @@ impl TranscriptWatcher {
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        // Handle user messages -> log active:prompt status (filter hcom injections)
+        // Handle user messages -> log active:prompt status (filter nomadterm injections)
         if payload_type == "message" && payload.get("role").and_then(|v| v.as_str()) == Some("user")
         {
             let text = self.extract_message_text(payload);
-            // Skip hcom-injected messages, only log real user prompts
-            if !text.starts_with("[hcom]") {
+            // Skip nomadterm-injected messages, only log real user prompts
+            if !text.starts_with("[nomadterm]") {
                 self.log_user_prompt(timestamp, db);
             }
             return 0;

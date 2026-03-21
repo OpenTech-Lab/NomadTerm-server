@@ -1,4 +1,4 @@
-//! Start command: `hcom start [--as <name>] [--orphan <name|pid>]`
+//! Start command: `nomadterm start [--as <name>] [--orphan <name|pid>]`
 //!
 //!
 //! Three main paths:
@@ -24,9 +24,9 @@ use crate::router::GlobalFlags;
 use crate::shared::constants::ST_ACTIVE;
 use crate::shared::context::HcomContext;
 
-/// Parsed arguments for `hcom start`.
+/// Parsed arguments for `nomadterm start`.
 #[derive(clap::Parser, Debug)]
-#[command(name = "start", about = "Start hcom participation")]
+#[command(name = "start", about = "Start nomadterm participation")]
 pub struct StartArgs {
     /// Rebind to a different instance name
     #[arg(long = "as")]
@@ -92,13 +92,13 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
                 let rt = instances::parse_running_tasks(Some(rt_str));
                 if rt.active {
                     if rebind_target.is_some() {
-                        println!("[HCOM] Cannot use --as while Tasks are running.");
+                        println!("[NOMADTERM] Cannot use --as while Tasks are running.");
                     } else if orphan_target.is_some() {
-                        println!("[HCOM] Cannot use --orphan while Tasks are running.");
+                        println!("[NOMADTERM] Cannot use --orphan while Tasks are running.");
                     } else {
                         println!(
-                            "[HCOM] Cannot run 'hcom start' from within a Task subagent.\n\
-                             Subagents must use: hcom start --name <your-agent-id>"
+                            "[NOMADTERM] Cannot run 'nomadterm start' from within a Task subagent.\n\
+                             Subagents must use: nomadterm start --name <your-agent-id>"
                         );
                     }
                     return Ok(1);
@@ -119,7 +119,7 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
         .and_then(|id| detect_subagent(&db, id));
 
     if subagent_via_as.is_some() || (subagent_via_name.is_some() && rebind_target.is_some()) {
-        println!("[HCOM] Subagents cannot change identity. End your turn.");
+        println!("[NOMADTERM] Subagents cannot change identity. End your turn.");
         return Ok(1);
     }
     let subagent_info = subagent_via_name;
@@ -218,7 +218,7 @@ fn start_subagent(db: &HcomDb, info: &SubagentInfo) -> Result<i32> {
             by
         };
         println!(
-            "[HCOM] Your session was stopped by {by}. Do not continue working. End your turn immediately."
+            "[NOMADTERM] Your session was stopped by {by}. Do not continue working. End your turn immediately."
         );
         return Ok(1);
     }
@@ -235,7 +235,7 @@ fn start_subagent(db: &HcomDb, info: &SubagentInfo) -> Result<i32> {
 
     if let Some(name) = existing_name {
         instances::set_status(db, &name, ST_ACTIVE, "start", Default::default());
-        println!("hcom already started for {name}");
+        println!("nomadterm already started for {name}");
         return Ok(0);
     }
 
@@ -448,7 +448,7 @@ fn start_from_orphan(
 
     pidtrack::remove_pid(hcom_dir, pid);
 
-    println!("[hcom:{}]", name);
+    println!("[nomadterm:{}]", name);
     if can_reuse {
         println!("Recovered orphan PID {} as '{}'.", pid, name);
     } else {
@@ -520,23 +520,23 @@ fn start_rebind(
     if let Some(ref td) = target_data {
         if td.origin_device_id.is_none() || td.origin_device_id.as_deref() == Some("") {
             if let Err(e) = db.delete_instance(&target_name) {
-                eprintln!("[hcom] warn: delete_instance failed for {target_name}: {e}");
+                eprintln!("[nomadterm] warn: delete_instance failed for {target_name}: {e}");
             }
         }
     }
 
     // Clean up target's bindings
     if let Err(e) = db.delete_process_bindings_for_instance(&target_name) {
-        eprintln!("[hcom] warn: delete_process_bindings failed for {target_name}: {e}");
+        eprintln!("[nomadterm] warn: delete_process_bindings failed for {target_name}: {e}");
     }
     if let Err(e) = db.delete_session_bindings_for_instance(&target_name) {
-        eprintln!("[hcom] warn: delete_session_bindings failed for {target_name}: {e}");
+        eprintln!("[nomadterm] warn: delete_session_bindings failed for {target_name}: {e}");
     }
 
     // Delete old identity if different from target
     if !current_name.is_empty() && current_name != target_name {
         if let Err(e) = db.delete_instance(current_name) {
-            eprintln!("[hcom] warn: delete_instance failed for {current_name}: {e}");
+            eprintln!("[nomadterm] warn: delete_instance failed for {current_name}: {e}");
         }
     }
 
@@ -567,26 +567,26 @@ fn start_rebind(
         }
         updates.insert("name_announced".into(), serde_json::json!(1));
         if let Err(e) = db.update_instance_fields(&target_name, &updates) {
-            eprintln!("[hcom] warn: update_instance_fields failed for {target_name}: {e}");
+            eprintln!("[nomadterm] warn: update_instance_fields failed for {target_name}: {e}");
         }
     }
 
     // Create bindings
     if let Some(ref sid) = session_id {
         if let Err(e) = db.set_session_binding(sid, &target_name) {
-            eprintln!("[hcom] warn: set_session_binding failed for {target_name}: {e}");
+            eprintln!("[nomadterm] warn: set_session_binding failed for {target_name}: {e}");
         }
     }
     if let Some(ref process_id) = ctx.process_id {
         let sid = session_id.as_deref().unwrap_or("");
         if let Err(e) = db.set_process_binding(process_id, sid, &target_name) {
-            eprintln!("[hcom] warn: set_process_binding failed for {target_name}: {e}");
+            eprintln!("[nomadterm] warn: set_process_binding failed for {target_name}: {e}");
         }
 
         // Migrate notify endpoints before notify so wake reaches correct port
         if !current_name.is_empty() && current_name != target_name {
             if let Err(e) = db.migrate_notify_endpoints(current_name, &target_name) {
-                eprintln!("[hcom] warn: migrate_notify_endpoints failed: {e}");
+                eprintln!("[nomadterm] warn: migrate_notify_endpoints failed: {e}");
             }
         }
 
@@ -613,7 +613,7 @@ fn start_rebind(
         None,
     );
 
-    println!("[hcom:{}]", target_name);
+    println!("[nomadterm:{}]", target_name);
     println!("{}", bootstrap_text);
 
     log_info(
@@ -695,9 +695,9 @@ fn start_bare(
                 };
                 if ok {
                     println!("\nRestart {tool_display} to enable automatic message delivery.");
-                    println!("Then run: hcom start");
+                    println!("Then run: nomadterm start");
                 } else {
-                    eprintln!("Failed to install hooks. Run: hcom hooks add {vanilla_tool}");
+                    eprintln!("Failed to install hooks. Run: nomadterm hooks add {vanilla_tool}");
                 }
                 return Ok(1);
             }
@@ -744,7 +744,7 @@ fn start_bare(
     if let Ok(Some(existing)) = db.get_instance_full(&name) {
         if existing.status != "stopped" {
             // Already active — short message
-            println!("hcom already started for {}", name);
+            println!("nomadterm already started for {}", name);
             return Ok(0);
         }
     }
@@ -769,13 +769,13 @@ fn start_bare(
     // Bind process if we have a process_id
     if let Some(ref process_id) = ctx.process_id {
         if let Err(e) = db.set_process_binding(process_id, "", &name) {
-            eprintln!("[hcom] warn: set_process_binding failed for {name}: {e}");
+            eprintln!("[nomadterm] warn: set_process_binding failed for {name}: {e}");
         }
     }
 
     // Print bootstrap
     let hcom_config = HcomConfig::load(None).unwrap_or_else(|e| {
-        eprintln!("[hcom] warn: config load failed, using defaults: {e}");
+        eprintln!("[nomadterm] warn: config load failed, using defaults: {e}");
         let mut c = HcomConfig::default();
         c.normalize();
         c
@@ -794,7 +794,7 @@ fn start_bare(
         None,
     );
 
-    println!("[hcom:{}]", name);
+    println!("[nomadterm:{}]", name);
     println!("{}", bootstrap_text);
 
     // Log

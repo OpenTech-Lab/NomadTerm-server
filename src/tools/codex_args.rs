@@ -492,9 +492,9 @@ pub fn validate_conflicts(spec: &CodexArgsSpec) -> Vec<String> {
 
     if spec.is_exec {
         warnings.push(
-            "ERROR: Codex exec mode not supported in hcom.\n\
+            "ERROR: Codex exec mode not supported in nomadterm.\n\
              Use interactive mode (no 'exec' subcommand) for PTY sessions.\n\
-             For headless: use 'hcom N claude -p \"task\"'"
+             For headless: use 'nomadterm N claude -p \"task\"'"
                 .to_string(),
         );
     }
@@ -922,8 +922,8 @@ mod tests {
     #[test]
     fn test_update_developer_instructions() {
         let spec = parse_tokens(&sv(&["--model", "gpt-4"]), SourceType::Cli);
-        let updated = spec.update(None, None, None, Some("use hcom"));
-        // Should have -c developer_instructions=use hcom prepended
+        let updated = spec.update(None, None, None, Some("use nomadterm"));
+        // Should have -c developer_instructions=use nomadterm prepended
         assert!(updated.clean_tokens.contains(&"-c".to_string()));
         assert!(
             updated

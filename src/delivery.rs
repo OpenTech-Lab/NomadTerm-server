@@ -132,11 +132,11 @@ pub(crate) fn gate_block_detail(reason: &str) -> &'static str {
 
 /// Build message preview with DB access for Gemini/Codex injection.
 ///
-/// Format: `<hcom>sender → recipient (+N)</hcom>`
+/// Format: `<nomadterm>sender → recipient (+N)</nomadterm>`
 ///
 /// ## Why different tools need different injection strategies:
 ///
-/// - **Claude**: Injects minimal `<hcom>` trigger only. The Claude hook shows the full
+/// - **Claude**: Injects minimal `<nomadterm>` trigger only. The Claude hook shows the full
 ///   message to human via system message in TUI + separate JSON for agent. Minimal
 ///   trigger is sufficient since hook handles both human and agent presentation.
 ///
@@ -145,14 +145,14 @@ pub(crate) fn gate_block_detail(reason: &str) -> &'static str {
 ///   terminal gives human context since hook output is agent-only. BeforeAgent hook
 ///   still delivers full message to agent via additionalContext.
 ///
-/// - **Codex**: Injects message preview + hcom listen instruction. Preview shows human
+/// - **Codex**: Injects message preview + nomadterm listen instruction. Preview shows human
 ///   message context in terminal (like Gemini). Bash command output is truncated for
 ///   agent only (command execution-based delivery). No BeforeAgent-style hook exists -
-///   Codex executes 'hcom listen' as shell command.
+///   Codex executes 'nomadterm listen' as shell command.
 fn build_message_preview_with_db(db: &HcomDb, name: &str) -> String {
     let messages = db.get_unread_messages(name);
     if messages.is_empty() {
-        return "<hcom></hcom>".to_string();
+        return "<nomadterm></nomadterm>".to_string();
     }
 
     // Build preview from first message:
@@ -191,10 +191,10 @@ fn build_message_preview_with_db(db: &HcomDb, name: &str) -> String {
 }
 
 /// Build Codex inject text with hint after failed inject
-/// Format: <hcom>sender → recipient (+N)</hcom> | Run: hcom listen
+/// Format: <nomadterm>sender → recipient (+N)</nomadterm> | Run: nomadterm listen
 fn build_codex_inject_with_hint(db: &HcomDb, name: &str) -> String {
     let preview = build_message_preview_with_db(db, name);
-    format!("{} | Run: hcom listen", preview)
+    format!("{} | Run: nomadterm listen", preview)
 }
 
 /// Tool-specific configuration for delivery gate.
@@ -635,11 +635,11 @@ pub fn run_delivery_loop(
             }
             if !first_message_injected && db.has_pending(&current_name) {
                 let text = build_message_preview_with_db(db, &current_name);
-                // Truncate to input box width, fall back to <hcom> tag
+                // Truncate to input box width, fall back to <nomadterm> tag
                 let cols = state.screen.read().map(|s| s.cols).unwrap_or(80);
                 let input_box_width = (cols as usize).saturating_sub(15).max(10);
                 let text = if text.len() > input_box_width {
-                    "<hcom>".to_string()
+                    "<nomadterm>".to_string()
                 } else {
                     text
                 };
@@ -661,7 +661,7 @@ pub fn run_delivery_loop(
                 }
             }
 
-            // Detect DB file replacement (hcom reset / schema bump) and reconnect
+            // Detect DB file replacement (nomadterm reset / schema bump) and reconnect
             db.reconnect_if_stale();
 
             // Heartbeat + port re-registration
@@ -729,7 +729,7 @@ pub fn run_delivery_loop(
                         );
                     }
 
-                    // Detect DB file replacement (hcom reset / schema bump) and reconnect
+                    // Detect DB file replacement (nomadterm reset / schema bump) and reconnect
                     db.reconnect_if_stale();
 
                     // Update heartbeat to prove we're alive (also re-asserts tcp_mode=true)
@@ -843,9 +843,9 @@ pub fn run_delivery_loop(
 
                         let parsed_tool = Tool::from_str(&config.tool).ok();
                         let text = match parsed_tool {
-                            Some(Tool::Claude) => "<hcom>".to_string(),
+                            Some(Tool::Claude) => "<nomadterm>".to_string(),
                             Some(Tool::Codex) if inject_attempt > 0 => {
-                                // Codex retry: add hint to prompt agent to run hcom listen
+                                // Codex retry: add hint to prompt agent to run nomadterm listen
                                 build_codex_inject_with_hint(db, &current_name)
                             }
                             _ => {
@@ -853,11 +853,11 @@ pub fn run_delivery_loop(
                                 build_message_preview_with_db(db, &current_name)
                             }
                         };
-                        // Contract to minimal <hcom> if preview won't fit in input box
+                        // Contract to minimal <nomadterm> if preview won't fit in input box
                         let cols = state.screen.read().map(|s| s.cols).unwrap_or(80);
                         let input_box_width = (cols as usize).saturating_sub(15).max(10);
                         let text = if text.len() > input_box_width {
-                            "<hcom>".to_string()
+                            "<nomadterm>".to_string()
                         } else {
                             text
                         };
@@ -1410,7 +1410,7 @@ pub fn run_delivery_loop(
 
         // 5. Delete instance row
         if let Err(e) = db.delete_instance(&current_name) {
-            eprintln!("[hcom] warn: delete_instance failed for {current_name}: {e}");
+            eprintln!("[nomadterm] warn: delete_instance failed for {current_name}: {e}");
         }
     } else {
         log_info(

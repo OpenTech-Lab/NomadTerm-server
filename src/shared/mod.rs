@@ -1,4 +1,4 @@
-//! Shared types, constants, and utilities for hcom.
+//! Shared types, constants, and utilities for nomadterm.
 
 pub mod ansi;
 pub mod constants;

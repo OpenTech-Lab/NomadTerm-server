@@ -1,10 +1,10 @@
-//! `hcom reset` command — archive and clear conversation, optionally hooks/config.
+//! `nomadterm reset` command — archive and clear conversation, optionally hooks/config.
 //!
 //!
 //! Modes:
-//!   hcom reset              Clear database (archive conversation)
-//!   hcom reset hooks        Remove hooks
-//!   hcom reset all          Stop all + clear db + remove hooks + reset config
+//!   nomadterm reset              Clear database (archive conversation)
+//!   nomadterm reset hooks        Remove hooks
+//!   nomadterm reset all          Stop all + clear db + remove hooks + reset config
 
 use crate::db::HcomDb;
 use crate::shared::{CommandContext, is_inside_ai_tool};
@@ -16,7 +16,7 @@ pub enum ResetTarget {
 }
 
 #[derive(clap::Parser, Debug)]
-#[command(name = "reset", about = "Reset hcom components")]
+#[command(name = "reset", about = "Reset nomadterm components")]
 pub struct ResetArgs {
     /// Reset scope
     #[arg(value_enum)]

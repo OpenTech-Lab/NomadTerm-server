@@ -1,10 +1,10 @@
-//! `hcom transcript` command — view and search agent conversation transcripts.
+//! `nomadterm transcript` command — view and search agent conversation transcripts.
 //!
 //!
 //! Supports:
-//! - View transcript: `hcom transcript @instance [N | N-M] [--full] [--detailed] [--json] [--last N]`
-//! - Timeline: `hcom transcript timeline [--last N] [--full] [--json]`
-//! - Search: `hcom transcript search "pattern" [--live] [--all] [--limit N] [--agent TYPE]`
+//! - View transcript: `nomadterm transcript @instance [N | N-M] [--full] [--detailed] [--json] [--last N]`
+//! - Timeline: `nomadterm transcript timeline [--last N] [--full] [--json]`
+//! - Search: `nomadterm transcript search "pattern" [--live] [--all] [--limit N] [--agent TYPE]`
 
 use std::path::{Path, PathBuf};
 
@@ -16,7 +16,7 @@ use crate::db::HcomDb;
 use crate::log::log_warn;
 use crate::shared::CommandContext;
 
-/// Parsed arguments for `hcom transcript`.
+/// Parsed arguments for `nomadterm transcript`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "transcript", about = "View and search transcripts")]
 pub struct TranscriptArgs {
@@ -54,7 +54,7 @@ pub enum TranscriptSubcmd {
     Timeline(TranscriptTimelineArgs),
 }
 
-/// Args for `hcom transcript search`.
+/// Args for `nomadterm transcript search`.
 #[derive(clap::Args, Debug)]
 pub struct TranscriptSearchArgs {
     /// Search pattern (regex)
@@ -79,7 +79,7 @@ pub struct TranscriptSearchArgs {
     pub agent: Option<String>,
 }
 
-/// Args for `hcom transcript timeline`.
+/// Args for `nomadterm transcript timeline`.
 #[derive(clap::Args, Debug)]
 pub struct TranscriptTimelineArgs {
     /// JSON output
@@ -1688,7 +1688,7 @@ fn summarize_action(text: &str) -> String {
 
 // ── Search ───────────────────────────────────────────────────────────────
 
-/// Correlate transcript file paths to hcom agent names via DB queries.
+/// Correlate transcript file paths to nomadterm agent names via DB queries.
 /// Checks instances table first, then stopped life events.
 fn correlate_paths_to_hcom(
     db: &HcomDb,
@@ -1752,7 +1752,7 @@ fn correlate_paths_to_hcom(
     result
 }
 
-/// Search across transcripts: `hcom transcript search "pattern" [--live] [--all] [--limit N] [--exclude-self]`
+/// Search across transcripts: `nomadterm transcript search "pattern" [--live] [--all] [--limit N] [--exclude-self]`
 fn cmd_transcript_search(
     db: &HcomDb,
     args: &TranscriptSearchArgs,
@@ -1780,7 +1780,7 @@ fn cmd_transcript_search(
     let mut seen = std::collections::HashSet::new();
 
     if all_mode {
-        // --all: search disk-wide directories (not just hcom-tracked instances)
+        // --all: search disk-wide directories (not just nomadterm-tracked instances)
         let mut search_dirs: Vec<PathBuf> = Vec::new();
         let agent_filter = agent_filter.map(|s| s.as_str());
         let opencode_db = if transcript_agent_matches(agent_filter, "opencode") {
@@ -1853,7 +1853,7 @@ fn cmd_transcript_search(
             return 0;
         }
 
-        // Correlate transcript paths/session IDs to hcom names via DB.
+        // Correlate transcript paths/session IDs to nomadterm names via DB.
         let mut targets: Vec<(String, Option<String>)> = matching_files
             .iter()
             .cloned()
@@ -2050,7 +2050,7 @@ fn cmd_transcript_search(
         }
     }
 
-    // Search using ripgrep (with line-level matches + snippets) — hcom-tracked/live paths
+    // Search using ripgrep (with line-level matches + snippets) — nomadterm-tracked/live paths
     let mut results = Vec::new();
     for (name, path, agent) in &paths {
         if !Path::new(path).exists() {
@@ -2115,13 +2115,13 @@ fn cmd_transcript_search(
     } else if all_mode {
         ""
     } else {
-        " (hcom-tracked)"
+        " (nomadterm-tracked)"
     };
 
     if json_mode {
         println!(
             "{}",
-            json!({"count": results.len(), "results": results, "scope": if live_mode {"live"} else if all_mode {"all"} else {"hcom"}})
+            json!({"count": results.len(), "results": results, "scope": if live_mode {"live"} else if all_mode {"all"} else {"nomadterm"}})
         );
     } else {
         if results.is_empty() {
@@ -2172,7 +2172,7 @@ fn cmd_transcript_search(
     0
 }
 
-/// Timeline: `hcom transcript timeline [--last N] [--full] [--json]`
+/// Timeline: `nomadterm transcript timeline [--last N] [--full] [--json]`
 fn cmd_transcript_timeline(db: &HcomDb, args: &TranscriptTimelineArgs) -> i32 {
     let json_mode = args.json;
     let full_mode = args.full;
@@ -2324,7 +2324,7 @@ fn cmd_transcript_timeline(db: &HcomDb, args: &TranscriptTimelineArgs) -> i32 {
 
         // Command line (instance reference for navigation)
         println!(
-            "  hcom transcript @{inst} {}",
+            "  nomadterm transcript @{inst} {}",
             entry.get("position").and_then(|v| v.as_u64()).unwrap_or(1)
         );
         println!();
@@ -2335,7 +2335,7 @@ fn cmd_transcript_timeline(db: &HcomDb, args: &TranscriptTimelineArgs) -> i32 {
 
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
-/// Main entry point for `hcom transcript` command.
+/// Main entry point for `nomadterm transcript` command.
 pub fn cmd_transcript(db: &HcomDb, args: &TranscriptArgs, ctx: Option<&CommandContext>) -> i32 {
     // Handle subcommands
     match &args.subcmd {
@@ -2398,7 +2398,7 @@ pub fn cmd_transcript(db: &HcomDb, args: &TranscriptArgs, ctx: Option<&CommandCo
             }
         }
     } else {
-        eprintln!("Usage: hcom transcript @instance [N | N-M] [--full] [--json]");
+        eprintln!("Usage: nomadterm transcript @instance [N | N-M] [--full] [--json]");
         return 1;
     };
 
@@ -2760,7 +2760,7 @@ mod tests {
     #[test]
     fn test_correlate_paths_to_hcom_uses_session_id_for_opencode() {
         let dir = tempfile::tempdir().unwrap();
-        let db = HcomDb::open_at(&dir.path().join("hcom.db")).unwrap();
+        let db = HcomDb::open_at(&dir.path().join("nomadterm.db")).unwrap();
         db.conn()
             .execute_batch(
                 "CREATE TABLE instances (

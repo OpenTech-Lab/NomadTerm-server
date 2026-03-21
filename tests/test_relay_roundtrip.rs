@@ -1,23 +1,23 @@
 //! Relay MQTT roundtrip integration test.
 //!
-//! Two real hcom instances (separate HCOM_DIR), each with their own
+//! Two real nomadterm instances (separate HCOM_DIR), each with their own
 //! daemon, talking through a real public MQTT broker.
 //! Zero mocking, zero fake payloads.
 //!
 //! Phases:
-//! 1. Device A: hcom relay new → daemon connects to broker
-//! 2. Device A: hcom send → event pushed to broker
-//! 3. Device B: hcom relay connect <token> → daemon connects, pulls
-//! 4. Verify: Device B sees Device A's event in hcom events (namespaced)
+//! 1. Device A: nomadterm relay new → daemon connects to broker
+//! 2. Device A: nomadterm send → event pushed to broker
+//! 3. Device B: nomadterm relay connect <token> → daemon connects, pulls
+//! 4. Verify: Device B sees Device A's event in nomadterm events (namespaced)
 //! 5. Verify: Device A sees Device B as remote device in relay status
 //! 6. Cleanup: relay off, daemon stop, remove temp dirs
 //!
 //! Requires:
-//! - hcom installed
+//! - nomadterm installed
 //! - Network access to public MQTT brokers
 //!
 //! Run:
-//!     cargo test -p hcom --test test_relay_roundtrip -- --ignored --nocapture
+//!     cargo test -p nomadterm --test test_relay_roundtrip -- --ignored --nocapture
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,18 +28,18 @@ use std::time::{Duration, Instant};
 // ── Helpers ────────────────────────────────────────────────────────────
 
 fn hcom_with_dir(cmd: &str, hcom_dir: &str) -> Output {
-    Command::new("hcom")
+    Command::new("nomadterm")
         .args(shell_words::split(cmd).unwrap())
         .env("HCOM_DIR", hcom_dir)
         .output()
-        .expect("failed to execute hcom")
+        .expect("failed to execute nomadterm")
 }
 
 fn check(label: &str, cmd: &str, hcom_dir: &str) -> String {
     let out = hcom_with_dir(cmd, hcom_dir);
     assert!(
         out.status.success(),
-        "Device {label}: hcom {cmd}\nstdout: {}\nstderr: {}",
+        "Device {label}: nomadterm {cmd}\nstdout: {}\nstderr: {}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr),
     );
@@ -160,7 +160,7 @@ fn test_relay_roundtrip() {
     let path_b = dir_b_path.to_string_lossy().to_string();
 
     eprintln!("{}", "=".repeat(60));
-    eprintln!("Relay Roundtrip: two real hcom instances via MQTT");
+    eprintln!("Relay Roundtrip: two real nomadterm instances via MQTT");
     eprintln!("{}", "=".repeat(60));
     eprintln!("\n  Device A: {path_a}");
     eprintln!("  Device B: {path_b}");

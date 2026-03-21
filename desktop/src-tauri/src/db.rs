@@ -1,6 +1,6 @@
 //! Minimal repo CRUD for the Tauri desktop GUI.
 //!
-//! Opens the same `~/.hcom/hcom.db` that the nomadterm daemon uses.
+//! Opens the same `~/.nomadterm/nomadterm.db` that the nomadterm daemon uses.
 //! Only the `repos` table is managed here.
 
 use anyhow::{Context, Result};
@@ -30,12 +30,12 @@ pub struct RepoDB {
 }
 
 impl RepoDB {
-    /// Open (or create) the nomadterm database at `~/.hcom/hcom.db`.
+    /// Open (or create) the nomadterm database at `~/.nomadterm/nomadterm.db`.
     pub fn open() -> Result<Self> {
         let path = hcom_db_path();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
-                .with_context(|| format!("create hcom dir {:?}", parent))?;
+                .with_context(|| format!("create nomadterm dir {:?}", parent))?;
         }
         let conn = Connection::open(&path)
             .with_context(|| format!("open db {:?}", path))?;
@@ -128,8 +128,8 @@ impl RepoDB {
 fn hcom_db_path() -> std::path::PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join(".hcom")
-        .join("hcom.db")
+        .join(".nomadterm")
+        .join("nomadterm.db")
 }
 
 fn epoch_now() -> i64 {

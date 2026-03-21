@@ -155,7 +155,7 @@ mod tests {
     fn test_bundle_instance_name_system() {
         let id = SenderIdentity {
             kind: SenderKind::System,
-            name: "hcom".into(),
+            name: "nomadterm".into(),
             instance_data: None,
             session_id: None,
         };

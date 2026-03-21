@@ -1,7 +1,7 @@
 //! Batch launch tracking and wait_for_launch polling.
 //!
-//! batch is ready, times out, or errors. Used by `hcom events --wait` and
-//! the launcher to poll for readiness after `hcom N claude`.
+//! batch is ready, times out, or errors. Used by `nomadterm events --wait` and
+//! the launcher to poll for readiness after `nomadterm N claude`.
 
 use std::thread;
 use std::time::{Duration, Instant};
@@ -450,7 +450,7 @@ pub fn wait_for_launch(
         let batch_display = batch_ids.first().map(|s| s.as_str()).unwrap_or("?");
         let mut hint = format!(
             "Launch failed: {}/{} ready after {}s (batch: {}). \
-             Check ~/.hcom/.tmp/logs/background_*.log or hcom list -v",
+             Check ~/.nomadterm/.tmp/logs/background_*.log or nomadterm list -v",
             status_data.ready, status_data.expected, timeout_secs, batch_display
         );
         let failures = get_batch_failure_details_for_ids(db, &batch_ids);
@@ -594,7 +594,7 @@ mod tests {
             timestamp: Some("2024-01-01T00:00:00Z".into()),
             batch_id: Some("batch-123".into()),
             batches: None,
-            hint: Some("Launch failed: 1/3 ready after 30s (batch: batch-123). Check ~/.hcom/.tmp/logs/background_*.log or hcom list -v".into()),
+            hint: Some("Launch failed: 1/3 ready after 30s (batch: batch-123). Check ~/.nomadterm/.tmp/logs/background_*.log or nomadterm list -v".into()),
             message: None,
         };
         let json = result.to_json();
@@ -616,7 +616,7 @@ mod tests {
         );
         data.insert(
             "status_detail".into(),
-            serde_json::json!("Error: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s hcom-external`), then retry."),
+            serde_json::json!("Error: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s nomadterm-external`), then retry."),
         );
         db.save_instance_named("mari", &data).unwrap();
 
@@ -635,7 +635,7 @@ mod tests {
         let details = get_batch_failure_details_for_ids(&db, &["batch-123".to_string()]);
         assert_eq!(
             details,
-            vec!["mari: Error: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s hcom-external`), then retry.".to_string()]
+            vec!["mari: Error: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s nomadterm-external`), then retry.".to_string()]
         );
     }
 
@@ -672,14 +672,14 @@ mod tests {
         let details = get_batch_failure_details_for_ids(&db, &["batch-456".to_string()]);
         assert_eq!(
             details,
-            vec!["mari: launch probably failed - check logs or hcom list -v".to_string()]
+            vec!["mari: launch probably failed - check logs or nomadterm list -v".to_string()]
         );
 
         let stored = db.get_instance_full("mari").unwrap().unwrap();
         assert_eq!(stored.status_context, "launch_failed");
         assert_eq!(
             stored.status_detail,
-            "launch probably failed - check logs or hcom list -v"
+            "launch probably failed - check logs or nomadterm list -v"
         );
     }
 }

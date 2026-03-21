@@ -1,7 +1,7 @@
-//! Launch command: `hcom [N] <tool> [--tag X] [--terminal X] [--headless] [--hcom-prompt X] [--hcom-system-prompt X] [--batch-id X] [tool-args...]`
+//! Launch command: `nomadterm [N] <tool> [--tag X] [--terminal X] [--headless] [--nomadterm-prompt X] [--nomadterm-system-prompt X] [--batch-id X] [tool-args...]`
 //!
 //!
-//! Parses hcom-level flags, merges env config with CLI args via tool-specific
+//! Parses nomadterm-level flags, merges env config with CLI args via tool-specific
 //! parsers, then delegates to `launcher::launch()`.
 
 use anyhow::{Result, bail};
@@ -140,7 +140,7 @@ pub fn run(argv: &[String], flags: &GlobalFlags) -> Result<i32> {
         println!("Names: {}", instance_names.join(", "));
     }
     println!("Batch id: {}", result.batch_id);
-    println!("To block until ready or fail (30s timeout), run: hcom events launch");
+    println!("To block until ready or fail (30s timeout), run: nomadterm events launch");
 
     // Launch tips
     let launcher_participating = db
@@ -262,7 +262,7 @@ fn print_launch_preview(
     }
 }
 
-/// Hcom-level flags extracted from launch argv.
+/// Nomadterm-level flags extracted from launch argv.
 #[derive(Debug, Default)]
 struct HcomLaunchFlags {
     tag: Option<String>,
@@ -274,12 +274,12 @@ struct HcomLaunchFlags {
     batch_id: Option<String>,
 }
 
-/// Parse launch argv: extract count, tool name, hcom flags, and tool-specific args.
+/// Parse launch argv: extract count, tool name, nomadterm flags, and tool-specific args.
 ///
-/// Input forms: `[N] <tool> [--tag X] [--terminal X] [--headless] [--hcom-prompt X] [--hcom-system-prompt X] [--batch-id X] [tool-args...]`
+/// Input forms: `[N] <tool> [--tag X] [--terminal X] [--headless] [--nomadterm-prompt X] [--nomadterm-system-prompt X] [--batch-id X] [tool-args...]`
 fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, HcomLaunchFlags, Vec<String>)> {
     if argv.is_empty() {
-        bail!("Usage: hcom [N] <tool> [args...]");
+        bail!("Usage: nomadterm [N] <tool> [args...]");
     }
 
     let mut idx = 0;
@@ -320,15 +320,15 @@ fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, HcomLaunchFlags,
     let tool = argv[idx].to_string();
     idx += 1;
 
-    // Extract hcom flags from anywhere in remaining args (order-independent).
-    // Everything not recognized as an hcom flag is passed through as a tool arg.
+    // Extract nomadterm flags from anywhere in remaining args (order-independent).
+    // Everything not recognized as an nomadterm flag is passed through as a tool arg.
     let mut flags = HcomLaunchFlags::default();
     let mut tool_args = Vec::new();
     let remaining = &argv[idx..];
     let mut i = 0;
 
     while i < remaining.len() {
-        // Bare `--` separates hcom flags from tool args — pass the rest through
+        // Bare `--` separates nomadterm flags from tool args — pass the rest through
         if remaining[i] == "--" {
             tool_args.extend_from_slice(&remaining[i + 1..]);
             break;
@@ -357,7 +357,7 @@ fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, HcomLaunchFlags,
                 flags.headless = true;
                 i += 1;
             }
-            "--hcom-system-prompt" if i + 1 < remaining.len() => {
+            "--nomadterm-system-prompt" if i + 1 < remaining.len() => {
                 flags.system_prompt = Some(remaining[i + 1].clone());
                 i += 2;
             }
@@ -366,7 +366,7 @@ fn parse_launch_argv(argv: &[String]) -> Result<(usize, String, HcomLaunchFlags,
                 flags.system_prompt = Some(remaining[i + 1].clone());
                 i += 2;
             }
-            "--hcom-prompt" if i + 1 < remaining.len() => {
+            "--nomadterm-prompt" if i + 1 < remaining.len() => {
                 flags.initial_prompt = Some(remaining[i + 1].clone());
                 i += 2;
             }
@@ -566,7 +566,7 @@ mod tests {
     fn test_parse_launch_argv_hcom_prompt() {
         let (_, _, flags, args) = parse_launch_argv(&s(&[
             "claude",
-            "--hcom-prompt",
+            "--nomadterm-prompt",
             "do the thing",
             "--model",
             "haiku",
@@ -580,7 +580,7 @@ mod tests {
     fn test_parse_launch_argv_hcom_system_prompt() {
         let (_, _, flags, args) = parse_launch_argv(&s(&[
             "claude",
-            "--hcom-system-prompt",
+            "--nomadterm-system-prompt",
             "you are helpful",
             "--model",
             "haiku",

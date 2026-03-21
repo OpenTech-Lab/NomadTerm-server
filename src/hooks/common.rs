@@ -71,10 +71,10 @@ pub(crate) const SAFE_HCOM_COMMANDS: &[&str] = &[
 /// Pre-gate check: should hooks proceed?
 ///
 ///
-/// - HCOM-launched (process_id or is_launched) → always proceed
+/// - NOMADTERM-launched (process_id or is_launched) → always proceed
 /// - Otherwise: check if DB has any instances → if not, skip (exit 0, empty output)
 ///
-/// This prevents outputting hints/errors when hcom is installed but not actively used.
+/// This prevents outputting hints/errors when nomadterm is installed but not actively used.
 pub fn hook_gate_check(ctx: &HcomContext, db: &HcomDb) -> bool {
     if ctx.process_id.is_some() || ctx.is_launched {
         return true;
@@ -501,7 +501,7 @@ fn delete_hook_notify_endpoint(db: &HcomDb, instance_name: &str) {
     );
 }
 
-/// Find last [hcom:xxx] marker in transcript.
+/// Find last [nomadterm:xxx] marker in transcript.
 ///
 /// Reads file backwards in 64MB chunks with 70-byte overlap to find marker.
 pub fn find_last_bind_marker(transcript_path: &str) -> Option<String> {
@@ -515,7 +515,7 @@ pub fn find_last_bind_marker(transcript_path: &str) -> Option<String> {
 
     let chunk_size: usize = 64 * 1024 * 1024; // 64MB
     let overlap: usize = 70; // max prefix len (12) + max instance name (50) + margin
-    let marker_prefixes: &[&[u8]] = &[b"[hcom:"];
+    let marker_prefixes: &[&[u8]] = &[b"[nomadterm:"];
 
     let mut file = std::fs::File::open(path).ok()?;
 
@@ -645,7 +645,7 @@ pub fn init_hook_context(
     let start = Instant::now();
     let mut instance_name: Option<String> = None;
 
-    // Path 1: Process binding (hcom-launched instances)
+    // Path 1: Process binding (nomadterm-launched instances)
     let process_start = Instant::now();
     if let Some(ref process_id) = ctx.process_id {
         if let Ok(Some(name)) = db.get_process_binding(process_id) {
@@ -738,7 +738,7 @@ pub fn init_hook_context(
 
 /// Transcript marker fallback binding.
 ///
-/// Searches transcript for [hcom:name] marker and creates session binding
+/// Searches transcript for [nomadterm:name] marker and creates session binding
 /// if instance is pending. Fast path: skips file I/O if no pending instances.
 ///
 fn try_bind_from_transcript(
@@ -1197,7 +1197,7 @@ mod tests {
         let path = dir.path().join("transcript.jsonl");
         let mut f = std::fs::File::create(&path).unwrap();
         writeln!(f, "some log data").unwrap();
-        writeln!(f, "more data [hcom:luna] more stuff").unwrap();
+        writeln!(f, "more data [nomadterm:luna] more stuff").unwrap();
         writeln!(f, "trailing data").unwrap();
 
         let result = find_last_bind_marker(path.to_str().unwrap());
@@ -1209,9 +1209,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("transcript.jsonl");
         let mut f = std::fs::File::create(&path).unwrap();
-        writeln!(f, "[hcom:first]").unwrap();
-        writeln!(f, "[hcom:second]").unwrap();
-        writeln!(f, "[hcom:third]").unwrap();
+        writeln!(f, "[nomadterm:first]").unwrap();
+        writeln!(f, "[nomadterm:second]").unwrap();
+        writeln!(f, "[nomadterm:third]").unwrap();
 
         let result = find_last_bind_marker(path.to_str().unwrap());
         assert_eq!(result, Some("third".to_string()));
@@ -1254,7 +1254,7 @@ mod tests {
         for _ in 0..1024 {
             writeln!(f, "{}", padding).unwrap();
         }
-        writeln!(f, "[hcom:bigtarget]").unwrap();
+        writeln!(f, "[nomadterm:bigtarget]").unwrap();
 
         let result = find_last_bind_marker(path.to_str().unwrap());
         assert_eq!(result, Some("bigtarget".to_string()));
@@ -1262,18 +1262,18 @@ mod tests {
 
     #[test]
     fn test_rfind_bytes_basic() {
-        let haystack = b"hello [hcom:test] world [hcom:second] end";
-        assert_eq!(rfind_bytes(haystack, b"[hcom:"), Some(24));
+        let haystack = b"hello [nomadterm:test] world [nomadterm:second] end";
+        assert_eq!(rfind_bytes(haystack, b"[nomadterm:"), Some(24));
     }
 
     #[test]
     fn test_rfind_bytes_not_found() {
-        assert_eq!(rfind_bytes(b"hello world", b"[hcom:"), None);
+        assert_eq!(rfind_bytes(b"hello world", b"[nomadterm:"), None);
     }
 
     #[test]
     fn test_rfind_bytes_empty() {
-        assert_eq!(rfind_bytes(b"", b"[hcom:"), None);
+        assert_eq!(rfind_bytes(b"", b"[nomadterm:"), None);
         assert_eq!(rfind_bytes(b"hello", b""), None);
     }
 
@@ -1300,7 +1300,7 @@ mod tests {
     #[test]
     fn test_notify_hook_instance_no_db() {
         // Best-effort function should not panic even with no DB
-        // (HcomDb::open() will fail in test env without ~/.hcom)
+        // (HcomDb::open() will fail in test env without ~/.nomadterm)
         notify_hook_instance("nonexistent");
     }
 
@@ -1610,7 +1610,7 @@ mod tests {
         );
 
         let transcript = dir.path().join("transcript.jsonl");
-        std::fs::write(&transcript, "assistant output [hcom:luna]\n").unwrap();
+        std::fs::write(&transcript, "assistant output [nomadterm:luna]\n").unwrap();
 
         let ctx = crate::shared::context::HcomContext::from_env(
             &std::collections::HashMap::new(),

@@ -23,7 +23,7 @@ static CONFIG: Mutex<Option<Config>> = Mutex::new(None);
 /// rather than calling env::var directly.
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// HCOM directory (HCOM_DIR or ~/.hcom)
+    /// NOMADTERM directory (HCOM_DIR or ~/.nomadterm)
     pub hcom_dir: PathBuf,
     /// Instance name (HCOM_INSTANCE_NAME)
     pub instance_name: Option<String>,
@@ -139,9 +139,9 @@ const VALID_SANDBOX_MODES: &[&str] = &["workspace", "untrusted", "danger-full-ac
 
 /// TOML file header comment.
 const TOML_HEADER: &str = "\
-# hcom configuration
-# Help: hcom config --help
-# Docs: hcom run docs
+# nomadterm configuration
+# Help: nomadterm config --help
+# Docs: nomadterm run docs
 ";
 
 /// Get value from nested TOML table using dotted path (e.g., "launch.claude.args").
@@ -196,7 +196,7 @@ impl std::fmt::Display for HcomConfigError {
 
 impl std::error::Error for HcomConfigError {}
 
-/// HCOM user configuration with validation.
+/// NOMADTERM user configuration with validation.
 /// Load priority: env var → config.toml → defaults.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HcomConfig {
@@ -1065,7 +1065,7 @@ const DEFAULT_ENV_VARS: &[&str] = &[
     "GEMINI_MODEL",
 ];
 
-/// Load non-HCOM env vars from env file.
+/// Load non-NOMADTERM env vars from env file.
 pub fn load_env_extras(path: &std::path::Path) -> HashMap<String, String> {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
@@ -1088,7 +1088,7 @@ pub fn load_env_extras(path: &std::path::Path) -> HashMap<String, String> {
     result
 }
 
-/// Write env passthrough file (non-HCOM vars only).
+/// Write env passthrough file (non-NOMADTERM vars only).
 pub fn save_env_file(extras: &HashMap<String, String>) -> std::io::Result<()> {
     let env_path = Config::get().hcom_dir.join("env");
 
@@ -1225,7 +1225,7 @@ mod tests {
             Config::init();
             let config = Config::get();
             let expected = env::var("HOME")
-                .map(|h| PathBuf::from(h).join(".hcom"))
+                .map(|h| PathBuf::from(h).join(".nomadterm"))
                 .unwrap();
             assert_eq!(config.hcom_dir, expected);
         });
@@ -1235,10 +1235,10 @@ mod tests {
     #[serial]
     fn test_hcom_dir_overrides_home() {
         Config::reset();
-        with_env("HCOM_DIR", "/custom/hcom", || {
+        with_env("HCOM_DIR", "/custom/nomadterm", || {
             Config::init();
             let config = Config::get();
-            assert_eq!(config.hcom_dir, PathBuf::from("/custom/hcom"));
+            assert_eq!(config.hcom_dir, PathBuf::from("/custom/nomadterm"));
         });
     }
 
@@ -1306,11 +1306,11 @@ mod tests {
     #[serial]
     fn test_hcom_dir_tilde_expansion() {
         Config::reset();
-        with_env("HCOM_DIR", "~/.hcom", || {
+        with_env("HCOM_DIR", "~/.nomadterm", || {
             Config::init();
             let config = Config::get();
             let home = env::var("HOME").unwrap();
-            assert_eq!(config.hcom_dir, PathBuf::from(home).join(".hcom"));
+            assert_eq!(config.hcom_dir, PathBuf::from(home).join(".nomadterm"));
         });
     }
 
@@ -1331,10 +1331,10 @@ mod tests {
     #[serial]
     fn test_hcom_dir_absolute_stays_absolute() {
         Config::reset();
-        with_env("HCOM_DIR", "/absolute/hcom", || {
+        with_env("HCOM_DIR", "/absolute/nomadterm", || {
             Config::init();
             let config = Config::get();
-            assert_eq!(config.hcom_dir, PathBuf::from("/absolute/hcom"));
+            assert_eq!(config.hcom_dir, PathBuf::from("/absolute/nomadterm"));
         });
     }
 

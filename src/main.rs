@@ -1,4 +1,4 @@
-//! hcom — inter-agent communication CLI: PTY wrapper, hook handler, TUI.
+//! nomadterm — inter-agent communication CLI: PTY wrapper, hook handler, TUI.
 
 mod bootstrap;
 mod cli_context;
@@ -66,9 +66,9 @@ fn main() -> Result<()> {
 #[cfg(unix)]
 pub fn run_pty(args: &[String]) -> Result<()> {
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
-        eprintln!("hcom pty - PTY wrapper for hcom");
+        eprintln!("nomadterm pty - PTY wrapper for nomadterm");
         eprintln!();
-        eprintln!("Usage: hcom pty <tool> [args...]");
+        eprintln!("Usage: nomadterm pty <tool> [args...]");
         eprintln!();
         eprintln!("Tools: claude, gemini, codex");
         eprintln!();
@@ -79,7 +79,7 @@ pub fn run_pty(args: &[String]) -> Result<()> {
         eprintln!();
         eprintln!("Environment:");
         eprintln!("  HCOM_INSTANCE_NAME    Instance name for logging");
-        eprintln!("  HCOM_DIR              Custom hcom directory");
+        eprintln!("  HCOM_DIR              Custom nomadterm directory");
         if args.is_empty() {
             bail!("Tool name required");
         }

@@ -1,4 +1,4 @@
-//! Error type hierarchy for hcom.
+//! Error type hierarchy for nomadterm.
 //!
 //! Three error types for different contexts:
 //! - `HcomError`: User-facing operation failures (shown to humans)
@@ -10,7 +10,7 @@
 
 use thiserror::Error;
 
-/// User-facing hcom operation error.
+/// User-facing nomadterm operation error.
 ///
 /// Displayed directly to the user (e.g., "instance not found", "send failed").
 #[derive(Debug, Error)]

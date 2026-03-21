@@ -1,4 +1,4 @@
-//! `hcom hooks` command — add/remove/status for tool hooks.
+//! `nomadterm hooks` command — add/remove/status for tool hooks.
 //!
 //!
 //! Manages hook installation across Claude, Gemini, Codex, and OpenCode.
@@ -6,7 +6,7 @@
 use crate::db::HcomDb;
 use crate::shared::CommandContext;
 
-/// Parsed arguments for `hcom hooks`.
+/// Parsed arguments for `nomadterm hooks`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "hooks", about = "Manage tool hooks")]
 pub struct HooksArgs {
@@ -184,7 +184,7 @@ fn cmd_hooks_add(argv: &[String]) -> i32 {
     if fail_count > 0 { 1 } else { 0 }
 }
 
-/// Remove hooks for specified tool(s). Called from both `hcom hooks remove` and `hcom reset hooks`.
+/// Remove hooks for specified tool(s). Called from both `nomadterm hooks remove` and `nomadterm reset hooks`.
 pub fn cmd_hooks_remove(argv: &[String]) -> i32 {
     // Determine which tools to remove
     let tools: Vec<&str> = if argv.is_empty() || (argv.len() == 1 && argv[0] == "all") {
@@ -285,18 +285,18 @@ pub fn cmd_hooks(_db: &HcomDb, args: &HooksArgs, _ctx: Option<&CommandContext>) 
 
     if first == "--help" || first == "-h" {
         println!(
-            "hcom hooks - Manage tool hooks for hcom integration\n\n\
+            "nomadterm hooks - Manage tool hooks for nomadterm integration\n\n\
              Hooks enable automatic message delivery and status tracking. Without hooks,\n\
-             you can still use hcom in ad-hoc mode (run hcom start in any ai tool).\n\n\
+             you can still use nomadterm in ad-hoc mode (run nomadterm start in any ai tool).\n\n\
              Usage:\n  \
-             hcom hooks                  Show hook status for all tools\n  \
-             hcom hooks status           Same as above\n  \
-             hcom hooks add [tool]       Add hooks (claude|gemini|codex|opencode|all)\n  \
-             hcom hooks remove [tool]    Remove hooks (claude|gemini|codex|opencode|all)\n\n\
+             nomadterm hooks                  Show hook status for all tools\n  \
+             nomadterm hooks status           Same as above\n  \
+             nomadterm hooks add [tool]       Add hooks (claude|gemini|codex|opencode|all)\n  \
+             nomadterm hooks remove [tool]    Remove hooks (claude|gemini|codex|opencode|all)\n\n\
              Examples:\n  \
-             hcom hooks add claude       Add Claude Code hooks only\n  \
-             hcom hooks add              Auto-detect tool or add all\n  \
-             hcom hooks remove all       Remove all hooks\n\n\
+             nomadterm hooks add claude       Add Claude Code hooks only\n  \
+             nomadterm hooks add              Auto-detect tool or add all\n  \
+             nomadterm hooks remove all       Remove all hooks\n\n\
              After adding, restart the tool to activate hooks."
         );
         return 0;
@@ -310,7 +310,7 @@ pub fn cmd_hooks(_db: &HcomDb, args: &HooksArgs, _ctx: Option<&CommandContext>) 
         "remove" | "uninstall" => cmd_hooks_remove(&sub_argv),
         _ => {
             eprintln!("Error: Unknown hooks subcommand: {first}");
-            eprintln!("Usage: hcom hooks [status|add|remove] [tool]");
+            eprintln!("Usage: nomadterm hooks [status|add|remove] [tool]");
             1
         }
     }

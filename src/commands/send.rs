@@ -1,4 +1,4 @@
-//! `hcom send` command — send messages to hcom instances.
+//! `nomadterm send` command — send messages to nomadterm instances.
 
 use std::io::{IsTerminal, Read as IoRead};
 
@@ -26,14 +26,14 @@ Inline bundle (attach structured context):
     --files <paths>                Comma-separated file paths
     --transcript <ranges>          Format: 3-14:normal,6:full,22-30:detailed
     --extends <id>                 Parent bundle (optional)
-  See 'hcom bundle --help' for bundle details
+  See 'nomadterm bundle --help' for bundle details
 
 Examples:
-    hcom send @luna -- Hello there!
-    hcom send @luna @nova --intent request -- Can you help?
-    hcom send -- Broadcast message to everyone
-    echo 'Complex message' | hcom send @luna
-    hcom send @luna <<'EOF'
+    nomadterm send @luna -- Hello there!
+    nomadterm send @luna @nova --intent request -- Can you help?
+    nomadterm send -- Broadcast message to everyone
+    echo 'Complex message' | nomadterm send @luna
+    nomadterm send @luna <<'EOF'
     Multi-line message with special chars
     EOF";
 
@@ -47,7 +47,7 @@ fn parse_positional(s: &str) -> Result<String, String> {
     }
 }
 
-/// Parsed arguments for `hcom send`.
+/// Parsed arguments for `nomadterm send`.
 #[derive(clap::Parser, Debug)]
 #[command(
     name = "send",
@@ -529,7 +529,7 @@ fn resolve_message(args: &SendArgs) -> Result<String, String> {
             .join(" ")
     };
     Err(format!(
-        "No message provided.\nUse: hcom send {targets_str} -- your message\n Or: echo 'msg' | hcom send {targets_str}"
+        "No message provided.\nUse: nomadterm send {targets_str} -- your message\n Or: echo 'msg' | nomadterm send {targets_str}"
     ))
 }
 
@@ -585,7 +585,7 @@ fn process_positionals(positionals: &[String]) -> (Vec<String>, Option<String>) 
     (targets, None)
 }
 
-/// Main entry point for `hcom send` command.
+/// Main entry point for `nomadterm send` command.
 ///
 /// Returns exit code (0 = success, 1 = error).
 pub fn cmd_send(db: &HcomDb, args: &SendArgs, ctx: Option<&CommandContext>) -> i32 {
@@ -770,7 +770,7 @@ pub fn cmd_send(db: &HcomDb, args: &SendArgs, ctx: Option<&CommandContext>) -> i
         && std::env::var("CLAUDE_CODE_ENTRYPOINT").is_ok()
     {
         eprintln!("Error: Cannot send without identity.");
-        eprintln!("Run 'hcom start' first, then use 'hcom send'.");
+        eprintln!("Run 'nomadterm start' first, then use 'nomadterm send'.");
         return 1;
     }
 
@@ -862,7 +862,7 @@ pub fn cmd_send(db: &HcomDb, args: &SendArgs, ctx: Option<&CommandContext>) -> i
                 }
                 bundle_lines.push(String::new());
                 bundle_lines.push("View bundle:".to_string());
-                bundle_lines.push(format!("  hcom bundle cat {bundle_id}"));
+                bundle_lines.push(format!("  nomadterm bundle cat {bundle_id}"));
 
                 message = format!("{}\n\n{}", message.trim_end(), bundle_lines.join("\n"));
             }
@@ -973,9 +973,9 @@ pub fn cmd_send(db: &HcomDb, args: &SendArgs, ctx: Option<&CommandContext>) -> i
         let messages = db.get_unread_messages(&sender_identity.name);
         if !messages.is_empty() {
             println!("\n{}", "─".repeat(40));
-            println!("[hcom] new message(s)");
+            println!("[nomadterm] new message(s)");
             println!("{}", "─".repeat(40));
-            println!("\nRun: hcom listen --name {}", sender_identity.name);
+            println!("\nRun: nomadterm listen --name {}", sender_identity.name);
         }
     }
 

@@ -327,7 +327,7 @@ pub fn merge_claude_args(env_spec: &ClaudeArgsSpec, cli_spec: &ClaudeArgsSpec) -
     parse_tokens(&merged, SourceType::Cli)
 }
 
-/// Add HCOM-specific background mode defaults if missing.
+/// Add NOMADTERM-specific background mode defaults if missing.
 ///
 /// When -p/--print detected, adds --output-format stream-json and --verbose.
 pub fn add_background_defaults(spec: &ClaudeArgsSpec) -> ClaudeArgsSpec {

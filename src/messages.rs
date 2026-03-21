@@ -6,9 +6,9 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::LazyLock;
 
-/// Precompiled regex for @[hcom-*] system notification mentions.
+/// Precompiled regex for @[nomadterm-*] system notification mentions.
 static SYSTEM_BRACKET_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"@\[hcom-[a-z]+\]").unwrap());
+    LazyLock::new(|| Regex::new(r"@\[nomadterm-[a-z]+\]").unwrap());
 
 /// Message scope: broadcast (everyone) or mentions (targeted).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -310,7 +310,7 @@ pub fn compute_scope(
 
     // No explicit targets (None) — check for @mentions in message text
     if message.contains('@') {
-        // Check for invalid system notification mention attempts like @[hcom-events]
+        // Check for invalid system notification mention attempts like @[nomadterm-events]
         let system_attempts: Vec<&str> = SYSTEM_BRACKET_RE
             .find_iter(message)
             .map(|m| m.as_str())
@@ -592,7 +592,7 @@ pub fn format_hook_messages(
     result
 }
 
-/// Format messages for model injection — wraps in <hcom> tags.
+/// Format messages for model injection — wraps in <nomadterm> tags.
 #[allow(clippy::type_complexity)]
 pub fn format_messages_json(
     messages: &[Value],
@@ -608,7 +608,7 @@ pub fn format_messages_json(
         get_config_hints,
         tip_checker,
     );
-    format!("<hcom>{}</hcom>", formatted)
+    format!("<nomadterm>{}</nomadterm>", formatted)
 }
 
 /// Get full name from instance data Value.
@@ -651,7 +651,7 @@ fn get_tip_text(tip_key: &str) -> Option<&'static str> {
 
 /// Remove bash escape sequences from message content.
 ///
-/// Bash escapes special characters when constructing commands. Since hcom
+/// Bash escapes special characters when constructing commands. Since nomadterm
 /// receives messages as command arguments, we unescape common sequences
 /// that don't affect the actual message intent.
 ///
@@ -847,8 +847,8 @@ pub const PREVIEW_MAX_LEN: usize = 60;
 /// Reuses format_hook_messages but truncates before user message content.
 /// User content may contain @ chars that trigger autocomplete in some CLIs.
 pub fn build_message_preview(formatted: &str, max_len: usize) -> String {
-    let wrapper_open = "<hcom>";
-    let wrapper_close = "</hcom>";
+    let wrapper_open = "<nomadterm>";
+    let wrapper_close = "</nomadterm>";
     let wrapper_len = wrapper_open.len() + wrapper_close.len();
 
     if formatted.is_empty() {
@@ -1146,7 +1146,7 @@ mod tests {
     #[test]
     fn test_compute_scope_system_mention_fails() {
         let instances = vec![info("luna", None)];
-        let result = compute_scope("hey @[hcom-events]", &instances, None);
+        let result = compute_scope("hey @[nomadterm-events]", &instances, None);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("System notifications"));
     }
@@ -1290,7 +1290,7 @@ mod tests {
 
     #[test]
     fn test_build_message_preview_empty() {
-        assert_eq!(build_message_preview("", 60), "<hcom></hcom>");
+        assert_eq!(build_message_preview("", 60), "<nomadterm></nomadterm>");
     }
 
     #[test]
@@ -1298,8 +1298,8 @@ mod tests {
         let formatted = "[request #42] luna → nova: here is a long message";
         let result = build_message_preview(formatted, 60);
         // Should include up to the colon but not the message content
-        assert!(result.starts_with("<hcom>"));
-        assert!(result.ends_with("</hcom>"));
+        assert!(result.starts_with("<nomadterm>"));
+        assert!(result.ends_with("</nomadterm>"));
         assert!(result.contains("[request #42] luna → nova"));
         assert!(!result.contains("here is a long message"));
     }
@@ -1308,7 +1308,7 @@ mod tests {
     fn test_build_message_preview_no_colon() {
         let formatted = "short text";
         let result = build_message_preview(formatted, 60);
-        assert_eq!(result, "<hcom>short text</hcom>");
+        assert_eq!(result, "<nomadterm>short text</nomadterm>");
     }
 
     // ---- is_mentioned ----
@@ -1424,10 +1424,10 @@ mod tests {
             &msgs,
             "nova",
             &|_name| None,
-            &|| "respond with hcom send".to_string(),
+            &|| "respond with nomadterm send".to_string(),
             None,
         );
-        assert!(result.contains("[respond with hcom send]"));
+        assert!(result.contains("[respond with nomadterm send]"));
     }
 
     #[test]
@@ -1440,8 +1440,8 @@ mod tests {
         })];
 
         let result = format_messages_json(&msgs, "nova", &|_name| None, &|| String::new(), None);
-        assert!(result.starts_with("<hcom>"));
-        assert!(result.ends_with("</hcom>"));
+        assert!(result.starts_with("<nomadterm>"));
+        assert!(result.ends_with("</nomadterm>"));
     }
 
     #[test]

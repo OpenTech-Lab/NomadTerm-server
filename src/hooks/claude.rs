@@ -455,13 +455,13 @@ fn handle_sessionstart(
         let output = serde_json::json!({
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
-                "additionalContext": format!("[hcom available - run '{} start' to participate]", hcom_cmd),
+                "additionalContext": format!("[nomadterm available - run '{} start' to participate]", hcom_cmd),
             }
         });
         return (0, serde_json::to_string(&output).unwrap_or_default());
     }
 
-    // HCOM-launched: bind session and inject bootstrap
+    // NOMADTERM-launched: bind session and inject bootstrap
     let process_id = process_id.unwrap();
     let mut result_output: Option<Value> = None;
 
@@ -499,7 +499,7 @@ fn handle_compact_recovery(
         .or_else(|| process_id.and_then(|pid| instances::resolve_process_binding(db, Some(pid))))?;
 
     let bootstrap = if process_id.is_some() {
-        // hcom-launched: inject full bootstrap
+        // nomadterm-launched: inject full bootstrap
         let inst = db.get_instance_full(&instance_name).ok()??;
         let tag = inst.tag.as_deref().unwrap_or("");
         bootstrap::get_bootstrap(
@@ -520,8 +520,8 @@ fn handle_compact_recovery(
         updates.insert("name_announced".into(), serde_json::json!(false));
         instances::update_instance_position(db, &instance_name, &updates);
         format!(
-            "[HCOM RECOVERY] You were participating in hcom as '{}'. \
-             Run this command now to continue: hcom start --as {}",
+            "[NOMADTERM RECOVERY] You were participating in nomadterm as '{}'. \
+             Run this command now to continue: nomadterm start --as {}",
             instance_name, instance_name
         )
     };
@@ -534,7 +534,7 @@ fn handle_compact_recovery(
     }))
 }
 
-/// Bind session to process and inject bootstrap for hcom-launched instances.
+/// Bind session to process and inject bootstrap for nomadterm-launched instances.
 fn bind_and_bootstrap(
     db: &HcomDb,
     ctx: &HcomContext,
@@ -655,7 +655,7 @@ fn start_task(db: &HcomDb, session_id: &str, raw: &Value) -> (String, i32) {
         },
     );
 
-    // Append hcom instructions to Task prompt
+    // Append nomadterm instructions to Task prompt
     let original_prompt = tool_input
         .get("prompt")
         .and_then(|v| v.as_str())
@@ -663,7 +663,7 @@ fn start_task(db: &HcomDb, session_id: &str, raw: &Value) -> (String, i32) {
     if !original_prompt.is_empty() {
         let hcom_cmd = crate::runtime_env::build_hcom_command();
         let hcom_hint =
-            format!("\n\n---\nTo use hcom: run `{hcom_cmd} start --name <your-agent-id>` first.");
+            format!("\n\n---\nTo use nomadterm: run `{hcom_cmd} start --name <your-agent-id>` first.");
         let mut updated = tool_input.clone();
         if let Some(obj) = updated.as_object_mut() {
             obj.insert(
@@ -952,7 +952,7 @@ fn inject_bootstrap_if_needed(
     paths::increment_flag_counter("instance_count");
 
     Some(serde_json::json!({
-        "systemMessage": "[HCOM info shown to instance]",
+        "systemMessage": "[NOMADTERM info shown to instance]",
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
             "additionalContext": bootstrap,
@@ -1222,7 +1222,7 @@ fn handle_permission_request(
     (0, String::new())
 }
 
-/// Parent Notification: map Claude notification types to hcom lifecycle state.
+/// Parent Notification: map Claude notification types to nomadterm lifecycle state.
 fn handle_notify(
     db: &HcomDb,
     payload: &HookPayload,
@@ -1561,7 +1561,7 @@ fn subagent_stop(db: &HcomDb, raw: &Value, session_id: &str) -> (i32, String) {
         .ok();
 
     let Some((subagent_name, existing_transcript, parent_name)) = row else {
-        // No instance = subagent never ran hcom start
+        // No instance = subagent never ran nomadterm start
         // Remove from parent's running_tasks to prevent stuck active state
         if let Ok(Some(parent)) = db.get_session_binding(session_id) {
             remove_subagent_from_parent(db, &parent, agent_id);
@@ -1623,7 +1623,7 @@ fn subagent_stop(db: &HcomDb, raw: &Value, session_id: &str) -> (i32, String) {
     (exit_code, stdout)
 }
 
-/// Subagent PostToolUse: message delivery for subagents running hcom commands.
+/// Subagent PostToolUse: message delivery for subagents running nomadterm commands.
 ///
 /// Returns (exit_code, stdout).
 fn subagent_posttooluse(db: &HcomDb, raw: &Value) -> (i32, String) {
@@ -1721,7 +1721,7 @@ fn subagent_posttooluse(db: &HcomDb, raw: &Value) -> (i32, String) {
     (0, serde_json::to_string(&output).unwrap_or_default())
 }
 
-/// Detect and process vanilla instance binding from `hcom start` output.
+/// Detect and process vanilla instance binding from `nomadterm start` output.
 fn bind_vanilla_from_marker(
     db: &HcomDb,
     raw: &Value,
@@ -1867,20 +1867,20 @@ static RE_HCOM_COMMANDS: LazyLock<Regex> = LazyLock::new(|| {
 });
 static RE_HCOM_CLAUDE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bhcom\s+claude-").unwrap());
 static RE_UVX_HCOM: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\buvx\s+hcom\s+claude-").unwrap());
+    LazyLock::new(|| Regex::new(r"\buvx\s+nomadterm\s+claude-").unwrap());
 static RE_HCOM_ACTIVE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\bHCOM_ACTIVE.*hcom\.py").unwrap());
+    LazyLock::new(|| Regex::new(r"\bHCOM_ACTIVE.*nomadterm\.py").unwrap());
 static RE_HCOM_PY_COMMANDS: LazyLock<Regex> = LazyLock::new(|| {
     let pattern = CLAUDE_HOOK_COMMANDS.join("|");
-    Regex::new(&format!(r#"hcom\.py["']?\s+({})\b"#, pattern)).unwrap()
+    Regex::new(&format!(r#"nomadterm\.py["']?\s+({})\b"#, pattern)).unwrap()
 });
-static RE_SH_HCOM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"sh\s+-c.*hcom").unwrap());
+static RE_SH_HCOM: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"sh\s+-c.*nomadterm").unwrap());
 
 /// Get path to Claude settings.json.
 ///
 /// Uses `paths::get_project_root()` which respects HCOM_DIR:
 /// - HCOM_DIR set → project_root is HCOM_DIR parent → {parent}/.claude/settings.json
-/// - Otherwise → ~/.hcom parent = ~ → ~/.claude/settings.json
+/// - Otherwise → ~/.nomadterm parent = ~ → ~/.claude/settings.json
 pub fn get_claude_settings_path() -> PathBuf {
     paths::get_project_root()
         .join(".claude")
@@ -1893,9 +1893,9 @@ pub fn load_claude_settings(settings_path: &Path) -> Option<Value> {
     serde_json::from_str(&content).ok()
 }
 
-/// Get hook command string. Uses ${HCOM} env var set in settings.json.
+/// Get hook command string. Uses ${NOMADTERM} env var set in settings.json.
 fn get_hook_command() -> String {
-    "${HCOM}".to_string()
+    "${NOMADTERM}".to_string()
 }
 
 /// Format a single Claude permission pattern: `Bash(prefix cmd:*)`.
@@ -1913,10 +1913,10 @@ fn build_claude_permissions() -> Vec<String> {
         .collect()
 }
 
-/// Build ALL permission patterns (both "hcom" and "uvx hcom" prefixes) for removal.
+/// Build ALL permission patterns (both "nomadterm" and "uvx nomadterm" prefixes) for removal.
 fn build_all_claude_permission_patterns() -> Vec<String> {
     let mut patterns = Vec::new();
-    for prefix in &["hcom", "uvx hcom"] {
+    for prefix in &["nomadterm", "uvx nomadterm"] {
         for cmd in SAFE_HCOM_COMMANDS {
             patterns.push(format_claude_permission(prefix, cmd));
         }
@@ -1924,24 +1924,24 @@ fn build_all_claude_permission_patterns() -> Vec<String> {
     patterns
 }
 
-/// Check if a hook command string matches any hcom hook pattern.
+/// Check if a hook command string matches any nomadterm hook pattern.
 fn is_hcom_hook_command(command: &str) -> bool {
-    // Env var patterns: ${HCOM} or %HCOM%
-    if command.contains("${HCOM}") || command.contains("$HCOM") || command.contains("%HCOM%") {
+    // Env var patterns: ${NOMADTERM} or %NOMADTERM%
+    if command.contains("${NOMADTERM}") || command.contains("$NOMADTERM") || command.contains("%NOMADTERM%") {
         return true;
     }
 
-    // Standard patterns: hcom <hook_command>
+    // Standard patterns: nomadterm <hook_command>
     if RE_HCOM_COMMANDS.is_match(command) {
         return true;
     }
 
-    // Tool prefix pattern: hcom claude-
+    // Tool prefix pattern: nomadterm claude-
     if RE_HCOM_CLAUDE.is_match(command) {
         return true;
     }
 
-    // uvx pattern: uvx hcom claude-
+    // uvx pattern: uvx nomadterm claude-
     if RE_UVX_HCOM.is_match(command) {
         return true;
     }
@@ -1963,10 +1963,10 @@ fn is_hcom_hook_command(command: &str) -> bool {
     false
 }
 
-/// Remove all hcom hooks from a Claude settings dictionary (in-place).
+/// Remove all nomadterm hooks from a Claude settings dictionary (in-place).
 ///
-/// Scans all hook types and removes hooks whose command matches hcom patterns.
-/// Also removes HCOM from env and hcom permission patterns from permissions.allow.
+/// Scans all hook types and removes hooks whose command matches nomadterm patterns.
+/// Also removes NOMADTERM from env and nomadterm permission patterns from permissions.allow.
 /// Returns true if any hooks/env/permissions were removed.
 fn remove_hcom_hooks_from_settings(settings: &mut Value) -> bool {
     let mut removed_any = false;
@@ -2023,7 +2023,7 @@ fn remove_hcom_hooks_from_settings(settings: &mut Value) -> bool {
                 }
             };
 
-            // Filter out hcom hooks
+            // Filter out nomadterm hooks
             let non_hcom_hooks: Vec<&Value> = hooks_field
                 .iter()
                 .filter(|hook| {
@@ -2036,13 +2036,13 @@ fn remove_hcom_hooks_from_settings(settings: &mut Value) -> bool {
                 removed_any = true;
             }
 
-            // Only keep matcher if it has non-hcom hooks remaining
+            // Only keep matcher if it has non-nomadterm hooks remaining
             if !non_hcom_hooks.is_empty() {
                 let mut matcher_copy = matcher.clone();
                 matcher_copy["hooks"] = Value::Array(non_hcom_hooks.into_iter().cloned().collect());
                 updated_matchers.push(matcher_copy);
             }
-            // If all hooks were hcom, drop the entire matcher
+            // If all hooks were nomadterm, drop the entire matcher
         }
 
         if updated_matchers.is_empty() {
@@ -2052,9 +2052,9 @@ fn remove_hcom_hooks_from_settings(settings: &mut Value) -> bool {
         }
     }
 
-    // Remove HCOM from env section
+    // Remove NOMADTERM from env section
     if let Some(env) = obj.get_mut("env").and_then(|v| v.as_object_mut()) {
-        if env.remove("HCOM").is_some() {
+        if env.remove("NOMADTERM").is_some() {
             removed_any = true;
         }
         if env.is_empty() {
@@ -2062,7 +2062,7 @@ fn remove_hcom_hooks_from_settings(settings: &mut Value) -> bool {
         }
     }
 
-    // Remove hcom permission patterns
+    // Remove nomadterm permission patterns
     if let Some(perms) = obj.get_mut("permissions").and_then(|v| v.as_object_mut()) {
         if let Some(allow) = perms.get_mut("allow").and_then(|v| v.as_array_mut()) {
             let all_patterns = build_all_claude_permission_patterns();
@@ -2086,11 +2086,11 @@ fn remove_hcom_hooks_from_settings(settings: &mut Value) -> bool {
     removed_any
 }
 
-/// Set up hcom hooks in Claude settings.json.
+/// Set up nomadterm hooks in Claude settings.json.
 ///
-/// - Removes existing hcom hooks first (clean slate)
+/// - Removes existing nomadterm hooks first (clean slate)
 /// - Adds all hooks from CLAUDE_HOOK_CONFIGS
-/// - Sets HCOM environment variable
+/// - Sets NOMADTERM environment variable
 /// - Optionally adds permission patterns
 /// - Uses atomic write for concurrent safety
 ///
@@ -2109,7 +2109,7 @@ pub fn setup_claude_hooks(include_permissions: bool) -> bool {
         settings["hooks"] = serde_json::json!({});
     }
 
-    // Remove existing hcom hooks
+    // Remove existing nomadterm hooks
     remove_hcom_hooks_from_settings(&mut settings);
 
     // Build hook commands from CLAUDE_HOOK_CONFIGS
@@ -2147,11 +2147,11 @@ pub fn setup_claude_hooks(include_permissions: bool) -> bool {
             .push(hook_dict);
     }
 
-    // Set $HCOM environment variable
+    // Set $NOMADTERM environment variable
     if !settings.get("env").is_some_and(|v| v.is_object()) {
         settings["env"] = serde_json::json!({});
     }
-    settings["env"]["HCOM"] = Value::String(crate::runtime_env::build_hcom_command());
+    settings["env"]["NOMADTERM"] = Value::String(crate::runtime_env::build_hcom_command());
     // Remove stale HCOM_DIR from settings
     if let Some(env) = settings["env"].as_object_mut() {
         env.remove("HCOM_DIR");
@@ -2176,7 +2176,7 @@ pub fn setup_claude_hooks(include_permissions: bool) -> bool {
             }
         }
     } else {
-        // Remove hcom permissions if disabled
+        // Remove nomadterm permissions if disabled
         if let Some(perms) = settings
             .get_mut("permissions")
             .and_then(|v| v.as_object_mut())
@@ -2211,10 +2211,10 @@ pub fn setup_claude_hooks(include_permissions: bool) -> bool {
     verify_claude_hooks_installed(Some(&settings_path), include_permissions)
 }
 
-/// Verify that hcom hooks are correctly installed in Claude settings.
+/// Verify that nomadterm hooks are correctly installed in Claude settings.
 ///
 /// Checks all hook types exist with correct commands, timeouts, and matchers.
-/// Checks HCOM env var is set. Optionally checks permissions.
+/// Checks NOMADTERM env var is set. Optionally checks permissions.
 pub fn verify_claude_hooks_installed(
     settings_path: Option<&Path>,
     check_permissions: bool,
@@ -2252,10 +2252,10 @@ pub fn verify_claude_hooks_installed(
             for hook in hooks_list {
                 let command = hook.get("command").and_then(|v| v.as_str()).unwrap_or("");
                 let has_hcom =
-                    command.contains("${HCOM}") || command.to_lowercase().contains("hcom");
+                    command.contains("${NOMADTERM}") || command.to_lowercase().contains("nomadterm");
                 if has_hcom && command.contains(cmd_suffix) {
                     if hcom_hook_found {
-                        // Duplicate hcom hook
+                        // Duplicate nomadterm hook
                         return false;
                     }
 
@@ -2284,8 +2284,8 @@ pub fn verify_claude_hooks_installed(
         }
     }
 
-    // Check HCOM env var
-    if settings.get("env").and_then(|v| v.get("HCOM")).is_none() {
+    // Check NOMADTERM env var
+    if settings.get("env").and_then(|v| v.get("NOMADTERM")).is_none() {
         return false;
     }
 
@@ -2309,7 +2309,7 @@ pub fn verify_claude_hooks_installed(
     true
 }
 
-/// Remove hcom hooks from a specific settings path. Returns true on success.
+/// Remove nomadterm hooks from a specific settings path. Returns true on success.
 fn remove_hooks_from_settings_path(settings_path: &Path) -> bool {
     if !settings_path.exists() {
         return true;
@@ -2334,10 +2334,10 @@ fn remove_hooks_from_settings_path(settings_path: &Path) -> bool {
     paths::atomic_write(settings_path, &json_str)
 }
 
-/// Remove hcom hooks from Claude settings.
+/// Remove nomadterm hooks from Claude settings.
 ///
 /// Cleans both global (~/.claude/settings.json) and local (HCOM_DIR-based) paths.
-/// Only removes hcom-specific hooks, not the whole file.
+/// Only removes nomadterm-specific hooks, not the whole file.
 pub fn remove_claude_hooks() -> bool {
     let global_path = dirs::home_dir()
         .map(|h| h.join(".claude").join("settings.json"))
@@ -2390,12 +2390,12 @@ mod tests {
     #[test]
     fn test_extract_name() {
         assert_eq!(
-            extract_name("hcom send --name luna 'hello'"),
+            extract_name("nomadterm send --name luna 'hello'"),
             Some("luna".to_string())
         );
-        assert_eq!(extract_name("hcom list"), None);
+        assert_eq!(extract_name("nomadterm list"), None);
         assert_eq!(
-            extract_name("hcom send --name abc123 --intent request"),
+            extract_name("nomadterm send --name abc123 --intent request"),
             Some("abc123".to_string())
         );
     }
@@ -2465,10 +2465,10 @@ mod tests {
     fn test_bind_vanilla_string_response() {
         // Test that tool_response as string works
         let _raw = serde_json::json!({
-            "tool_response": "output [hcom:luna] done"
+            "tool_response": "output [nomadterm:luna] done"
         });
         // Can't test full bind without DB, but can verify marker extraction
-        let caps = BIND_MARKER_RE.captures("output [hcom:luna] done");
+        let caps = BIND_MARKER_RE.captures("output [nomadterm:luna] done");
         assert!(caps.is_some());
         assert_eq!(caps.unwrap().get(1).unwrap().as_str(), "luna");
     }
@@ -2476,9 +2476,9 @@ mod tests {
     #[test]
     fn test_bind_vanilla_dict_response() {
         let _raw = serde_json::json!({
-            "tool_response": {"stdout": "[hcom:nova]", "stderr": ""}
+            "tool_response": {"stdout": "[nomadterm:nova]", "stderr": ""}
         });
-        let response_text = "[hcom:nova]";
+        let response_text = "[nomadterm:nova]";
         let caps = BIND_MARKER_RE.captures(response_text);
         assert!(caps.is_some());
         assert_eq!(caps.unwrap().get(1).unwrap().as_str(), "nova");
@@ -2486,19 +2486,19 @@ mod tests {
 
     #[test]
     fn test_is_hcom_hook_command() {
-        assert!(is_hcom_hook_command("${HCOM} sessionstart"));
-        assert!(is_hcom_hook_command("${HCOM} post"));
-        assert!(is_hcom_hook_command("hcom sessionstart"));
-        assert!(is_hcom_hook_command("hcom post"));
-        assert!(is_hcom_hook_command("uvx hcom claude-notify"));
+        assert!(is_hcom_hook_command("${NOMADTERM} sessionstart"));
+        assert!(is_hcom_hook_command("${NOMADTERM} post"));
+        assert!(is_hcom_hook_command("nomadterm sessionstart"));
+        assert!(is_hcom_hook_command("nomadterm post"));
+        assert!(is_hcom_hook_command("uvx nomadterm claude-notify"));
         assert!(!is_hcom_hook_command("echo hello"));
         assert!(!is_hcom_hook_command(""));
     }
 
     #[test]
     fn test_is_hcom_hook_command_legacy() {
-        assert!(is_hcom_hook_command("HCOM_ACTIVE=1 hcom.py sessionstart"));
-        assert!(is_hcom_hook_command("sh -c 'hcom something'"));
+        assert!(is_hcom_hook_command("HCOM_ACTIVE=1 nomadterm.py sessionstart"));
+        assert!(is_hcom_hook_command("sh -c 'nomadterm something'"));
     }
 
     #[test]
@@ -2520,16 +2520,16 @@ mod tests {
                 "SessionStart": [{
                     "hooks": [{
                         "type": "command",
-                        "command": "${HCOM} sessionstart"
+                        "command": "${NOMADTERM} sessionstart"
                     }]
                 }]
             },
-            "env": {"HCOM": "hcom"},
+            "env": {"NOMADTERM": "nomadterm"},
         });
         assert!(remove_hcom_hooks_from_settings(&mut settings));
         // SessionStart should be removed entirely
         assert!(settings["hooks"].get("SessionStart").is_none());
-        // HCOM env should be removed
+        // NOMADTERM env should be removed
         assert!(settings.get("env").is_none());
     }
 
@@ -2539,7 +2539,7 @@ mod tests {
             "hooks": {
                 "PostToolUse": [{
                     "hooks": [
-                        {"type": "command", "command": "${HCOM} post"},
+                        {"type": "command", "command": "${NOMADTERM} post"},
                         {"type": "command", "command": "echo custom hook"},
                     ]
                 }]
@@ -2560,7 +2560,7 @@ mod tests {
             "hooks": {},
             "permissions": {
                 "allow": [
-                    "Bash(hcom send:*)",
+                    "Bash(nomadterm send:*)",
                     "Bash(custom:*)",
                 ]
             }
@@ -2581,16 +2581,16 @@ mod tests {
     #[test]
     fn test_format_claude_permission() {
         assert_eq!(
-            format_claude_permission("hcom", "send"),
-            "Bash(hcom send:*)"
+            format_claude_permission("nomadterm", "send"),
+            "Bash(nomadterm send:*)"
         );
         assert_eq!(
-            format_claude_permission("hcom", "--help"),
-            "Bash(hcom --help)"
+            format_claude_permission("nomadterm", "--help"),
+            "Bash(nomadterm --help)"
         );
         assert_eq!(
-            format_claude_permission("uvx hcom", "list"),
-            "Bash(uvx hcom list:*)"
+            format_claude_permission("uvx nomadterm", "list"),
+            "Bash(uvx nomadterm list:*)"
         );
     }
 
@@ -2608,10 +2608,10 @@ mod tests {
     #[test]
     fn test_build_all_claude_permission_patterns() {
         let patterns = build_all_claude_permission_patterns();
-        // Should have both hcom and uvx hcom variants
+        // Should have both nomadterm and uvx nomadterm variants
         assert_eq!(patterns.len(), SAFE_HCOM_COMMANDS.len() * 2);
-        assert!(patterns.iter().any(|p| p.contains("hcom send")));
-        assert!(patterns.iter().any(|p| p.contains("uvx hcom send")));
+        assert!(patterns.iter().any(|p| p.contains("nomadterm send")));
+        assert!(patterns.iter().any(|p| p.contains("uvx nomadterm send")));
     }
 
     #[test]
@@ -2626,8 +2626,8 @@ mod tests {
 
         // Can't call setup_claude_hooks directly (uses get_claude_settings_path),
         // but we can test the verify path with a hand-built settings file.
-        let hook_cmd = "${HCOM}";
-        let mut settings = serde_json::json!({"hooks": {}, "env": {"HCOM": "hcom"}});
+        let hook_cmd = "${NOMADTERM}";
+        let mut settings = serde_json::json!({"hooks": {}, "env": {"NOMADTERM": "nomadterm"}});
 
         for &(hook_type, matcher, cmd_suffix, timeout) in CLAUDE_HOOK_CONFIGS {
             let mut hook_entry = serde_json::json!({
@@ -2675,10 +2675,10 @@ mod tests {
         let settings = serde_json::json!({
             "hooks": {
                 "SessionStart": [{
-                    "hooks": [{"type": "command", "command": "${HCOM} sessionstart"}]
+                    "hooks": [{"type": "command", "command": "${NOMADTERM} sessionstart"}]
                 }]
             },
-            "env": {"HCOM": "hcom"}
+            "env": {"NOMADTERM": "nomadterm"}
         });
         std::fs::write(&settings_path, serde_json::to_string(&settings).unwrap()).unwrap();
 
@@ -2700,10 +2700,10 @@ mod tests {
         let settings = serde_json::json!({
             "hooks": {
                 "SessionStart": [{
-                    "hooks": [{"type": "command", "command": "${HCOM} sessionstart"}]
+                    "hooks": [{"type": "command", "command": "${NOMADTERM} sessionstart"}]
                 }]
             },
-            "env": {"HCOM": "hcom"},
+            "env": {"NOMADTERM": "nomadterm"},
             "other_key": "preserved"
         });
         std::fs::write(&path, serde_json::to_string_pretty(&settings).unwrap()).unwrap();
@@ -2731,14 +2731,14 @@ mod tests {
         serde_json::from_str(&content).unwrap()
     }
 
-    /// Independent verification: no hcom hooks in Claude settings JSON.
+    /// Independent verification: no nomadterm hooks in Claude settings JSON.
     fn independently_verify_no_hcom_hooks_claude(settings: &Value) -> Vec<String> {
         let mut violations = Vec::new();
         let hooks = match settings.get("hooks").and_then(|v| v.as_object()) {
             Some(h) => h,
             None => return violations,
         };
-        let hcom_patterns = ["hcom", "HCOM", "${HCOM}"];
+        let hcom_patterns = ["nomadterm", "NOMADTERM", "${NOMADTERM}"];
         for (hook_type, matchers_val) in hooks {
             let matchers = match matchers_val.as_array() {
                 Some(a) => a,
@@ -2760,7 +2760,7 @@ mod tests {
         violations
     }
 
-    /// Independent verification: expected hcom hooks present.
+    /// Independent verification: expected nomadterm hooks present.
     fn independently_verify_hcom_hooks_present_claude(
         settings: &Value,
         expected: &[(&str, &str)], // (hook_type, command_substring)
@@ -2829,7 +2829,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("{hook_type} missing or not array"));
             assert!(!arr.is_empty(), "{hook_type} should have entries");
 
-            // Find the hcom hook entry with exact command match
+            // Find the nomadterm hook entry with exact command match
             let hook_cmd_base = get_hook_command();
             let expected_command = format!("{} {}", hook_cmd_base, cmd_suffix);
             let mut found = false;
@@ -2866,10 +2866,10 @@ mod tests {
             );
         }
 
-        // HCOM env var should be set
+        // NOMADTERM env var should be set
         assert!(
-            settings.get("env").and_then(|v| v.get("HCOM")).is_some(),
-            "HCOM env var should be set"
+            settings.get("env").and_then(|v| v.get("NOMADTERM")).is_some(),
+            "NOMADTERM env var should be set"
         );
 
         assert!(verify_claude_hooks_installed(Some(&settings_path), false));
@@ -2909,10 +2909,10 @@ mod tests {
 
         let updated = read_json(&settings_path);
 
-        // User env keys preserved (HCOM is added by setup)
+        // User env keys preserved (NOMADTERM is added by setup)
         assert_eq!(updated["env"]["MY_VAR"], "test");
         assert_eq!(updated["env"]["OTHER"], "value");
-        assert!(updated["env"].get("HCOM").is_some());
+        assert!(updated["env"].get("NOMADTERM").is_some());
 
         // permissions.deny preserved
         assert_eq!(
@@ -2962,12 +2962,12 @@ mod tests {
         let (_dir, _test_home, settings_path, _guard) = claude_test_env();
 
         std::fs::create_dir_all(settings_path.parent().unwrap()).unwrap();
-        // Mixed hcom + user hooks in same type
+        // Mixed nomadterm + user hooks in same type
         let settings = serde_json::json!({
             "hooks": {
                 "PostToolUse": [{
                     "hooks": [
-                        {"type": "command", "command": "${HCOM} post"},
+                        {"type": "command", "command": "${NOMADTERM} post"},
                         {"type": "command", "command": "echo user hook", "name": "my-logger"},
                     ]
                 }]
@@ -2989,9 +2989,9 @@ mod tests {
         assert_eq!(hooks_list.len(), 1);
         assert_eq!(hooks_list[0]["command"], "echo user hook");
 
-        // No hcom hooks
+        // No nomadterm hooks
         let violations = independently_verify_no_hcom_hooks_claude(&updated);
-        assert!(violations.is_empty(), "hcom hooks remain: {violations:?}");
+        assert!(violations.is_empty(), "nomadterm hooks remain: {violations:?}");
 
         drop(_guard);
     }
@@ -3033,7 +3033,7 @@ mod tests {
         let violations = independently_verify_no_hcom_hooks_claude(&after_remove);
         assert!(
             violations.is_empty(),
-            "after remove, hcom hooks still present: {violations:?}"
+            "after remove, nomadterm hooks still present: {violations:?}"
         );
 
         // User data preserved
@@ -3141,12 +3141,12 @@ mod tests {
             allow.iter().any(|v| v.as_str() == Some("Bash(custom:*)")),
             "user permission should be preserved"
         );
-        // hcom permissions added
+        // nomadterm permissions added
         let perms = build_claude_permissions();
         for p in &perms {
             assert!(
                 allow.iter().any(|v| v.as_str() == Some(p.as_str())),
-                "hcom permission {p} should be added"
+                "nomadterm permission {p} should be added"
             );
         }
         // deny preserved

@@ -1,24 +1,24 @@
-//! Shared runtime helpers for invoking hcom and locating tool config roots.
+//! Shared runtime helpers for invoking nomadterm and locating tool config roots.
 
-/// Cached hcom invocation prefix (computed once per process lifetime).
+/// Cached nomadterm invocation prefix (computed once per process lifetime).
 static HCOM_PREFIX: std::sync::LazyLock<Vec<String>> = std::sync::LazyLock::new(|| {
     if std::env::var("HCOM_DEV_ROOT").is_ok() {
-        return vec!["hcom".into()];
+        return vec!["nomadterm".into()];
     }
 
     if let Ok(exe) = std::env::current_exe() {
         if let Ok(resolved) = exe.canonicalize() {
             let has_uv = resolved.components().any(|c| c.as_os_str() == "uv");
             if has_uv {
-                return vec!["uvx".into(), "hcom".into()];
+                return vec!["uvx".into(), "nomadterm".into()];
             }
         }
     }
 
-    vec!["hcom".into()]
+    vec!["nomadterm".into()]
 });
 
-/// Detect hcom invocation prefix based on execution context.
+/// Detect nomadterm invocation prefix based on execution context.
 pub(crate) fn get_hcom_prefix() -> Vec<String> {
     HCOM_PREFIX.clone()
 }
@@ -34,14 +34,14 @@ pub(crate) fn tool_config_root() -> std::path::PathBuf {
         .unwrap_or_else(|| dirs::home_dir().unwrap_or_default())
 }
 
-/// Build hcom command string for prompts, config, and hook commands.
+/// Build nomadterm command string for prompts, config, and hook commands.
 pub(crate) fn build_hcom_command() -> String {
     get_hcom_prefix().join(" ")
 }
 
 /// Set terminal title via escape codes written to /dev/tty.
 pub(crate) fn set_terminal_title(instance_name: &str) {
-    let title = format!("hcom: {}", instance_name);
+    let title = format!("nomadterm: {}", instance_name);
     if let Ok(mut tty) = std::fs::OpenOptions::new().write(true).open("/dev/tty") {
         use std::io::Write;
         let _ = write!(tty, "\x1b]1;{}\x07\x1b]2;{}\x07", title, title);
@@ -85,7 +85,7 @@ mod tests {
         std::env::set_current_dir(&workspace).unwrap();
         unsafe {
             std::env::set_var("HOME", &home);
-            std::env::set_var("HCOM_DIR", ".sandbox/.hcom");
+            std::env::set_var("HCOM_DIR", ".sandbox/.nomadterm");
         }
 
         let root = super::tool_config_root();

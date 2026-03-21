@@ -1,4 +1,4 @@
-//! `hcom list` command — list active instances.
+//! `nomadterm list` command — list active instances.
 //!
 //!
 //! Supports: human-readable, --json, --names, --format, -v,
@@ -14,7 +14,7 @@ use crate::instances::{
 };
 use crate::shared::{CommandContext, SENDER, ST_LISTENING, shorten_path_max, status_icon};
 
-/// Parsed arguments for `hcom list`.
+/// Parsed arguments for `nomadterm list`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "list", about = "List active agents")]
 pub struct ListArgs {
@@ -75,7 +75,7 @@ fn get_unread_counts_batch(db: &HcomDb, instances: &[InstanceRow]) -> HashMap<St
     counts
 }
 
-/// Main entry point for `hcom list` command.
+/// Main entry point for `nomadterm list` command.
 ///
 /// Returns exit code (0 = success, 1 = error).
 pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i32 {
@@ -121,12 +121,12 @@ pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i
             .unwrap_or((None, None))
     };
 
-    // Single instance query: hcom list <name|self> [field] [--json]
+    // Single instance query: nomadterm list <name|self> [field] [--json]
     if let Some(target) = target_name {
         let is_self = target == "self";
 
         if is_self && sender_identity.is_none() {
-            eprintln!("Error: Cannot use 'self' without identity. Run 'hcom start' first.");
+            eprintln!("Error: Cannot use 'self' without identity. Run 'nomadterm start' first.");
             return 1;
         }
 
@@ -194,7 +194,7 @@ pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i
             }
             _ => {
                 eprintln!("Error: Not found: {target}");
-                eprintln!("Use 'hcom list' to see active agents.");
+                eprintln!("Use 'nomadterm list' to see active agents.");
                 return 1;
             }
         }
@@ -545,7 +545,7 @@ pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i
     }
 
     if sorted_instances.is_empty() {
-        println!("No active agents. Launch one with: hcom claude");
+        println!("No active agents. Launch one with: nomadterm claude");
     }
 
     // Recently stopped summary
@@ -563,7 +563,7 @@ pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i
             )
         };
         println!("\nRecently stopped (10m): {names}");
-        println!("  -> hcom list --stopped [name]");
+        println!("  -> nomadterm list --stopped [name]");
     }
 
     // Hint about archives if no instances
@@ -582,7 +582,7 @@ pub fn cmd_list(db: &HcomDb, args: &ListArgs, ctx: Option<&CommandContext>) -> i
                     .count();
                 if archive_count > 0 {
                     let plural = if archive_count != 1 { "s" } else { "" };
-                    println!("({archive_count} archived session{plural} - run: hcom archive)");
+                    println!("({archive_count} archived session{plural} - run: nomadterm archive)");
                 }
             }
         }
@@ -602,7 +602,7 @@ fn extract_field_value(payload: &serde_json::Value, field: &str) -> String {
     }
 }
 
-/// Print shell-export format for `hcom list --sh`.
+/// Print shell-export format for `nomadterm list --sh`.
 fn print_sh_exports(payload: &serde_json::Value) {
     let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("");
     let session_id = payload
@@ -626,7 +626,7 @@ fn print_sh_exports(payload: &serde_json::Value) {
 
 use crate::tools::args_common::shell_quote;
 
-/// `hcom list --stopped [name] [--all] [--last N]` — show stopped instances from life events.
+/// `nomadterm list --stopped [name] [--all] [--last N]` — show stopped instances from life events.
 /// Without a name: shows recent stopped (default last 20, use --all for unlimited).
 /// With a name: shows details for that specific stopped instance.
 /// Uses human-friendly formatting rather than raw JSON for readability.
@@ -737,7 +737,7 @@ fn cmd_list_stopped(db: &HcomDb, args: &ListArgs) -> i32 {
                 println!("  Transcript: {tp}");
             }
         }
-        println!("\n  Resume: hcom r {}", entry.instance);
+        println!("\n  Resume: nomadterm r {}", entry.instance);
 
         // Show history if multiple stop events
         if entries.len() > 1 {
@@ -801,8 +801,8 @@ fn cmd_list_stopped(db: &HcomDb, args: &ListArgs) -> i32 {
         if !show_all {
             println!("\n  --all: show all  |  --last N: show last N");
         }
-        println!("  Details: hcom list --stopped <name>");
-        println!("  Resume:  hcom r <name>");
+        println!("  Details: nomadterm list --stopped <name>");
+        println!("  Resume:  nomadterm r <name>");
     }
 
     0

@@ -31,6 +31,11 @@ export function DetailPanel({
       .catch(console.error);
   }, [serverState.running]);
 
+  // Clear any error once the server is confirmed running.
+  useEffect(() => {
+    if (serverState.running) setError(null);
+  }, [serverState.running]);
+
   if (!repo) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">

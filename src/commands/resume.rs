@@ -1,4 +1,4 @@
-//! Resume command: `hcom r <name> [tool-args...]`
+//! Resume command: `nomadterm r <name> [tool-args...]`
 //!
 //!
 //! Loads a stopped instance's snapshot and relaunches with --resume session_id.
@@ -42,7 +42,7 @@ pub fn parse_resume_argv(argv: &[String], cmd: &str) -> Result<(String, Vec<Stri
     }
 
     if i >= argv.len() {
-        bail!("Usage: hcom {} <name> [tool-args...]", cmd);
+        bail!("Usage: nomadterm {} <name> [tool-args...]", cmd);
     }
 
     let name = argv[i].clone();
@@ -65,7 +65,7 @@ pub fn do_resume(
     // For resume (not fork): reject if instance is still active
     if !fork {
         if let Ok(Some(_)) = db.get_instance_full(&name) {
-            bail!("'{}' is still active — run hcom stop {} first", name, name);
+            bail!("'{}' is still active — run nomadterm stop {} first", name, name);
         }
     }
 
@@ -85,7 +85,7 @@ pub fn do_resume(
         );
     }
 
-    // Extract hcom-level flags (--tag, --terminal, --dir) from extra args before tool parsing
+    // Extract nomadterm-level flags (--tag, --terminal, --dir) from extra args before tool parsing
     let (tag_override, terminal_override, dir_override, clean_extra) =
         extract_hcom_flags(extra_args);
 
@@ -178,7 +178,7 @@ pub fn do_resume(
                 format!(
                     "YOU ARE A FORK of agent '{}'. \
                      You have the same session history but are a NEW agent. \
-                     Run hcom start to get your own identity.",
+                     Run nomadterm start to get your own identity.",
                     name
                 )
             } else {
@@ -224,8 +224,8 @@ pub fn do_resume(
     Ok(if result.launched > 0 { 0 } else { 1 })
 }
 
-/// Extract hcom-level flags (--tag, --terminal, --name, --go) from args.
-/// Returns (tag, terminal, remaining) with hcom flags stripped.
+/// Extract nomadterm-level flags (--tag, --terminal, --name, --go) from args.
+/// Returns (tag, terminal, remaining) with nomadterm flags stripped.
 fn extract_hcom_flags(
     args: &[String],
 ) -> (Option<String>, Option<String>, Option<String>, Vec<String>) {
@@ -254,7 +254,7 @@ fn extract_hcom_flags(
             dir = Some(args[i][6..].to_string());
             i += 1;
         } else if args[i] == "--name" && i + 1 < args.len() {
-            // --name is a global hcom flag, strip it so it doesn't leak to tool CLI
+            // --name is a global nomadterm flag, strip it so it doesn't leak to tool CLI
             i += 2;
         } else if args[i] == "--go" {
             i += 1;

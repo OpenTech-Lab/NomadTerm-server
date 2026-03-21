@@ -1,4 +1,4 @@
-//! Track hcom-launched process PIDs for orphan detection and recovery.
+//! Track nomadterm-launched process PIDs for orphan detection and recovery.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -253,7 +253,7 @@ pub fn record_pid(rec: &PidRecord<'_>) {
     write_raw(hcom_dir, &data);
 }
 
-/// Get running hcom processes not accounted for by active instances.
+/// Get running nomadterm processes not accounted for by active instances.
 ///
 /// Auto-prunes dead PIDs from the file. If `active_pids` is provided,
 /// also prunes PIDs that are now active from the file and filters them

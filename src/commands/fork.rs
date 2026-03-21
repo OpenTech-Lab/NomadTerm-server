@@ -1,4 +1,4 @@
-//! Fork command: `hcom f <name> [tool-args...]`
+//! Fork command: `nomadterm f <name> [tool-args...]`
 //!
 //!
 //! Forks an active or stopped instance by launching with --fork-session

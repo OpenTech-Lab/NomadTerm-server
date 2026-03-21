@@ -1,7 +1,7 @@
-//! Centralized path resolution and file utilities for hcom.
+//! Centralized path resolution and file utilities for nomadterm.
 //!
-//! Single source of truth for all hcom directory and file paths.
-//! Respects HCOM_DIR env var for worktrees/dev, falls back to ~/.hcom.
+//! Single source of truth for all nomadterm directory and file paths.
+//! Respects HCOM_DIR env var for worktrees/dev, falls back to ~/.nomadterm.
 //! Also provides atomic file operations and flag counters.
 
 use crate::config::Config;
@@ -22,7 +22,7 @@ pub const SCRIPTS_DIR: &str = "scripts";
 /// Normalization behavior:
 /// - `~` expands against HOME/USERPROFILE when available
 /// - relative paths are resolved against the provided cwd
-/// - otherwise falls back to `HOME/.hcom` or `.hcom`
+/// - otherwise falls back to `HOME/.nomadterm` or `.nomadterm`
 pub fn resolve_hcom_dir_from_env(env: &HashMap<String, String>, cwd: &Path) -> (PathBuf, bool) {
     let home = env.get("HOME").or_else(|| env.get("USERPROFILE"));
     let hcom_dir = env.get("HCOM_DIR").filter(|value| !value.is_empty());
@@ -45,21 +45,21 @@ pub fn resolve_hcom_dir_from_env(env: &HashMap<String, String>, cwd: &Path) -> (
             path
         }
     } else {
-        home.map(|home_dir| PathBuf::from(home_dir).join(".hcom"))
-            .unwrap_or_else(|| PathBuf::from(".hcom"))
+        home.map(|home_dir| PathBuf::from(home_dir).join(".nomadterm"))
+            .unwrap_or_else(|| PathBuf::from(".nomadterm"))
     };
 
     (resolved, hcom_dir.is_some())
 }
 
-/// Get the hcom base directory.
+/// Get the nomadterm base directory.
 ///
-/// Uses centralized Config (HCOM_DIR env var or ~/.hcom fallback).
+/// Uses centralized Config (HCOM_DIR env var or ~/.nomadterm fallback).
 pub fn hcom_dir() -> PathBuf {
     Config::get().hcom_dir
 }
 
-/// Build path under hcom directory, optionally ensuring parent exists.
+/// Build path under nomadterm directory, optionally ensuring parent exists.
 pub fn hcom_path(parts: &[&str]) -> PathBuf {
     let mut path = hcom_dir();
     for part in parts {
@@ -79,14 +79,14 @@ pub fn get_project_root() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("/"))
 }
 
-/// Get the database path (hcom_dir/hcom.db)
+/// Get the database path (hcom_dir/nomadterm.db)
 pub fn db_path() -> PathBuf {
-    hcom_dir().join("hcom.db")
+    hcom_dir().join("nomadterm.db")
 }
 
-/// Get the log file path (hcom_dir/.tmp/logs/hcom.log)
+/// Get the log file path (hcom_dir/.tmp/logs/nomadterm.log)
 pub fn log_path() -> PathBuf {
-    hcom_dir().join(".tmp").join("logs").join("hcom.log")
+    hcom_dir().join(".tmp").join("logs").join("nomadterm.log")
 }
 
 /// Get the pidtrack file path (hcom_dir/.tmp/launched_pids.json)
@@ -104,7 +104,7 @@ pub fn scripts_dir() -> PathBuf {
     hcom_dir().join(SCRIPTS_DIR)
 }
 
-/// Ensure all critical HCOM directories exist. Idempotent, safe to call repeatedly.
+/// Ensure all critical NOMADTERM directories exist. Idempotent, safe to call repeatedly.
 /// Called at hook entry to support opt-in scenarios where hooks execute before CLI commands.
 /// Returns true on success, false on failure.
 pub fn ensure_hcom_directories() -> bool {
@@ -245,7 +245,7 @@ mod tests {
     fn test_get_project_root_logic() {
         // get_project_root returns parent of hcom_dir
         // Test the logic directly without relying on global Config
-        let base = Path::new("/home/test/.hcom");
+        let base = Path::new("/home/test/.nomadterm");
         assert_eq!(
             base.parent().unwrap().to_path_buf(),
             PathBuf::from("/home/test")
@@ -256,7 +256,7 @@ mod tests {
     fn test_resolve_hcom_dir_default() {
         let env = HashMap::from([("HOME".to_string(), "/home/test".to_string())]);
         let (path, overridden) = resolve_hcom_dir_from_env(&env, Path::new("/worktree"));
-        assert_eq!(path, PathBuf::from("/home/test/.hcom"));
+        assert_eq!(path, PathBuf::from("/home/test/.nomadterm"));
         assert!(!overridden);
     }
 
@@ -264,18 +264,18 @@ mod tests {
     fn test_resolve_hcom_dir_expands_tilde() {
         let env = HashMap::from([
             ("HOME".to_string(), "/home/test".to_string()),
-            ("HCOM_DIR".to_string(), "~/custom/.hcom".to_string()),
+            ("HCOM_DIR".to_string(), "~/custom/.nomadterm".to_string()),
         ]);
         let (path, overridden) = resolve_hcom_dir_from_env(&env, Path::new("/worktree"));
-        assert_eq!(path, PathBuf::from("/home/test/custom/.hcom"));
+        assert_eq!(path, PathBuf::from("/home/test/custom/.nomadterm"));
         assert!(overridden);
     }
 
     #[test]
     fn test_resolve_hcom_dir_makes_relative_absolute() {
-        let env = HashMap::from([("HCOM_DIR".to_string(), "relative/.hcom".to_string())]);
+        let env = HashMap::from([("HCOM_DIR".to_string(), "relative/.nomadterm".to_string())]);
         let (path, overridden) = resolve_hcom_dir_from_env(&env, Path::new("/worktree"));
-        assert_eq!(path, PathBuf::from("/worktree").join("relative/.hcom"));
+        assert_eq!(path, PathBuf::from("/worktree").join("relative/.nomadterm"));
         assert!(overridden);
     }
 }

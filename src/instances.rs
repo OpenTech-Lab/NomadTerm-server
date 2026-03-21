@@ -203,7 +203,7 @@ pub fn get_instance_status(data: &InstanceRow, db: &HcomDb) -> ComputedStatus {
             let detail = get_or_finalize_launch_failure_detail(db, data)
                 .or_else(|| extract_launch_failure_detail(data))
                 .unwrap_or_else(|| {
-                    "launch probably failed - check logs or hcom list -v".to_string()
+                    "launch probably failed - check logs or nomadterm list -v".to_string()
                 });
             return ComputedStatus {
                 status: ST_INACTIVE.to_string(),
@@ -360,7 +360,7 @@ pub(crate) fn finalize_launch_failure_detail(
 
     let detail = extract_launch_failure_detail(data)
         .or_else(|| fallback_detail.map(ToString::to_string))
-        .unwrap_or_else(|| "launch probably failed - check logs or hcom list -v".to_string());
+        .unwrap_or_else(|| "launch probably failed - check logs or nomadterm list -v".to_string());
 
     let mut updates = serde_json::Map::new();
     updates.insert("status".into(), serde_json::json!(ST_INACTIVE));
@@ -414,7 +414,7 @@ fn add_tmux_server_remediation(detail: &str) -> String {
         return detail.to_string();
     }
     format!(
-        "{detail} Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s hcom-external`), then retry."
+        "{detail} Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s nomadterm-external`), then retry."
     )
 }
 
@@ -1176,7 +1176,7 @@ pub fn set_status(
     let (current_data, db_error) = match db.get_instance_full(instance_name) {
         Ok(data) => (data, false),
         Err(e) => {
-            eprintln!("[hcom] warn: set_status DB read failed for {instance_name}: {e}");
+            eprintln!("[nomadterm] warn: set_status DB read failed for {instance_name}: {e}");
             (None, true)
         }
     };
@@ -1377,7 +1377,7 @@ pub fn bind_session_to_process(
                 let data = match db.get_instance_full(&name) {
                     Ok(d) => d,
                     Err(e) => {
-                        eprintln!("[hcom] warn: get_instance_full failed for {name}: {e}");
+                        eprintln!("[nomadterm] warn: get_instance_full failed for {name}: {e}");
                         None
                     }
                 };
@@ -1393,7 +1393,7 @@ pub fn bind_session_to_process(
     let canonical = match db.get_session_binding(session_id) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("[hcom] warn: get_session_binding failed for {session_id}: {e}");
+            eprintln!("[nomadterm] warn: get_session_binding failed for {session_id}: {e}");
             None
         }
     };
@@ -1775,11 +1775,11 @@ pub fn create_orphaned_pty_identity(
 
     // Bind session
     if let Err(e) = db.rebind_session(session_id, &name) {
-        eprintln!("[hcom] warn: rebind_session failed for {name}: {e}");
+        eprintln!("[nomadterm] warn: rebind_session failed for {name}: {e}");
     }
     if let Some(pid) = process_id {
         if let Err(e) = db.set_process_binding(pid, session_id, &name) {
-            eprintln!("[hcom] warn: set_process_binding failed for {name}: {e}");
+            eprintln!("[nomadterm] warn: set_process_binding failed for {name}: {e}");
         }
     }
 
@@ -2253,7 +2253,7 @@ Error: Operation not permitted (os error 1)
         assert_eq!(
             result.as_deref(),
             Some(
-                "Error: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s hcom-external`), then retry."
+                "Error: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s nomadterm-external`), then retry."
             )
         );
     }
@@ -2269,7 +2269,7 @@ WARNING: proceeding, even though we could not update PATH: Operation not permitt
         assert_eq!(
             result.as_deref(),
             Some(
-                "WARNING: proceeding, even though we could not update PATH: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s hcom-external`), then retry."
+                "WARNING: proceeding, even though we could not update PATH: Operation not permitted (os error 1) Fully reset tmux first (`tmux kill-server`), then start a fresh tmux server with approval/escalation (for example: `tmux new-session -d -s nomadterm-external`), then retry."
             )
         );
     }

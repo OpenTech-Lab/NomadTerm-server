@@ -1,4 +1,4 @@
-//! `hcom listen` command — block and receive messages.
+//! `nomadterm listen` command — block and receive messages.
 //!
 //!
 //! Supports: message-wait mode, --timeout, --json, --sql filter mode.
@@ -15,7 +15,7 @@ use crate::instances::{self, StatusUpdate, get_display_name, set_status};
 use crate::notify::NotifyServer;
 use crate::shared::{CommandContext, ST_ACTIVE, ST_INACTIVE, ST_LISTENING};
 
-/// Parsed arguments for `hcom listen`.
+/// Parsed arguments for `nomadterm listen`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "listen", about = "Wait for events matching filters")]
 pub struct ListenArgs {
@@ -106,7 +106,7 @@ fn build_prefix(intent: Option<&str>, thread: Option<&str>, event_id: Option<i64
     }
 }
 
-/// Main entry point for `hcom listen` command.
+/// Main entry point for `nomadterm listen` command.
 ///
 /// Returns exit code (0 = success, 1 = error, 130 = interrupted).
 pub fn cmd_listen(db: &HcomDb, args: &ListenArgs, ctx: Option<&CommandContext>) -> i32 {
@@ -142,7 +142,7 @@ pub fn cmd_listen(db: &HcomDb, args: &ListenArgs, ctx: Option<&CommandContext>) 
                 eprintln!("Error: {e}");
             } else {
                 eprintln!("Error: --name required (no identity context)");
-                eprintln!("Usage: hcom listen --name <name> [--timeout N]");
+                eprintln!("Usage: nomadterm listen --name <name> [--timeout N]");
             }
             return 1;
         }
@@ -198,7 +198,7 @@ pub fn cmd_listen(db: &HcomDb, args: &ListenArgs, ctx: Option<&CommandContext>) 
 
     let instance_data = identity.instance_data.as_ref();
     if instance_data.is_none() {
-        eprintln!("Error: hcom not started for '{instance_name}'.");
+        eprintln!("Error: nomadterm not started for '{instance_name}'.");
         return 1;
     }
 
@@ -261,7 +261,7 @@ pub fn cmd_listen(db: &HcomDb, args: &ListenArgs, ctx: Option<&CommandContext>) 
         .flatten()
         .is_none()
     {
-        eprintln!("[You have been disconnected from HCOM]");
+        eprintln!("[You have been disconnected from NOMADTERM]");
         return 0;
     }
 
@@ -342,7 +342,7 @@ fn listen_loop(
         if db.get_instance_full(instance_name).ok().flatten().is_none() {
             if !json_output {
                 eprintln!(
-                    "\n[Disconnected: HCOM stopped for {instance_name}. Unless told otherwise, stop work and end your turn now]"
+                    "\n[Disconnected: NOMADTERM stopped for {instance_name}. Unless told otherwise, stop work and end your turn now]"
                 );
             }
             return 0;
@@ -604,7 +604,7 @@ fn filter_listen_loop(
         // Check if stopped
         if db.get_instance_full(instance_name).ok().flatten().is_none() {
             if !json_output {
-                eprintln!("\n[Disconnected: HCOM stopped for {instance_name}]");
+                eprintln!("\n[Disconnected: NOMADTERM stopped for {instance_name}]");
             }
             return 0;
         }
@@ -623,7 +623,7 @@ fn filter_listen_loop(
 
             // Check for subscription notification
             for msg in &messages {
-                if msg.from == "[hcom-events]" && msg.text.contains(&format!("[sub:{sub_id}]")) {
+                if msg.from == "[nomadterm-events]" && msg.text.contains(&format!("[sub:{sub_id}]")) {
                     if json_output {
                         let j = serde_json::json!({
                             "matched": true,

@@ -37,7 +37,7 @@ fn spawn_background_check(flag: &Path, current: &str) {
     // Runs completely detached — parent doesn't wait.
     let script = format!(
         r#"
-TAG=$(curl -fsSL --max-time 5 https://api.github.com/repos/aannoo/hcom/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | cut -d'"' -f4)
+TAG=$(curl -fsSL --max-time 5 https://api.github.com/repos/aannoo/nomadterm/releases/latest 2>/dev/null | grep '"tag_name"' | head -1 | cut -d'"' -f4)
 VER="${{TAG#v}}"
 if [ -n "$VER" ]; then
     # Compare: if remote > current, write version; else write empty
@@ -68,7 +68,7 @@ fn get_update_cmd() -> &'static str {
     let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(_) => {
-            return "curl -fsSL https://raw.githubusercontent.com/aannoo/hcom/main/install.sh | sh";
+            return "curl -fsSL https://raw.githubusercontent.com/aannoo/nomadterm/main/install.sh | sh";
         }
     };
 
@@ -77,23 +77,23 @@ fn get_update_cmd() -> &'static str {
     // Dev build
     if path_str.contains("/hook-comms/")
         || path_str.contains("/target/")
-        || path_str.contains("/.hcom-build/")
+        || path_str.contains("/.nomadterm-build/")
     {
         return "./build.sh";
     }
 
     // uv tool install
     if path_str.contains("/uv/") || path_str.contains("/.local/share/uv/") {
-        return "uv tool upgrade hcom";
+        return "uv tool upgrade nomadterm";
     }
 
     // pip install (venv or site-packages)
     if path_str.contains("/site-packages/") || path_str.contains("/venv/") {
-        return "pip install -U hcom";
+        return "pip install -U nomadterm";
     }
 
     // Default: curl installer
-    "curl -fsSL https://raw.githubusercontent.com/aannoo/hcom/main/install.sh | sh"
+    "curl -fsSL https://raw.githubusercontent.com/aannoo/nomadterm/main/install.sh | sh"
 }
 
 /// Check for updates (once daily cached). Returns (latest_version, update_cmd) or None.
@@ -142,7 +142,7 @@ pub fn get_update_info() -> Option<(String, &'static str)> {
 /// Return update notice string for stderr, or None if up to date.
 pub fn get_update_notice() -> Option<String> {
     let (latest, cmd) = get_update_info()?;
-    Some(format!("→ Update available: hcom v{latest} ({cmd})"))
+    Some(format!("→ Update available: nomadterm v{latest} ({cmd})"))
 }
 
 #[cfg(test)]

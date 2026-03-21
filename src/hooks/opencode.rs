@@ -73,7 +73,7 @@ fn get_opencode_db_path() -> Option<String> {
 /// Handle opencode-start: bind session to process, set listening status.
 ///
 /// Called by OpenCode plugin on session.created event.
-/// Expects: hcom opencode-start --session-id <id> [--notify-port <port>]
+/// Expects: nomadterm opencode-start --session-id <id> [--notify-port <port>]
 ///
 /// Returns JSON: {"name": "<instance>", "session_id": "<id>", "bootstrap": "..."}
 fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String) {
@@ -253,7 +253,7 @@ fn handle_start(ctx: &HcomContext, db: &HcomDb, argv: &[String]) -> (i32, String
 /// Handle opencode-status: update instance status.
 ///
 /// Called by OpenCode plugin on session.status and session.idle events.
-/// Expects: hcom opencode-status --name <name> --status <status> [--context <ctx>] [--detail <d>]
+/// Expects: nomadterm opencode-status --name <name> --status <status> [--context <ctx>] [--detail <d>]
 fn handle_status(db: &HcomDb, argv: &[String]) -> (i32, String) {
     let name = match parse_flag(argv, "--name") {
         Some(n) => n,
@@ -391,7 +391,7 @@ fn handle_read(db: &HcomDb, argv: &[String]) -> (i32, String) {
 /// Handle opencode-stop: finalize session and clean up instance.
 ///
 /// Called by OpenCode plugin on session.deleted event.
-/// Expects: hcom opencode-stop --name <name> [--reason <reason>]
+/// Expects: nomadterm opencode-stop --name <name> [--reason <reason>]
 fn handle_stop(db: &HcomDb, argv: &[String]) -> (i32, String) {
     let name = match parse_flag(argv, "--name") {
         Some(n) => n,
@@ -414,7 +414,7 @@ pub fn dispatch_opencode_hook(hook_name: &str, argv: &[String]) -> (i32, String)
     // Build context
     let ctx = HcomContext::from_os();
 
-    // Ensure hcom directories exist before opening DB.
+    // Ensure nomadterm directories exist before opening DB.
     // On clean HOME/HCOM_DIR the DB parent dir won't exist yet.
     crate::paths::ensure_hcom_directories_at(&ctx.hcom_dir);
 
@@ -484,10 +484,10 @@ pub fn dispatch_opencode_hook(hook_name: &str, argv: &[String]) -> (i32, String)
     (exit_code, output)
 }
 
-/// Embedded hcom.ts plugin source (compiled into the binary).
-pub const PLUGIN_SOURCE: &str = include_str!("../opencode_plugin/hcom.ts");
+/// Embedded nomadterm.ts plugin source (compiled into the binary).
+pub const PLUGIN_SOURCE: &str = include_str!("../opencode_plugin/nomadterm.ts");
 
-const PLUGIN_FILENAME: &str = "hcom.ts";
+const PLUGIN_FILENAME: &str = "nomadterm.ts";
 
 /// Resolve XDG_CONFIG_HOME with fallback to ~/.config.
 fn xdg_config_home() -> String {
@@ -506,12 +506,12 @@ pub fn get_global_plugin_dir() -> std::path::PathBuf {
         .join("plugins")
 }
 
-/// Get the canonical install path for the hcom.ts plugin.
+/// Get the canonical install path for the nomadterm.ts plugin.
 pub fn get_opencode_plugin_path() -> std::path::PathBuf {
     get_global_plugin_dir().join(PLUGIN_FILENAME)
 }
 
-/// Scan all directories where hcom.ts plugin might exist.
+/// Scan all directories where nomadterm.ts plugin might exist.
 ///
 /// Checks both plugin/ and plugins/ under:
 /// - ~/.config/opencode/ (or XDG equivalent)
@@ -532,7 +532,7 @@ fn scan_plugin_dirs() -> Vec<std::path::PathBuf> {
     candidates.into_iter().filter(|d| d.exists()).collect()
 }
 
-/// Check if hcom.ts plugin is installed in any OpenCode plugin directory.
+/// Check if nomadterm.ts plugin is installed in any OpenCode plugin directory.
 pub fn verify_opencode_plugin_installed() -> bool {
     if get_opencode_plugin_path().exists() {
         return true;
@@ -542,7 +542,7 @@ pub fn verify_opencode_plugin_installed() -> bool {
         .any(|d| d.join(PLUGIN_FILENAME).exists())
 }
 
-/// Install the hcom.ts plugin to the canonical plugin directory.
+/// Install the nomadterm.ts plugin to the canonical plugin directory.
 ///
 /// Creates ~/.config/opencode/plugins/ if needed.
 /// Writes the embedded plugin source directly (no file copy needed).
@@ -561,7 +561,7 @@ pub fn install_opencode_plugin() -> std::io::Result<bool> {
     Ok(true)
 }
 
-/// Remove hcom.ts from ALL OpenCode plugin directories.
+/// Remove nomadterm.ts from ALL OpenCode plugin directories.
 pub fn remove_opencode_plugin() -> std::io::Result<()> {
     let mut paths = vec![get_opencode_plugin_path()];
     for d in scan_plugin_dirs() {
@@ -587,7 +587,7 @@ fn plugin_is_current() -> bool {
     }
 }
 
-/// Ensure the hcom.ts plugin is installed and up to date.
+/// Ensure the nomadterm.ts plugin is installed and up to date.
 ///
 /// Used by the launcher for auto-install on first launch.
 pub fn ensure_plugin_installed() -> bool {
@@ -664,12 +664,12 @@ mod tests {
     #[test]
     fn test_get_opencode_plugin_path() {
         let path = get_opencode_plugin_path();
-        assert!(path.ends_with("hcom.ts"));
+        assert!(path.ends_with("nomadterm.ts"));
     }
 
     #[test]
     fn test_plugin_filename_constant() {
-        assert_eq!(PLUGIN_FILENAME, "hcom.ts");
+        assert_eq!(PLUGIN_FILENAME, "nomadterm.ts");
     }
 
     // ── Transcript path ──

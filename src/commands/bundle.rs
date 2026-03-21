@@ -1,4 +1,4 @@
-//! `hcom bundle` command — structured context sharing.
+//! `nomadterm bundle` command — structured context sharing.
 //!
 //!
 //! Subcommands: list, show, cat, chain, prepare/preview, create.
@@ -15,13 +15,13 @@ use crate::shared::{CommandContext, SenderKind};
 // Re-use transcript parsing for bundle prepare/cat (C5 fix)
 use super::transcript::{TranscriptQuery, format_exchanges_pub, get_exchanges_pub};
 
-/// Parsed arguments for `hcom bundle`.
+/// Parsed arguments for `nomadterm bundle`.
 ///
 /// Uses manual subcommand routing to support:
-/// - `hcom bundle` → list (default)
-/// - `hcom bundle --json --last 5` → list with flags
-/// - `hcom bundle <id>` → implicit show
-/// - `hcom bundle <subcmd> ...` → explicit subcommand
+/// - `nomadterm bundle` → list (default)
+/// - `nomadterm bundle --json --last 5` → list with flags
+/// - `nomadterm bundle <id>` → implicit show
+/// - `nomadterm bundle <subcmd> ...` → explicit subcommand
 #[derive(clap::Parser, Debug)]
 #[command(name = "bundle", about = "Manage context bundles")]
 pub struct BundleArgs {
@@ -169,7 +169,7 @@ fn get_bundle_by_id(db: &HcomDb, id_or_prefix: &str) -> Option<Value> {
 
 // ── Subcommands ──────────────────────────────────────────────────────────
 
-/// List bundles: `hcom bundle [list] [--last N] [--json]`
+/// List bundles: `nomadterm bundle [list] [--last N] [--json]`
 fn cmd_bundle_list(db: &HcomDb, args: &BundleListArgs) -> i32 {
     let json_mode = args.json;
     let last_n = args.last.unwrap_or(20);
@@ -224,7 +224,7 @@ fn cmd_bundle_list(db: &HcomDb, args: &BundleListArgs) -> i32 {
     }
 
     if rows.is_empty() {
-        println!("No bundles found. Create one with: hcom bundle prepare");
+        println!("No bundles found. Create one with: nomadterm bundle prepare");
         return 0;
     }
 
@@ -276,7 +276,7 @@ fn cmd_bundle_list(db: &HcomDb, args: &BundleListArgs) -> i32 {
     0
 }
 
-/// Show bundle: `hcom bundle show <id> [--json]`
+/// Show bundle: `nomadterm bundle show <id> [--json]`
 fn cmd_bundle_show(db: &HcomDb, args: &BundleShowArgs) -> i32 {
     let json_mode = args.json;
 
@@ -333,7 +333,7 @@ fn cmd_bundle_show(db: &HcomDb, args: &BundleShowArgs) -> i32 {
     0
 }
 
-/// Cat bundle (expand full content): `hcom bundle cat <id>`
+/// Cat bundle (expand full content): `nomadterm bundle cat <id>`
 fn cmd_bundle_cat(db: &HcomDb, args: &BundleCatArgs) -> i32 {
     let bundle = match get_bundle_by_id(db, &args.id) {
         Some(b) => b,
@@ -616,7 +616,7 @@ fn cmd_bundle_cat(db: &HcomDb, args: &BundleCatArgs) -> i32 {
     0
 }
 
-/// Chain: `hcom bundle chain <id> [--json]`
+/// Chain: `nomadterm bundle chain <id> [--json]`
 fn cmd_bundle_chain(db: &HcomDb, args: &BundleChainArgs) -> i32 {
     let json_mode = args.json;
 
@@ -698,7 +698,7 @@ fn cmd_bundle_chain(db: &HcomDb, args: &BundleChainArgs) -> i32 {
     0
 }
 
-/// Prepare: `hcom bundle prepare [--for AGENT] [--last-transcript N] [--last-events N] [--compact] [--json]`
+/// Prepare: `nomadterm bundle prepare [--for AGENT] [--last-transcript N] [--last-events N] [--compact] [--json]`
 #[allow(clippy::type_complexity)]
 fn cmd_bundle_prepare(db: &HcomDb, args: &BundlePrepareArgs, ctx: Option<&CommandContext>) -> i32 {
     let json_mode = args.json;
@@ -867,7 +867,7 @@ fn cmd_bundle_prepare(db: &HcomDb, args: &BundlePrepareArgs, ctx: Option<&Comman
 
         // Build template command (cap events at 20)
         let mut template_parts = vec![
-            format!("hcom bundle create \"Bundle Title Here\" --name {agent}"),
+            format!("nomadterm bundle create \"Bundle Title Here\" --name {agent}"),
             "--description \"detailed description text here\"".to_string(),
         ];
         if let Some(ref range) = transcript_range {
@@ -915,14 +915,14 @@ fn cmd_bundle_prepare(db: &HcomDb, args: &BundlePrepareArgs, ctx: Option<&Comman
         let sep = "─".repeat(40);
         println!("{sep}");
         println!("HOW TO USE THIS CONTEXT:\n");
-        println!("Use 'hcom send' with these bundle flags to create and send directly");
+        println!("Use 'nomadterm send' with these bundle flags to create and send directly");
         println!(
             "Transcript detail: normal (truncated) | full (complete text) | detailed (complete text with tools)\n"
         );
         println!("Use this bundle context as a template for your specific bundle");
         println!("- Pick relevant events/files/transcript ranges from the bundle context");
         println!(
-            "- Use the hcom events and hcom transcript commands to find all everything relevant to include"
+            "- Use the nomadterm events and nomadterm transcript commands to find all everything relevant to include"
         );
         println!(
             "- Specify the correct transcript detail for each transcript range \
@@ -934,9 +934,9 @@ summerise specific transcript ranges and events. give deep insight so another ag
 everything you know about this. what happened, decisions, current state, issues, plans, etc.\n"
         );
         println!("A good bundle includes everything relevant and nothing irrelevant.\n");
-        println!("View: hcom transcript {agent} [--range N-N] [--full|--detailed]");
-        println!("View: hcom events {agent} [--last N]\n");
-        println!("Use hcom bundle prepare --compact to hide this how to section\n");
+        println!("View: nomadterm transcript {agent} [--range N-N] [--full|--detailed]");
+        println!("View: nomadterm events {agent} [--last N]\n");
+        println!("Use nomadterm bundle prepare --compact to hide this how to section\n");
     }
 
     // Transcript
@@ -1015,7 +1015,7 @@ everything you know about this. what happened, decisions, current state, issues,
         println!("{sep}");
         println!("CREATE:");
         let mut template_parts = vec![
-            format!("hcom bundle create \"Bundle Title Here\" --name {agent}"),
+            format!("nomadterm bundle create \"Bundle Title Here\" --name {agent}"),
             "--description \"detailed description text here\"".to_string(),
         ];
         if let Some(ref range) = transcript_range {
@@ -1042,7 +1042,7 @@ everything you know about this. what happened, decisions, current state, issues,
     0
 }
 
-/// Create: `hcom bundle create [TITLE] --description DESC [--events LIST] [--files LIST] [--transcript RANGES] [--extends ID] [--json]`
+/// Create: `nomadterm bundle create [TITLE] --description DESC [--events LIST] [--files LIST] [--transcript RANGES] [--extends ID] [--json]`
 fn cmd_bundle_create(db: &HcomDb, args: &BundleCreateArgs, ctx: Option<&CommandContext>) -> i32 {
     let json_mode = args.json;
 
@@ -1073,7 +1073,7 @@ fn cmd_bundle_create(db: &HcomDb, args: &BundleCreateArgs, ctx: Option<&CommandC
         Some(t) => t.clone(),
         None => {
             eprintln!(
-                "Usage: hcom bundle create TITLE --description DESC [--events LIST] [--files LIST] [--transcript RANGES]"
+                "Usage: nomadterm bundle create TITLE --description DESC [--events LIST] [--files LIST] [--transcript RANGES]"
             );
             return 1;
         }
@@ -1269,7 +1269,7 @@ use crate::instances::format_age;
 
 // ── Main Entry Point ─────────────────────────────────────────────────────
 
-/// Main entry point for `hcom bundle` command.
+/// Main entry point for `nomadterm bundle` command.
 /// Manual subcommand routing to support implicit list/show patterns.
 pub fn cmd_bundle(db: &HcomDb, args: &BundleArgs, ctx: Option<&CommandContext>) -> i32 {
     let argv = &args.args;
@@ -1319,7 +1319,7 @@ pub fn cmd_bundle(db: &HcomDb, args: &BundleArgs, ctx: Option<&CommandContext>) 
         },
         _ => {
             if subcmd.starts_with('-') {
-                // Flags without subcommand → list mode: `hcom bundle --json --last 5`
+                // Flags without subcommand → list mode: `nomadterm bundle --json --last 5`
                 match try_parse::<BundleListArgs>("bundle list", argv) {
                     Ok(a) => cmd_bundle_list(db, &a),
                     Err(code) => code,

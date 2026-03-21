@@ -247,7 +247,7 @@ impl Ejector {
             (0..w).map(|i| chars[(i + offset) % 3]).collect()
         };
 
-        let label = " hcom ";
+        let label = " nomadterm ";
         let label_w = 6;
         let left_w = width.saturating_sub(label_w) / 2;
         let right_w = width.saturating_sub(label_w + left_w);

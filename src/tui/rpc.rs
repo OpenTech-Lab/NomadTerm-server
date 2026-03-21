@@ -46,7 +46,7 @@ fn first_non_empty_line(text: &str) -> Option<&str> {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-/// Build argv for launch: `hcom [count] [tool] [--tag T] [--terminal T] [tool-specific prompt]`
+/// Build argv for launch: `nomadterm [count] [tool] [--tag T] [--terminal T] [tool-specific prompt]`
 ///
 /// Prompt handling varies per tool:
 ///   claude: `-p "prompt"` (headless) or bare positional (interactive)

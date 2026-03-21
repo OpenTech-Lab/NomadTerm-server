@@ -55,7 +55,7 @@ pub fn instance_not_found_error(name: &str) -> String {
             "Instance '{name}' not found. Your session may have ended. Stop working and end your turn."
         );
     }
-    format!("Instance '{name}' not found. Run 'hcom start --as {name}' to reclaim your identity.")
+    format!("Instance '{name}' not found. Run 'nomadterm start --as {name}' to reclaim your identity.")
 }
 
 /// Validate user-provided name input for length and dangerous characters.
@@ -166,7 +166,7 @@ pub fn resolve_from_name(db: &HcomDb, name: &str) -> Result<SenderIdentity, Hcom
 ///
 /// * `db` - Database handle
 /// * `name` - Instance name from `--name` flag (strict lookup)
-/// * `system_sender` - System notification sender name (e.g., 'hcom-launcher')
+/// * `system_sender` - System notification sender name (e.g., 'nomadterm-launcher')
 /// * `session_id` - Explicit session_id (for hook context, bypasses env detection)
 /// * `process_id` - HCOM_PROCESS_ID (for launched instances)
 /// * `codex_thread_id` - Codex thread ID for opportunistic session binding
@@ -255,7 +255,7 @@ pub fn resolve_identity(
         }
     }
 
-    // 4. Auto-detect from process binding (hcom-launched instances)
+    // 4. Auto-detect from process binding (nomadterm-launched instances)
     if let Some(pid) = process_id {
         if !pid.is_empty() {
             let bound_name = db
@@ -276,7 +276,7 @@ pub fn resolve_identity(
                                 .is_some_and(|s| !s.is_empty());
 
                             // Opportunistic session binding for Codex (no SessionStart hook).
-                            // First hcom command the Codex agent runs triggers this.
+                            // First nomadterm command the Codex agent runs triggers this.
                             // Uses bind_session_to_process for proper resume/placeholder handling.
                             let mut final_name = inst_name.clone();
                             if !has_session {
@@ -337,7 +337,7 @@ pub fn resolve_identity(
                         &format!("process_id={}", pid),
                     );
                     return Err(HcomError::IdentityRequired(
-                        "Session expired. Run 'hcom start' to reconnect.".to_string(),
+                        "Session expired. Run 'nomadterm start' to reconnect.".to_string(),
                     ));
                 }
             }
@@ -362,7 +362,7 @@ pub fn resolve_identity(
         ),
     );
     Err(HcomError::IdentityRequired(
-        "No hcom identity. Run 'hcom start' first, then use --name <yourname> on commands."
+        "No nomadterm identity. Run 'nomadterm start' first, then use --name <yourname> on commands."
             .to_string(),
     ))
 }
@@ -397,7 +397,7 @@ pub fn require_identity_gate(
     }
 
     Err(HcomError::IdentityRequired(format!(
-        "'{cmd}' requires identity. Use --name <yourname> or run inside an hcom-launched session."
+        "'{cmd}' requires identity. Use --name <yourname> or run inside an nomadterm-launched session."
     )))
 }
 
@@ -568,9 +568,9 @@ mod tests {
         let (db, _dir) = make_test_db();
 
         let identity =
-            resolve_identity(&db, None, Some("hcom-launcher"), None, None, None, None).unwrap();
+            resolve_identity(&db, None, Some("nomadterm-launcher"), None, None, None, None).unwrap();
         assert!(matches!(identity.kind, SenderKind::System));
-        assert_eq!(identity.name, "hcom-launcher");
+        assert_eq!(identity.name, "nomadterm-launcher");
     }
 
     #[test]
@@ -665,7 +665,7 @@ mod tests {
         let (db, _dir) = make_test_db();
 
         let err = resolve_identity(&db, None, None, None, None, None, None).unwrap_err();
-        assert!(err.to_string().contains("No hcom identity"));
+        assert!(err.to_string().contains("No nomadterm identity"));
     }
 
     #[test]
@@ -677,7 +677,7 @@ mod tests {
         let identity = resolve_identity(
             &db,
             Some("luna"),
-            Some("hcom-launcher"),
+            Some("nomadterm-launcher"),
             None,
             None,
             None,
@@ -685,7 +685,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(identity.kind, SenderKind::System));
-        assert_eq!(identity.name, "hcom-launcher");
+        assert_eq!(identity.name, "nomadterm-launcher");
     }
 
     #[test]

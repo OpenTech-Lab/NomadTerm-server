@@ -11,17 +11,17 @@ use crate::paths;
 use crate::shared::constants::{SENDER, ST_ACTIVE, ST_LISTENING};
 
 // Bundled script names (compile-time known).
-// User scripts are discovered at runtime from ~/.hcom/scripts/.
+// User scripts are discovered at runtime from ~/.nomadterm/scripts/.
 
 // MAIN BOOTSTRAP TEMPLATE
 
-const UNIVERSAL: &str = r#"[HCOM SESSION]
-You have access to the hcom communication tool.
+const UNIVERSAL: &str = r#"[NOMADTERM SESSION]
+You have access to the nomadterm communication tool.
 - Your name: {display_name}
 - Authority: Prioritize @{SENDER} over others
-- Important: Include this marker anywhere in your first response only: [hcom:{instance_name}]
+- Important: Include this marker anywhere in your first response only: [nomadterm:{instance_name}]
 
-You run hcom commands on behalf of the human user. The human uses natural language with you.
+You run nomadterm commands on behalf of the human user. The human uses natural language with you.
 
 ## MESSAGES
 
@@ -31,12 +31,12 @@ Response rules:
 - intent=ack → don't respond
 
 Routing rules:
-- hcom message (<hcom> tags, hook feedback) → run `hcom send` to respond
+- nomadterm message (<nomadterm> tags, hook feedback) → run `nomadterm send` to respond
 - Normal user chat → respond in chat
 
 ## CAPABILITIES
 
-You MUST use `hcom <cmd> --name {instance_name}` for all hcom commands:
+You MUST use `nomadterm <cmd> --name {instance_name}` for all nomadterm commands:
 
 - Message: send @name(s) [--intent request|inform|ack] [--reply-to <id>] -- "message text"
   Or instead of --: --file <path> | --base64 <string> | pipe/heredoc
@@ -48,22 +48,22 @@ You MUST use `hcom <cmd> --name {instance_name}` for all hcom commands:
   Event-based notifications, watch agents, subscribe, react: events sub [filters] | --help
 - Handoff context: bundle prepare
 - Spawn agents: [num] <claude|gemini|codex|opencode> [--tag labelOrGroup] [--terminal tmux|kitty|wezterm|etc]
-  Example: `hcom 1 claude --tag cool` -> automatic <hcom> msg when ready -> send it task via hcom send
-  Resume: hcom r <name> [args] | Fork: hcom f <name> [args] | Kill: hcom kill <name(s)>
+  Example: `nomadterm 1 claude --tag cool` -> automatic <nomadterm> msg when ready -> send it task via nomadterm send
+  Resume: nomadterm r <name> [args] | Fork: nomadterm f <name> [args] | Kill: nomadterm kill <name(s)>
   background, set prompt, system, forward args: <claude|gemini|codex|opencode> --help
 - Run workflows: run <script> [args] [--help]
   {scripts}
 - View agent screen: term [name] | inject text/enter: term inject <name> ['text'] [--enter]
 - Other commands: status (diagnostics), config (set terminal, etc), relay (remote)
 
-If unsure about syntax, always run `hcom <command> --help` FIRST. Do not guess.
+If unsure about syntax, always run `nomadterm <command> --help` FIRST. Do not guess.
 
 ## RULES
 
-1. Task via hcom → ack immediately, do work, report via hcom
+1. Task via nomadterm → ack immediately, do work, report via nomadterm
 2. No filler messages (greetings, thanks, congratulations).
 3. Use --intent on sends: request (want reply), inform (dont need reply), ack (responding).
-4. User says "the gemini/claude/codex agent" or unclear → run `hcom list` to resolve name
+4. User says "the gemini/claude/codex agent" or unclear → run `nomadterm list` to resolve name
 
 Agent names are 4-letter CVCV words. When user mentions one, they mean an agent.
 {active_instances}
@@ -77,92 +77,92 @@ const RELAY_NOTICE: &str = r#"
 Remote agents have suffix (e.g., `luna:BOXE`). @luna = local only; @luna:BOXE = remote. Remote event IDs 42:BOXE."#;
 
 const HEADLESS_NOTICE: &str = r#"
-Headless mode: No one sees your chat, only hcom messages. Communicate via hcom send."#;
+Headless mode: No one sees your chat, only nomadterm messages. Communicate via nomadterm send."#;
 
 const UVX_CMD_NOTICE: &str = r#"
-Note: hcom command in this environment is `{hcom_cmd}`. Substitute in examples."#;
+Note: nomadterm command in this environment is `{hcom_cmd}`. Substitute in examples."#;
 
 // Tool-specific delivery
 
 const DELIVERY_AUTO: &str = r#"## DELIVERY
 
-Messages instantly and automatically arrive via <hcom> tags — end your turn to receive them.
+Messages instantly and automatically arrive via <nomadterm> tags — end your turn to receive them.
 
 ## WAITING RULES
 
-1. Never use `sleep [sec]` instead use `hcom listen [sec]`
-2. Only use `hcom listen` when you are waiting for something not related to hcom
-- Waiting for hcom message → end your turn
-- Waiting for agent progress → `hcom events sub`, subscribe, end your turn"#;
+1. Never use `sleep [sec]` instead use `nomadterm listen [sec]`
+2. Only use `nomadterm listen` when you are waiting for something not related to nomadterm
+- Waiting for nomadterm message → end your turn
+- Waiting for agent progress → `nomadterm events sub`, subscribe, end your turn"#;
 
 const DELIVERY_CODEX_HCOM_LAUNCHED: &str = r#"## DELIVERY
 
-New message notifications instantly and automatically arrive via <hcom> tags - end your turn to receive them.
-IMPORTANT: <hcom> tags = run `hcom listen 1 --name {instance_name}` IMMEDIATELY to read message.
+New message notifications instantly and automatically arrive via <nomadterm> tags - end your turn to receive them.
+IMPORTANT: <nomadterm> tags = run `nomadterm listen 1 --name {instance_name}` IMMEDIATELY to read message.
 
 ## WAITING RULES
 
 1. Never use `sleep`
-2. If you need a pure time-based pause (not waiting on hcom activity):
-- use `hcom listen [sec]` instead of `sleep [sec]`
-3. If you are waiting on hcom activity, DO NOT use any sleep, listen, polling or blocking. instead:
-- Waiting for hcom message → end your turn immediately
-- Waiting for agent progress → `hcom events sub`, subscribe, end your turn immediately"#;
+2. If you need a pure time-based pause (not waiting on nomadterm activity):
+- use `nomadterm listen [sec]` instead of `sleep [sec]`
+3. If you are waiting on nomadterm activity, DO NOT use any sleep, listen, polling or blocking. instead:
+- Waiting for nomadterm message → end your turn immediately
+- Waiting for agent progress → `nomadterm events sub`, subscribe, end your turn immediately"#;
 
 const DELIVERY_ADHOC: &str = r#"## DELIVERY
 
 Messages do NOT arrive automatically.
-- Check messages: `hcom listen 1`
-- Wait for messages: `hcom listen [timeout]`
-- Always substitute `sleep [timeout]` with `hcom listen [timeout]`
+- Check messages: `nomadterm listen 1`
+- Wait for messages: `nomadterm listen [timeout]`
+- Always substitute `sleep [timeout]` with `nomadterm listen [timeout]`
 
 <critical_rule>
 LISTENING REQUIREMENT:
-- After sending hcom message expecting reply → `hcom listen --timeout 60 --name {instance_name}`
-- After receiving a task via hcom → do the work, report, then enter CONNECTED MODE
+- After sending nomadterm message expecting reply → `nomadterm listen --timeout 60 --name {instance_name}`
+- After receiving a task via nomadterm → do the work, report, then enter CONNECTED MODE
 - User says "stay connected" → enter CONNECTED MODE
 
 CONNECTED MODE (infinite listen loop):
-1. Run: `hcom listen --name {instance_name} --timeout [large_num]`
+1. Run: `nomadterm listen --name {instance_name} --timeout [large_num]`
 2. Timeout → you MUST run listen again
 3. Message received → handle it, then listen again
 4. Exit only when user says stop
 
-WRONG: hcom listen & (background)
-RIGHT: hcom listen --timeout [sec] (blocking)
+WRONG: nomadterm listen & (background)
+RIGHT: nomadterm listen --timeout [sec] (blocking)
 </critical_rule>
 
-You are now registered with hcom."#;
+You are now registered with nomadterm."#;
 
 const CLAUDE_ONLY: &str = r#"## SUBAGENTS
 
-Subagents can join hcom:
+Subagents can join nomadterm:
 1. Run Task with background=true
-2. Tell subagent: `use hcom`
+2. Tell subagent: `use nomadterm`
 
-Subagents get their own hcom context and a random name. DO NOT give them any specific hcom syntax.
-Set keep-alive: `hcom config -i self subagent_timeout [SEC]`"#;
+Subagents get their own nomadterm context and a random name. DO NOT give them any specific nomadterm syntax.
+Set keep-alive: `nomadterm config -i self subagent_timeout [SEC]`"#;
 
 // SUBAGENT BOOTSTRAP
 
-const SUBAGENT_BOOTSTRAP: &str = r#"[HCOM SESSION]
-You're participating in the hcom multi-agent network.
+const SUBAGENT_BOOTSTRAP: &str = r#"[NOMADTERM SESSION]
+You're participating in the nomadterm multi-agent network.
 - Your name: {subagent_name}
 - Your parent: {parent_name}
-- Use "--name {subagent_name}" for all hcom commands
+- Use "--name {subagent_name}" for all nomadterm commands
 - Announce to parent once: send @{parent_name} --intent inform -- "Connected as {subagent_name}"
 
-Messages instantly auto-arrive via <hcom> tags — end your turn to receive them.
+Messages instantly auto-arrive via <nomadterm> tags — end your turn to receive them.
 
-- For hcom message waiting: end your turn (do not run `hcom listen`).
-- For non-hcom pause/yield, use `hcom listen` instead of `sleep`.
+- For nomadterm message waiting: end your turn (do not run `nomadterm listen`).
+- For non-nomadterm pause/yield, use `nomadterm listen` instead of `sleep`.
 
 Response rules:
 - From {SENDER} or intent=request → always respond
 - intent=inform → respond only if useful
 - intent=ack → don't respond
 
-hcom message → respond via hcom send
+nomadterm message → respond via nomadterm send
 
 Commands:
   {hcom_cmd} send @name(s) [--intent request|inform|ack] [--reply-to <id>] -- <"message"> (or --stdin, --file <path>, --base64 <string>)
@@ -172,7 +172,7 @@ Commands:
   {hcom_cmd} <cmd> --help --name {subagent_name}
 
 Rules:
-- Task via hcom → ack, work, report
+- Task via nomadterm → ack, work, report
 - Authority: @{SENDER} > others
 - Use --intent on sends: request (want reply), inform (FYI), ack (responding)"#;
 
@@ -238,7 +238,7 @@ fn get_scripts(hcom_dir: &std::path::Path) -> String {
         names.insert(name.to_string());
     }
 
-    // User scripts from ~/.hcom/scripts/
+    // User scripts from ~/.nomadterm/scripts/
     let user_dir = hcom_dir.join(paths::SCRIPTS_DIR);
     if let Ok(entries) = fs::read_dir(&user_dir) {
         for entry in entries.flatten() {
@@ -348,11 +348,11 @@ fn render_template(template: &str, ctx: &BootstrapContext) -> String {
 ///
 /// Args:
 ///   db: Database handle for reading active instances and instance data
-///   hcom_dir: Path to hcom data directory (for scripts discovery)
+///   hcom_dir: Path to nomadterm data directory (for scripts discovery)
 ///   instance_name: The instance name (as stored in DB)
 ///   tool: "claude", "gemini", "codex", "opencode", or "adhoc"
 ///   headless: Whether running in headless/background mode
-///   is_launched: Whether instance was launched by hcom
+///   is_launched: Whether instance was launched by nomadterm
 ///   notes: User notes (from HCOM_NOTES env var or config)
 ///   tag: Tag from config (instance-level tag overrides this)
 ///   relay_enabled: Whether relay is configured and enabled
@@ -395,7 +395,7 @@ pub fn get_bootstrap(
     if ctx.is_headless {
         parts.push(HEADLESS_NOTICE);
     }
-    if ctx.hcom_cmd != "hcom" {
+    if ctx.hcom_cmd != "nomadterm" {
         parts.push(UVX_CMD_NOTICE);
     }
 
@@ -427,8 +427,8 @@ pub fn get_bootstrap(
         result.push_str(&format!("\n\n## NOTES\n\n{}\n", ctx.notes));
     }
 
-    // Rewrite hcom references if using alternate command
-    if ctx.hcom_cmd != "hcom" {
+    // Rewrite nomadterm references if using alternate command
+    if ctx.hcom_cmd != "nomadterm" {
         let sentinel = "__HCOM_CMD__";
         result = result.replace(&ctx.hcom_cmd, sentinel);
         result = regex::Regex::new(r"\bhcom\b")
@@ -455,11 +455,11 @@ pub fn get_subagent_bootstrap(subagent_name: &str, parent_name: &str) -> String 
         .replace("{SENDER}", SENDER);
 
     let mut output = result;
-    if hcom_cmd != "hcom" {
+    if hcom_cmd != "nomadterm" {
         output.push_str(&UVX_CMD_NOTICE.replace("{hcom_cmd}", &hcom_cmd));
     }
 
-    format!("<hcom>\n{}\n</hcom>", output)
+    format!("<nomadterm>\n{}\n</nomadterm>", output)
 }
 
 // TESTS
@@ -580,7 +580,7 @@ mod tests {
         );
 
         assert!(result.contains("<hcom_system_context>"));
-        assert!(result.contains("[HCOM SESSION]"));
+        assert!(result.contains("[NOMADTERM SESSION]"));
         assert!(result.contains("Your name: luna"));
         assert!(result.contains("--name luna"));
         assert!(result.contains("SUBAGENTS")); // Claude-specific section
@@ -717,12 +717,12 @@ mod tests {
     fn test_get_subagent_bootstrap() {
         let result = get_subagent_bootstrap("luna_reviewer_1", "luna");
 
-        assert!(result.contains("<hcom>"));
+        assert!(result.contains("<nomadterm>"));
         assert!(result.contains("Your name: luna_reviewer_1"));
         assert!(result.contains("Your parent: luna"));
         assert!(result.contains("--name luna_reviewer_1"));
         assert!(result.contains(SENDER));
-        assert!(result.contains("</hcom>"));
+        assert!(result.contains("</nomadterm>"));
     }
 
     #[test]
@@ -732,7 +732,7 @@ mod tests {
             display_name: "p0c-luna".to_string(),
             tag: "p0c".to_string(),
             relay_enabled: false,
-            hcom_cmd: "hcom".to_string(),
+            hcom_cmd: "nomadterm".to_string(),
             is_launched: true,
             is_headless: false,
             active_instances: String::new(),

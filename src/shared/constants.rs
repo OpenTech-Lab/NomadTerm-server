@@ -1,4 +1,4 @@
-//! Shared constants for hcom — version, limits, patterns, and status definitions.
+//! Shared constants for nomadterm — version, limits, patterns, and status definitions.
 
 use regex::Regex;
 use std::sync::LazyLock;
@@ -13,7 +13,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const SENDER: &str = "bigboss";
 
 /// System notification identity (launcher, watchdog, subscriptions).
-pub const SYSTEM_SENDER: &str = "hcom";
+pub const SYSTEM_SENDER: &str = "nomadterm";
 
 /// Max messages delivered in a single hook response.
 pub const MAX_MESSAGES_PER_DELIVERY: usize = 50;
@@ -43,9 +43,9 @@ pub fn extract_mentions(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// Binding marker for vanilla sessions: [hcom:<name>].
+/// Binding marker for vanilla sessions: [nomadterm:<name>].
 pub static BIND_MARKER_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\[hcom:([a-z0-9_]+)\]").unwrap());
+    LazyLock::new(|| Regex::new(r"\[nomadterm:([a-z0-9_]+)\]").unwrap());
 
 /// Tools available for launch.
 pub const RELEASED_TOOLS: &[&str] = &["claude", "gemini", "codex", "opencode"];
@@ -66,7 +66,7 @@ pub const TOOL_MARKER_VARS: &[&str] = &[
     "OPENCODE",
 ];
 
-/// HCOM identity vars — set per-instance, cleared to prevent parent identity leakage.
+/// NOMADTERM identity vars — set per-instance, cleared to prevent parent identity leakage.
 pub const HCOM_IDENTITY_VARS: &[&str] = &[
     "HCOM_PROCESS_ID",
     "HCOM_LAUNCHED",
@@ -183,13 +183,13 @@ mod tests {
 
     #[test]
     fn test_bind_marker() {
-        let caps = BIND_MARKER_RE.captures("[hcom:luna]");
+        let caps = BIND_MARKER_RE.captures("[nomadterm:luna]");
         assert_eq!(caps.unwrap()[1].to_string(), "luna");
     }
 
     #[test]
     fn test_bind_marker_no_legacy() {
-        assert!(BIND_MARKER_RE.captures("[HCOM:BIND:test_name]").is_none());
+        assert!(BIND_MARKER_RE.captures("[NOMADTERM:BIND:test_name]").is_none());
     }
 
     #[test]

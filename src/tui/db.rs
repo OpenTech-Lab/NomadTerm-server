@@ -1,6 +1,6 @@
 //! Real database-backed DataSource for the TUI.
 //!
-//! Reads from ~/.hcom/hcom.db (or HCOM_DIR/hcom.db) to populate DataState.
+//! Reads from ~/.nomadterm/nomadterm.db (or HCOM_DIR/nomadterm.db) to populate DataState.
 //! Used when HCOM_MOCK_TUI is not set.
 
 use rusqlite::{Connection, params};
@@ -960,7 +960,7 @@ fn parse_status_or_life_row(
                     if !extras.is_empty() {
                         sub_lines.push(extras.join(" | "));
                     }
-                    sub_lines.push(format!("resume: hcom r {}", instance));
+                    sub_lines.push(format!("resume: nomadterm r {}", instance));
                 }
             }
             "batch_launched" => {
@@ -1009,8 +1009,8 @@ fn parse_status_or_life_row(
 
     let (kind, tool_name, detail_text) = if status == ST_ACTIVE && context.starts_with("tool:") {
         let t = context.strip_prefix("tool:").unwrap_or(context);
-        // Suppress hcom send commands — the resulting message is already shown
-        if detail.starts_with("hcom send") {
+        // Suppress nomadterm send commands — the resulting message is already shown
+        if detail.starts_with("nomadterm send") {
             return None;
         }
         (EventKind::Tool, t.to_string(), detail.to_string())
@@ -1657,7 +1657,7 @@ mod tests {
         assert!(
             ev.sub_lines
                 .iter()
-                .any(|l| l.starts_with("resume: hcom r nova")),
+                .any(|l| l.starts_with("resume: nomadterm r nova")),
             "expected resume hint in sub-lines, got {:?}",
             ev.sub_lines
         );

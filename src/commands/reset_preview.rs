@@ -48,22 +48,22 @@ fn load_preview_state(db: &HcomDb) -> ResetPreviewState {
 }
 
 fn render_hooks_preview() -> String {
-    let hcom_cmd = "hcom";
+    let hcom_cmd = "nomadterm";
     format!(
         "\n== RESET HOOKS PREVIEW ==\n\
-         This will remove hcom hooks from tool configs.\n\n\
+         This will remove nomadterm hooks from tool configs.\n\n\
          Actions:\n  \
          \u{2022} Remove hooks from Claude Code settings (~/.claude/settings.json)\n  \
          \u{2022} Remove hooks from Gemini CLI settings (~/.gemini/settings.json)\n  \
          \u{2022} Remove hooks from Codex config (~/.codex/)\n\n\
-         To reinstall: hcom hooks add\n\n\
+         To reinstall: nomadterm hooks add\n\n\
          Add --go flag and run again to proceed:\n  \
          {hcom_cmd} --go reset hooks\n"
     )
 }
 
 fn render_reset_all_preview(state: &ResetPreviewState) -> String {
-    let hcom_cmd = "hcom";
+    let hcom_cmd = "nomadterm";
     format!(
         "\n== RESET ALL PREVIEW ==\n\
          This will stop all instances, archive the database, remove hooks, and reset config.\n\n\
@@ -72,8 +72,8 @@ fn render_reset_all_preview(state: &ResetPreviewState) -> String {
          \u{2022} {event_count} events in database\n\n\
          Actions:\n  \
          1. Stop all {instance_count} local instances (kills processes, logs snapshots)\n  \
-         2. Archive database to ~/.hcom/archive/session-<timestamp>/\n  \
-         3. Delete database (hcom.db)\n  \
+         2. Archive database to ~/.nomadterm/archive/session-<timestamp>/\n  \
+         3. Delete database (nomadterm.db)\n  \
          4. Remove hooks from Claude/Gemini/Codex configs\n  \
          5. Archive and delete config.toml + env\n  \
          6. Clear device identity (new UUID on next relay)\n\n\
@@ -87,16 +87,16 @@ fn render_reset_all_preview(state: &ResetPreviewState) -> String {
 }
 
 fn render_reset_preview(state: &ResetPreviewState) -> String {
-    let hcom_cmd = "hcom";
+    let hcom_cmd = "nomadterm";
     format!(
         "\n== RESET PREVIEW ==\n\
-         This will archive and clear the current hcom session.\n\n\
+         This will archive and clear the current nomadterm session.\n\n\
          Current state:\n  \
          \u{2022} {instance_count} instance{plural}: {names_display}\n  \
          \u{2022} {event_count} events in database\n\n\
          Actions:\n  \
-         1. Archive database to ~/.hcom/archive/session-<timestamp>/\n  \
-         2. Delete database (hcom.db, hcom.db-wal, hcom.db-shm)\n  \
+         1. Archive database to ~/.nomadterm/archive/session-<timestamp>/\n  \
+         2. Delete database (nomadterm.db, nomadterm.db-wal, nomadterm.db-shm)\n  \
          3. Log reset event to fresh database\n  \
          4. Sync with relay (push reset, pull fresh state)\n\n\
          Note: Instance rows are deleted but snapshots preserved in archive.\n      \

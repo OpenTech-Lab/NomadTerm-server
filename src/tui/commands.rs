@@ -1,6 +1,6 @@
 //! Native command dispatch for TUI — replaces daemon socket RPC.
 //!
-//! Runs hcom commands as subprocesses of the same binary, capturing
+//! Runs nomadterm commands as subprocesses of the same binary, capturing
 //! stdout/stderr into a Response. Subprocess has its own file
 //! descriptors, keeping TUI rendering unaffected.
 //!
@@ -15,15 +15,15 @@ use std::process::Command;
 
 use crate::tui::rpc::Response;
 
-/// Resolve the hcom binary path.
+/// Resolve the nomadterm binary path.
 ///
 /// In normal operation (TUI running), this is the current executable.
 /// The binary is cached per-process since it never changes at runtime.
 fn hcom_binary() -> Result<PathBuf, String> {
-    std::env::current_exe().map_err(|e| format!("cannot find hcom binary: {e}"))
+    std::env::current_exe().map_err(|e| format!("cannot find nomadterm binary: {e}"))
 }
 
-/// Run an hcom command natively, returning captured stdout/stderr.
+/// Run an nomadterm command natively, returning captured stdout/stderr.
 ///
 /// Spawns the current binary as a subprocess with the given argv.
 /// Inherits environment (HCOM_DEV_ROOT, HCOM_DIR, etc.) so routing
@@ -37,7 +37,7 @@ pub fn run_native(argv: &[String]) -> Result<Response, String> {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .output()
-        .map_err(|e| format!("spawn hcom: {e}"))?;
+        .map_err(|e| format!("spawn nomadterm: {e}"))?;
 
     Ok(Response {
         exit_code: output.status.code().unwrap_or(1),
@@ -50,12 +50,12 @@ pub fn run_native(argv: &[String]) -> Result<Response, String> {
 mod tests {
     use super::*;
 
-    /// Find the hcom binary for testing. In test context, current_exe()
-    /// returns the test runner, not hcom. Look in cargo target dir instead.
+    /// Find the nomadterm binary for testing. In test context, current_exe()
+    /// returns the test runner, not nomadterm. Look in cargo target dir instead.
     fn test_binary() -> Option<PathBuf> {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         for profile in ["debug", "release"] {
-            let bin = manifest_dir.join("target").join(profile).join("hcom");
+            let bin = manifest_dir.join("target").join(profile).join("nomadterm");
             if bin.exists() {
                 return Some(bin);
             }
@@ -85,14 +85,14 @@ mod tests {
         let resp = match run_test_command(&["--version"]) {
             Some(r) => r,
             None => {
-                eprintln!("skipping: hcom binary not found in target/");
+                eprintln!("skipping: nomadterm binary not found in target/");
                 return;
             }
         };
         assert_eq!(resp.exit_code, 0);
         assert!(
-            resp.stdout.starts_with("hcom "),
-            "expected 'hcom ...' got: {}",
+            resp.stdout.starts_with("nomadterm "),
+            "expected 'nomadterm ...' got: {}",
             resp.stdout
         );
     }

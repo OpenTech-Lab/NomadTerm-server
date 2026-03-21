@@ -83,7 +83,7 @@ impl MqttRelay {
 
         let relay_id = config.relay_id.clone();
         let device_uuid = read_device_uuid();
-        let client_id = format!("hcom-{}", &device_uuid[..8.min(device_uuid.len())]);
+        let client_id = format!("nomadterm-{}", &device_uuid[..8.min(device_uuid.len())]);
 
         let mut mqttoptions = MqttOptions::new(&client_id, &host, port);
         mqttoptions.set_keep_alive(Duration::from_secs(30));
@@ -97,7 +97,7 @@ impl MqttRelay {
 
         // Auth
         if !config.relay_token.is_empty() {
-            mqttoptions.set_credentials("hcom", &config.relay_token);
+            mqttoptions.set_credentials("nomadterm", &config.relay_token);
         }
 
         // LWT: publish empty retained payload on ungraceful disconnect so remote
@@ -459,7 +459,7 @@ impl EphemeralClient {
 pub fn create_ephemeral_client(config: &HcomConfig) -> Option<EphemeralClient> {
     let (host, port, use_tls) = super::get_broker_from_config(config)?;
 
-    let client_id = format!("hcom-ephemeral-{}", std::process::id());
+    let client_id = format!("nomadterm-ephemeral-{}", std::process::id());
     let mut mqttoptions = MqttOptions::new(&client_id, &host, port);
     mqttoptions.set_keep_alive(Duration::from_secs(10));
     mqttoptions.set_clean_start(true);
@@ -469,7 +469,7 @@ pub fn create_ephemeral_client(config: &HcomConfig) -> Option<EphemeralClient> {
     }
 
     if !config.relay_token.is_empty() {
-        mqttoptions.set_credentials("hcom", &config.relay_token);
+        mqttoptions.set_credentials("nomadterm", &config.relay_token);
     }
 
     let (client, connection) = Client::new(mqttoptions, 10);

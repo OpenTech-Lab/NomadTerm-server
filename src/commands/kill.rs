@@ -1,4 +1,4 @@
-//! Kill command: `hcom kill <name(s)|all|tag:X>`
+//! Kill command: `nomadterm kill <name(s)|all|tag:X>`
 //!
 //!
 //! Sends SIGTERM to process groups and optionally closes terminal panes.
@@ -17,7 +17,7 @@ use crate::pidtrack;
 use crate::router::GlobalFlags;
 use crate::terminal;
 
-/// Parsed arguments for `hcom kill`.
+/// Parsed arguments for `nomadterm kill`.
 #[derive(clap::Parser, Debug)]
 #[command(name = "kill", about = "Kill agent processes")]
 pub struct KillArgs {
@@ -165,7 +165,7 @@ fn kill_all(db: &HcomDb, hcom_dir: &std::path::Path, initiator: &str) -> Result<
             }
             // Clean up instance
             stop_instance(db, &inst.name, initiator, "killed");
-            println!("  To resume: hcom r {}", inst.name);
+            println!("  To resume: nomadterm r {}", inst.name);
         } else {
             // No PID tracked — just clean up
             stop_instance(db, &inst.name, initiator, "killed");
@@ -386,7 +386,7 @@ fn kill_single(
     let pid = match inst.pid {
         Some(pid) => pid as u32,
         None => bail!(
-            "No tracked PID for '{}' — use 'hcom stop {}' instead",
+            "No tracked PID for '{}' — use 'nomadterm stop {}' instead",
             name,
             name
         ),
@@ -404,7 +404,7 @@ fn kill_single(
                 "Sent SIGTERM to process group {} for '{}'{}",
                 pid, name, pane_info
             );
-            println!("  To resume: hcom r {}", name);
+            println!("  To resume: nomadterm r {}", name);
             Ok(0)
         }
         terminal::KillResult::AlreadyDead => {
@@ -412,7 +412,7 @@ fn kill_single(
                 "Process group {} not found for '{}' (already terminated){}",
                 pid, name, pane_info
             );
-            println!("  To resume: hcom r {}", name);
+            println!("  To resume: nomadterm r {}", name);
             Ok(0)
         }
         terminal::KillResult::PermissionDenied => {
