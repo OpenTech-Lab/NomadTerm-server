@@ -84,7 +84,7 @@ pub struct AppState {
 // ---------------------------------------------------------------------------
 
 fn nomadterm_bin() -> String {
-    // 1. Same directory as this Tauri app binary.
+    // 1. Same directory as this Tauri app binary (production install path).
     if let Ok(exe) = std::env::current_exe() {
         let sibling = exe.parent().map(|p| p.join("nomadterm"));
         if let Some(path) = sibling {
@@ -92,8 +92,30 @@ fn nomadterm_bin() -> String {
                 return path.to_string_lossy().to_string();
             }
         }
+
+        // 2. Dev: walk up from the Tauri exe location to find the workspace
+        //    target/debug or target/release directory.
+        //    e.g. .../desktop/src-tauri/target/debug/nomadterm-desktop
+        //    → look for .../server/target/debug/nomadterm
+        if let Some(dir) = exe.parent() {
+            // Climb up from target/{debug,release} → src-tauri → desktop → server
+            let candidates = [
+                dir.join("nomadterm"),                                        // sibling (already checked)
+                dir.join("../../..").join("target/debug/nomadterm"),          // workspace debug
+                dir.join("../../..").join("target/release/nomadterm"),        // workspace release
+                dir.join("../../../..").join("target/debug/nomadterm"),       // one more level
+                dir.join("../../../..").join("target/release/nomadterm"),
+            ];
+            for candidate in &candidates {
+                if let Ok(resolved) = candidate.canonicalize() {
+                    if resolved.is_file() {
+                        return resolved.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
     }
-    // 2. PATH fallback.
+    // 3. PATH fallback.
     "nomadterm".to_string()
 }
 

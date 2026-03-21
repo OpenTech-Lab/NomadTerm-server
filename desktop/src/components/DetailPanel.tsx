@@ -22,6 +22,7 @@ export function DetailPanel({
 }: DetailPanelProps) {
   const [strategy, setStrategy] = useState<ConnectionStrategy | null>(null);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Detect the best connection path whenever panel mounts or server starts.
   useEffect(() => {
@@ -50,18 +51,23 @@ export function DetailPanel({
 
   async function handleToggle() {
     if (!repo) return;
-    if (serverState.running) {
-      await invoke("stop_server", { repoId: repo.id });
-      onServerStateChange(repo.id, { running: false, port: null });
-    } else {
-      const assignedPort = 7682 + repoIndex;
-      await invoke("start_server", {
-        repoId: repo.id,
-        repoToken: repo.token,
-        repoPath: repo.path,
-        port: assignedPort,
-      });
-      onServerStateChange(repo.id, { running: true, port: assignedPort });
+    setError(null);
+    try {
+      if (serverState.running) {
+        await invoke("stop_server", { repoId: repo.id });
+        onServerStateChange(repo.id, { running: false, port: null });
+      } else {
+        const assignedPort = 7682 + repoIndex;
+        await invoke("start_server", {
+          repoId: repo.id,
+          repoToken: repo.token,
+          repoPath: repo.path,
+          port: assignedPort,
+        });
+        onServerStateChange(repo.id, { running: true, port: assignedPort });
+      }
+    } catch (e) {
+      setError(String(e));
     }
   }
 
@@ -90,6 +96,13 @@ export function DetailPanel({
       </div>
 
       <Separator />
+
+      {/* Error banner */}
+      {error && (
+        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5 break-all">
+          {error}
+        </p>
+      )}
 
       {/* Status + controls */}
       <div className="flex items-center gap-3 flex-wrap">
